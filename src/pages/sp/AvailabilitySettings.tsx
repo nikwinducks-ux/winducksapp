@@ -3,14 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { serviceProviders } from "@/data/mockData";
-import { useRole } from "@/contexts/RoleContext";
+import { useServiceProviders } from "@/hooks/useSupabaseData";
+import { useAuth } from "@/contexts/AuthContext";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export default function AvailabilitySettings() {
-  const { currentSpId } = useRole();
-  const sp = serviceProviders.find((s) => s.id === currentSpId)!;
+  const { user } = useAuth();
+  const { data: providers = [] } = useServiceProviders();
+  const sp = providers.find((s) => s.id === user?.spId) ?? providers[0];
 
   const [schedule, setSchedule] = useState(
     DAYS.map((day) => ({
@@ -20,10 +21,12 @@ export default function AvailabilitySettings() {
       end: "17:00",
     }))
   );
-  const [maxJobs, setMaxJobs] = useState(sp.maxJobsPerDay);
-  const [travelRadius, setTravelRadius] = useState(sp.travelRadius);
+  const [maxJobs, setMaxJobs] = useState(5);
+  const [travelRadius, setTravelRadius] = useState(30);
   const [blackoutDates, setBlackoutDates] = useState<string[]>(["2026-03-15", "2026-04-10"]);
   const [saved, setSaved] = useState(false);
+
+  if (!sp) return <div className="py-20 text-center text-muted-foreground">Loading...</div>;
 
   const toggleDay = (idx: number) => {
     const next = [...schedule];

@@ -71,6 +71,51 @@ export type Database = {
         }
         Relationships: []
       }
+      job_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by_user_id: string | null
+          assignment_type: string
+          id: string
+          job_id: string
+          notes: string | null
+          sp_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by_user_id?: string | null
+          assignment_type?: string
+          id?: string
+          job_id: string
+          notes?: string | null
+          sp_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by_user_id?: string | null
+          assignment_type?: string
+          id?: string
+          job_id?: string
+          notes?: string | null
+          sp_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_assignments_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_sp_id_fkey"
+            columns: ["sp_id"]
+            isOneToOne: false
+            referencedRelation: "service_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           assigned_sp_id: string | null
@@ -263,15 +308,51 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          sp_id: string | null
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          sp_id?: string | null
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          sp_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_sp_id_fkey"
+            columns: ["sp_id"]
+            isOneToOne: false
+            referencedRelation: "service_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_sp_id: { Args: { _user_id: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "sp"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -398,6 +479,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "sp"],
+    },
   },
 } as const

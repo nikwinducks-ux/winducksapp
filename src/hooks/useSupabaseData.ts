@@ -336,6 +336,114 @@ export function useArchiveSP() {
   });
 }
 
+// ===== Job Mutations =====
+
+export function useCreateJob() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (form: {
+      customerId: string; serviceCategory: string; payout: string;
+      street: string; city: string; province: string; postalCode: string; country: string;
+      lat: string; lng: string; scheduledDate: string; scheduledTime: string; estimatedDuration: string;
+    }) => {
+      const { error } = await supabase.from("jobs").insert({
+        customer_id: form.customerId || null,
+        service_category: form.serviceCategory,
+        payout: parseFloat(form.payout) || 0,
+        job_address_street: form.street,
+        job_address_city: form.city,
+        job_address_region: form.province,
+        job_address_postal: form.postalCode,
+        job_address_country: form.country,
+        job_lat: form.lat ? parseFloat(form.lat) : null,
+        job_lng: form.lng ? parseFloat(form.lng) : null,
+        scheduled_date: form.scheduledDate || null,
+        scheduled_time: form.scheduledTime,
+        estimated_duration: form.estimatedDuration,
+        status: "Created",
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      toast({ title: "Job created", description: "Job has been saved." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+}
+
+export function useUpdateJob() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ id, ...form }: {
+      id: string; customerId: string; serviceCategory: string; payout: string;
+      street: string; city: string; province: string; postalCode: string; country: string;
+      lat: string; lng: string; scheduledDate: string; scheduledTime: string; estimatedDuration: string;
+    }) => {
+      const { error } = await supabase.from("jobs").update({
+        customer_id: form.customerId || null,
+        service_category: form.serviceCategory,
+        payout: parseFloat(form.payout) || 0,
+        job_address_street: form.street,
+        job_address_city: form.city,
+        job_address_region: form.province,
+        job_address_postal: form.postalCode,
+        job_address_country: form.country,
+        job_lat: form.lat ? parseFloat(form.lat) : null,
+        job_lng: form.lng ? parseFloat(form.lng) : null,
+        scheduled_date: form.scheduledDate || null,
+        scheduled_time: form.scheduledTime,
+        estimated_duration: form.estimatedDuration,
+      }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      toast({ title: "Job updated", description: "Changes saved." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+}
+
+export function useAssignJob() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ jobId, spId, assignedByUserId }: {
+      jobId: string; spId: string; assignedByUserId: string | null;
+    }) => {
+      // Update job status + assigned SP
+      const { error: jobErr } = await supabase.from("jobs").update({
+        assigned_sp_id: spId,
+        status: "Assigned",
+      }).eq("id", jobId);
+      if (jobErr) throw jobErr;
+
+      // Insert assignment audit record
+      const { error: assignErr } = await supabase.from("job_assignments").insert({
+        job_id: jobId,
+        sp_id: spId,
+        assigned_by_user_id: assignedByUserId,
+        assignment_type: "Manual",
+      });
+      if (assignErr) console.error("Assignment audit error:", assignErr);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      toast({ title: "SP assigned", description: "Job has been assigned." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+}
+
 // ===== Seeding =====
 
 export function useSeedData() {
@@ -444,6 +552,15 @@ export function useSeedData() {
       qc.invalidateQueries({ queryKey: ["service_providers"] });
       qc.invalidateQueries({ queryKey: ["jobs"] });
       console.log("✅ Seed data inserted successfully");
+
+      // Seed auth users via edge function
+      try {
+        const { data, error } = await supabase.functions.invoke("seed-users");
+        if (error) console.error("Seed users error:", error);
+        else console.log("✅ Auth users seeded:", data);
+      } catch (e) {
+        console.error("Seed users edge function error:", e);
+      }
     })();
   }, [qc]);
 }

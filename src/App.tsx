@@ -3,10 +3,11 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { RoleProvider, useRole } from "@/contexts/RoleContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { useSeedData } from "@/hooks/useSupabaseData";
 import NotFound from "./pages/NotFound";
+import Login from "./pages/Login";
 
 // SP Pages
 import SPDashboard from "./pages/sp/SPDashboard";
@@ -15,6 +16,7 @@ import JobOfferDetail from "./pages/sp/JobOfferDetail";
 import AvailabilitySettings from "./pages/sp/AvailabilitySettings";
 import AutoAcceptSettings from "./pages/sp/AutoAcceptSettings";
 import PerformancePage from "./pages/sp/PerformancePage";
+import MyJobs from "./pages/sp/MyJobs";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -29,12 +31,27 @@ import CustomerForm from "./pages/admin/CustomerForm";
 import SimulationTool from "./pages/admin/SimulationTool";
 import OfferWorkflow from "./pages/admin/OfferWorkflow";
 import Integrations from "./pages/admin/Integrations";
+import JobManagement from "./pages/admin/JobManagement";
+import JobForm from "./pages/admin/JobForm";
+import JobDetail from "./pages/admin/JobDetail";
 
 const queryClient = new QueryClient();
 
 function AppRoutes() {
-  const { role } = useRole();
+  const { user, loading } = useAuth();
   useSeedData();
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!user) return <Login />;
+
+  const role = user.role;
 
   return (
     <DashboardLayout>
@@ -46,6 +63,7 @@ function AppRoutes() {
         <Route path="/availability" element={<AvailabilitySettings />} />
         <Route path="/auto-accept" element={<AutoAcceptSettings />} />
         <Route path="/performance" element={<PerformancePage />} />
+        <Route path="/my-jobs" element={<MyJobs />} />
 
         {/* Admin Routes */}
         <Route path="/admin" element={role === "admin" ? <AdminDashboard /> : <Navigate to="/" replace />} />
@@ -59,6 +77,10 @@ function AppRoutes() {
         <Route path="/admin/customers/new" element={<CustomerForm />} />
         <Route path="/admin/customers/:id" element={<CustomerDetail />} />
         <Route path="/admin/customers/:id/edit" element={<CustomerForm />} />
+        <Route path="/admin/jobs" element={<JobManagement />} />
+        <Route path="/admin/jobs/new" element={<JobForm />} />
+        <Route path="/admin/jobs/:id" element={<JobDetail />} />
+        <Route path="/admin/jobs/:id/edit" element={<JobForm />} />
         <Route path="/admin/simulation" element={<SimulationTool />} />
         <Route path="/admin/workflow" element={<OfferWorkflow />} />
         <Route path="/admin/integrations" element={<Integrations />} />
@@ -75,9 +97,9 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <RoleProvider>
+        <AuthProvider>
           <AppRoutes />
-        </RoleProvider>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

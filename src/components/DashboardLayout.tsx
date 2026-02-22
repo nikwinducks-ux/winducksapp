@@ -1,14 +1,16 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { useRole } from "@/contexts/RoleContext";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, Briefcase, Calendar, Zap, TrendingUp,
   Sliders, Scale, Users, FlaskConical, GitBranch, Plug,
   ChevronLeft, ChevronRight, Shield, UserCircle, Contact,
+  LogOut, ClipboardList,
 } from "lucide-react";
 import { useState } from "react";
 
 const spLinks = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/my-jobs", icon: ClipboardList, label: "My Jobs" },
   { to: "/jobs", icon: Briefcase, label: "Job Offers" },
   { to: "/availability", icon: Calendar, label: "Availability" },
   { to: "/auto-accept", icon: Zap, label: "Auto-Accept" },
@@ -17,6 +19,7 @@ const spLinks = [
 
 const adminLinks = [
   { to: "/admin", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/admin/jobs", icon: Briefcase, label: "Jobs" },
   { to: "/admin/allocation", icon: Sliders, label: "Allocation Control" },
   { to: "/admin/fairness", icon: Scale, label: "Fairness Controls" },
   { to: "/admin/providers", icon: Users, label: "Service Providers" },
@@ -27,9 +30,10 @@ const adminLinks = [
 ];
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { role, setRole } = useRole();
+  const { user, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const role = user?.role ?? "sp";
   const links = role === "sp" ? spLinks : adminLinks;
 
   return (
@@ -52,31 +56,18 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           )}
         </div>
 
-        {/* Role Switcher */}
-        <div className="border-b border-sidebar-border p-2">
-          <div className={`flex ${collapsed ? "flex-col" : ""} gap-1`}>
-            <button
-              onClick={() => setRole("sp")}
-              className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
-                role === "sp"
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent"
-              } ${collapsed ? "justify-center" : "flex-1 justify-center"}`}
-            >
-              <UserCircle className="h-3.5 w-3.5" />
-              {!collapsed && "SP"}
-            </button>
-            <button
-              onClick={() => setRole("admin")}
-              className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
-                role === "admin"
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent"
-              } ${collapsed ? "justify-center" : "flex-1 justify-center"}`}
-            >
-              <Shield className="h-3.5 w-3.5" />
-              {!collapsed && "Admin"}
-            </button>
+        {/* User info */}
+        <div className="border-b border-sidebar-border p-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-sidebar-primary-foreground text-xs font-bold">
+              {role === "admin" ? <Shield className="h-3.5 w-3.5" /> : <UserCircle className="h-3.5 w-3.5" />}
+            </div>
+            {!collapsed && (
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-sidebar-foreground truncate">{user?.email}</p>
+                <p className="text-[10px] text-sidebar-foreground/60 uppercase">{role}</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -104,7 +95,14 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Collapse Toggle */}
+        {/* Logout + Collapse */}
+        <button
+          onClick={signOut}
+          className="flex items-center gap-2 px-4 py-2 text-xs text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors border-t border-sidebar-border"
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          {!collapsed && "Logout"}
+        </button>
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="flex h-10 items-center justify-center border-t border-sidebar-border text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
