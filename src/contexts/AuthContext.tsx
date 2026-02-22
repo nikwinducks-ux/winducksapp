@@ -41,12 +41,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    // Safety timeout - never stay loading forever
+    const timeout = setTimeout(() => {
+      console.warn("Auth loading timeout reached");
+      setLoading(false);
+    }, 5000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setSession(session);
         if (session?.user) {
-          const authUser = await fetchRole(session.user);
-          setUser(authUser);
+          try {
+            const authUser = await fetchRole(session.user);
+            setUser(authUser);
+          } catch {
+            setUser(null);
+          }
         } else {
           setUser(null);
         }
@@ -57,13 +67,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       if (session?.user) {
-        const authUser = await fetchRole(session.user);
-        setUser(authUser);
+        try {
+          const authUser = await fetchRole(session.user);
+          setUser(authUser);
+        } catch {
+          setUser(null);
+        }
       }
+      setLoading(false);
+    }).catch(() => {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
