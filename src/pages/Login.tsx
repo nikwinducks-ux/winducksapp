@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Shield, UserCircle, LogIn } from "lucide-react";
 
 export default function Login() {
+  const navigate = useNavigate();
   const { signIn } = useAuth();
   const [mode, setMode] = useState<"admin" | "sp" | null>(null);
   const [email, setEmail] = useState("");
@@ -59,6 +61,12 @@ export default function Login() {
                 <p className="font-semibold text-foreground">Service Provider Login</p>
                 <p className="text-sm text-muted-foreground">View jobs, availability, and performance</p>
               </div>
+            </button>
+          </div>
+
+          <div className="text-center">
+            <button onClick={() => navigate("/signup")} className="text-sm text-primary hover:underline">
+              Create an account →
             </button>
           </div>
 

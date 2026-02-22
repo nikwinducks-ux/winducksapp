@@ -8,6 +8,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { useSeedData } from "@/hooks/useSupabaseData";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import Signup from "./pages/Signup";
 
 // SP Pages
 import SPDashboard from "./pages/sp/SPDashboard";
@@ -34,6 +35,7 @@ import Integrations from "./pages/admin/Integrations";
 import JobManagement from "./pages/admin/JobManagement";
 import JobForm from "./pages/admin/JobForm";
 import JobDetail from "./pages/admin/JobDetail";
+import UserManagement from "./pages/admin/UserManagement";
 
 const queryClient = new QueryClient();
 
@@ -49,7 +51,14 @@ function AppRoutes() {
     );
   }
 
-  if (!user) return <Login />;
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/signup" element={<Signup />} />
+        <Route path="*" element={<Login />} />
+      </Routes>
+    );
+  }
 
   const role = user.role;
 
@@ -84,6 +93,7 @@ function AppRoutes() {
         <Route path="/admin/simulation" element={<SimulationTool />} />
         <Route path="/admin/workflow" element={<OfferWorkflow />} />
         <Route path="/admin/integrations" element={<Integrations />} />
+        <Route path="/admin/users" element={<UserManagement />} />
 
         <Route path="*" element={<NotFound />} />
       </Routes>

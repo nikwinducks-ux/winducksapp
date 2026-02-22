@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Briefcase, Calendar, Zap, TrendingUp,
   Sliders, Scale, Users, FlaskConical, GitBranch, Plug,
   ChevronLeft, ChevronRight, Shield, UserCircle, Contact,
-  LogOut, ClipboardList,
+  LogOut, ClipboardList, UserCog,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -27,6 +27,7 @@ const adminLinks = [
   { to: "/admin/simulation", icon: FlaskConical, label: "Simulation" },
   { to: "/admin/workflow", icon: GitBranch, label: "Offer Workflow" },
   { to: "/admin/integrations", icon: Plug, label: "Integrations" },
+  { to: "/admin/users", icon: UserCog, label: "Users" },
 ];
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
