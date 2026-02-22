@@ -1,12 +1,14 @@
 import { MetricCard } from "@/components/MetricCard";
-import { serviceProviders } from "@/data/mockData";
-import { useRole } from "@/contexts/RoleContext";
+import { useServiceProviders } from "@/hooks/useSupabaseData";
+import { useAuth } from "@/contexts/AuthContext";
 import { CheckCircle, Clock, XCircle, Star, Zap, Shield, Scale } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 
 export default function PerformancePage() {
-  const { currentSpId } = useRole();
-  const sp = serviceProviders.find((s) => s.id === currentSpId)!;
+  const { user } = useAuth();
+  const { data: providers = [] } = useServiceProviders();
+  const sp = providers.find((s) => s.id === user?.spId) ?? providers[0];
+  if (!sp) return <div className="py-20 text-center text-muted-foreground">Loading...</div>;
 
   const weeklyData = [
     { week: "W1", completed: 8, onTime: 7 },

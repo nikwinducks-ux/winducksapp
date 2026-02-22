@@ -1,16 +1,18 @@
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useServiceProviders, useJobs } from "@/hooks/useSupabaseData";
+import { useAuth } from "@/contexts/AuthContext";
 import { haversineDistance } from "@/lib/proximity";
 import { Briefcase, Clock, Star, TrendingUp, Shield, Scale } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function SPDashboard() {
+  const { user } = useAuth();
   const { data: serviceProviders = [] } = useServiceProviders();
   const { data: jobs = [] } = useJobs();
 
-  // Use first SP as the "current" SP
-  const sp = serviceProviders[0];
+  // Use logged-in SP, fallback to first SP
+  const sp = serviceProviders.find((s) => s.id === user?.spId) ?? serviceProviders[0];
   if (!sp) return <div className="py-20 text-center text-muted-foreground">Loading dashboard...</div>;
 
   const assignedJobs = jobs.filter((j) => j.assignedSpId === sp.id && j.status === "assigned");
