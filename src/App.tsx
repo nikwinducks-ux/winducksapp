@@ -37,7 +37,7 @@ import JobForm from "./pages/admin/JobForm";
 import JobDetail from "./pages/admin/JobDetail";
 import UserManagement from "./pages/admin/UserManagement";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 
 function AppRoutes() {
   const { user, loading } = useAuth();
