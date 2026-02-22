@@ -28,14 +28,14 @@ export default function Signup() {
       if (signUpErr) throw signUpErr;
       if (!data.user) throw new Error("Signup failed");
 
-      // Create role record
+      // Create role record FIRST before any auth state change picks it up
       const { error: roleErr } = await supabase.from("user_roles").insert({
         user_id: data.user.id,
         role,
       });
       if (roleErr) throw roleErr;
 
-      // Auto-login (auto-confirm is enabled)
+      // Now sign in — this triggers onAuthStateChange which will find the role
       const { error: loginErr } = await signIn(email, password);
       if (loginErr) setError(loginErr);
     } catch (err: any) {
