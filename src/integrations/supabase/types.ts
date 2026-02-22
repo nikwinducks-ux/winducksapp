@@ -14,7 +14,255 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      customers: {
+        Row: {
+          address_city: string
+          address_country: string
+          address_lat: number | null
+          address_lng: number | null
+          address_postal: string
+          address_region: string
+          address_street: string
+          created_at: string
+          email: string
+          id: string
+          name: string
+          notes: string
+          phone: string
+          status: string
+          tags: string[]
+          updated_at: string
+        }
+        Insert: {
+          address_city?: string
+          address_country?: string
+          address_lat?: number | null
+          address_lng?: number | null
+          address_postal?: string
+          address_region?: string
+          address_street?: string
+          created_at?: string
+          email?: string
+          id?: string
+          name: string
+          notes?: string
+          phone?: string
+          status?: string
+          tags?: string[]
+          updated_at?: string
+        }
+        Update: {
+          address_city?: string
+          address_country?: string
+          address_lat?: number | null
+          address_lng?: number | null
+          address_postal?: string
+          address_region?: string
+          address_street?: string
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          notes?: string
+          phone?: string
+          status?: string
+          tags?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      jobs: {
+        Row: {
+          assigned_sp_id: string | null
+          created_at: string
+          customer_id: string | null
+          estimated_duration: string
+          id: string
+          job_address_city: string
+          job_address_country: string
+          job_address_postal: string
+          job_address_region: string
+          job_address_street: string
+          job_lat: number | null
+          job_lng: number | null
+          job_number: string
+          payout: number
+          scheduled_date: string | null
+          scheduled_time: string
+          scores: Json | null
+          service_category: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_sp_id?: string | null
+          created_at?: string
+          customer_id?: string | null
+          estimated_duration?: string
+          id?: string
+          job_address_city?: string
+          job_address_country?: string
+          job_address_postal?: string
+          job_address_region?: string
+          job_address_street?: string
+          job_lat?: number | null
+          job_lng?: number | null
+          job_number?: string
+          payout?: number
+          scheduled_date?: string | null
+          scheduled_time?: string
+          scores?: Json | null
+          service_category?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_sp_id?: string | null
+          created_at?: string
+          customer_id?: string | null
+          estimated_duration?: string
+          id?: string
+          job_address_city?: string
+          job_address_country?: string
+          job_address_postal?: string
+          job_address_region?: string
+          job_address_street?: string
+          job_lat?: number | null
+          job_lng?: number | null
+          job_number?: string
+          payout?: number
+          scheduled_date?: string | null
+          scheduled_time?: string
+          scores?: Json | null
+          service_category?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jobs_assigned_sp_id_fkey"
+            columns: ["assigned_sp_id"]
+            isOneToOne: false
+            referencedRelation: "service_providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_providers: {
+        Row: {
+          acceptance_rate: number
+          auto_accept: boolean
+          avg_response_time: string
+          base_address_city: string
+          base_address_country: string
+          base_address_postal: string
+          base_address_region: string
+          base_address_street: string
+          base_lat: number | null
+          base_lng: number | null
+          cancellation_rate: number
+          categories: string[]
+          certifications: string[]
+          completion_rate: number
+          compliance_status: string
+          created_at: string
+          email: string
+          fairness_share: number
+          fairness_status: string
+          id: string
+          insurance_expiry: string | null
+          joined_date: string | null
+          max_jobs_per_day: number
+          name: string
+          notes: string
+          on_time_rate: number
+          phone: string
+          rating: number
+          reliability_score: number
+          service_radius_km: number
+          status: string
+          total_jobs_completed: number
+          updated_at: string
+        }
+        Insert: {
+          acceptance_rate?: number
+          auto_accept?: boolean
+          avg_response_time?: string
+          base_address_city?: string
+          base_address_country?: string
+          base_address_postal?: string
+          base_address_region?: string
+          base_address_street?: string
+          base_lat?: number | null
+          base_lng?: number | null
+          cancellation_rate?: number
+          categories?: string[]
+          certifications?: string[]
+          completion_rate?: number
+          compliance_status?: string
+          created_at?: string
+          email?: string
+          fairness_share?: number
+          fairness_status?: string
+          id?: string
+          insurance_expiry?: string | null
+          joined_date?: string | null
+          max_jobs_per_day?: number
+          name: string
+          notes?: string
+          on_time_rate?: number
+          phone?: string
+          rating?: number
+          reliability_score?: number
+          service_radius_km?: number
+          status?: string
+          total_jobs_completed?: number
+          updated_at?: string
+        }
+        Update: {
+          acceptance_rate?: number
+          auto_accept?: boolean
+          avg_response_time?: string
+          base_address_city?: string
+          base_address_country?: string
+          base_address_postal?: string
+          base_address_region?: string
+          base_address_street?: string
+          base_lat?: number | null
+          base_lng?: number | null
+          cancellation_rate?: number
+          categories?: string[]
+          certifications?: string[]
+          completion_rate?: number
+          compliance_status?: string
+          created_at?: string
+          email?: string
+          fairness_share?: number
+          fairness_status?: string
+          id?: string
+          insurance_expiry?: string | null
+          joined_date?: string | null
+          max_jobs_per_day?: number
+          name?: string
+          notes?: string
+          on_time_rate?: number
+          phone?: string
+          rating?: number
+          reliability_score?: number
+          service_radius_km?: number
+          status?: string
+          total_jobs_completed?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

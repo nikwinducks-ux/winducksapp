@@ -2,12 +2,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { jobs, serviceProviders } from "@/data/mockData";
+import { useServiceProviders, useJobs } from "@/hooks/useSupabaseData";
 import { ScoreBar } from "@/components/ScoreBar";
 import { haversineDistance, proximityScore, PROXIMITY_TOOLTIP } from "@/lib/proximity";
 import { FlaskConical, Trophy, Info } from "lucide-react";
+import type { ServiceProvider, Job } from "@/data/mockData";
 
-function generateScores(jobId: string) {
+function generateScores(jobId: string, jobs: Job[], serviceProviders: ServiceProvider[]) {
   const job = jobs.find((j) => j.id === jobId);
   return serviceProviders
     .filter((sp) => sp.status !== "Suspended")
@@ -49,6 +50,8 @@ function generateScores(jobId: string) {
 }
 
 export default function SimulationTool() {
+  const { data: serviceProviders = [] } = useServiceProviders();
+  const { data: jobs = [] } = useJobs();
   const [selectedJob, setSelectedJob] = useState("");
   const [results, setResults] = useState<ReturnType<typeof generateScores> | null>(null);
   const [running, setRunning] = useState(false);
@@ -56,7 +59,7 @@ export default function SimulationTool() {
   const runSimulation = () => {
     setRunning(true);
     setTimeout(() => {
-      setResults(generateScores(selectedJob));
+      setResults(generateScores(selectedJob, jobs, serviceProviders));
       setRunning(false);
     }, 800);
   };
@@ -65,7 +68,7 @@ export default function SimulationTool() {
     <div className="space-y-8 animate-fade-in">
       <div>
         <h1 className="page-header">Allocation Simulation</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Test allocation scoring against mock jobs</p>
+        <p className="mt-1 text-sm text-muted-foreground">Test allocation scoring against jobs</p>
       </div>
 
       <div className="metric-card space-y-4">
@@ -90,9 +93,8 @@ export default function SimulationTool() {
         </div>
       </div>
 
-      {results && (
+      {results && results.length > 0 && (
         <>
-          {/* #1 Explanation */}
           <div className="metric-card border-primary/20 bg-primary/5">
             <div className="flex items-center gap-2 mb-3">
               <Trophy className="h-5 w-5 text-primary" />
@@ -107,7 +109,6 @@ export default function SimulationTool() {
             </p>
           </div>
 
-          {/* Rankings */}
           <div className="space-y-3">
             {results.map((item, idx) => (
               <div key={item.sp.id} className={`metric-card ${idx === 0 ? "border-primary/30" : ""}`}>
@@ -129,21 +130,15 @@ export default function SimulationTool() {
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs text-muted-foreground">Proximity</span>
                           <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
+                            <TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground cursor-help" /></TooltipTrigger>
                             <TooltipContent className="max-w-xs text-xs">{PROXIMITY_TOOLTIP}</TooltipContent>
                           </Tooltip>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 score-bar-track">
-                            <div className="score-bar" style={{ width: `${item.scores.proximity}%` }} />
-                          </div>
+                          <div className="flex-1 score-bar-track"><div className="score-bar" style={{ width: `${item.scores.proximity}%` }} /></div>
                           <span className="text-xs font-semibold w-8 text-right">{item.scores.proximity}%</span>
                         </div>
-                        {item.distKm !== null && (
-                          <p className="text-xs text-muted-foreground">{item.distKm} km</p>
-                        )}
+                        {item.distKm !== null && <p className="text-xs text-muted-foreground">{item.distKm} km</p>}
                       </div>
                       <ScoreBar label="Competency" value={item.scores.competency} />
                       <ScoreBar label="Reliability" value={item.scores.reliability} />

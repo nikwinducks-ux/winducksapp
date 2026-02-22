@@ -29,7 +29,7 @@ export interface ServiceProvider {
   email: string;
   phone: string;
   avatar: string;
-  status: "Active" | "Suspended";
+  status: "Active" | "Suspended" | "Archived";
   baseAddress: Address;
   rating: number;
   reliabilityScore: number;
@@ -65,7 +65,7 @@ export interface Job {
   scheduledDate: string;
   scheduledTime: string;
   payout: number;
-  status: "pending" | "assigned" | "in-progress" | "completed" | "expired" | "declined";
+  status: "pending" | "assigned" | "in-progress" | "completed" | "expired" | "declined" | "created" | "cancelled" | "offered";
   assignedSpId?: string;
   distance?: number;
   scores?: AllocationScores;

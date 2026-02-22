@@ -1,12 +1,16 @@
 import { useParams, Link } from "react-router-dom";
-import { customers, jobs, formatAddress } from "@/data/mockData";
+import { useCustomer, useJobs } from "@/hooks/useSupabaseData";
+import { formatAddress } from "@/data/mockData";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, MapPin, Pencil } from "lucide-react";
 
 export default function CustomerDetail() {
   const { id } = useParams();
-  const customer = customers.find((c) => c.id === id);
+  const { data: customer, isLoading } = useCustomer(id);
+  const { data: jobs = [] } = useJobs();
+
+  if (isLoading) return <div className="py-20 text-center text-muted-foreground">Loading...</div>;
 
   if (!customer) {
     return (
