@@ -1,28 +1,103 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Shield, UserCircle, LogIn } from "lucide-react";
+import { Shield, UserCircle, LogIn, Loader2 } from "lucide-react";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, user, signOut } = useAuth();
   const [mode, setMode] = useState<"admin" | "sp" | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [signedInWaiting, setSignedInWaiting] = useState(false);
+  const [roleTimeout, setRoleTimeout] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Navigate once user/role is resolved
+  useEffect(() => {
+    if (signedInWaiting && user) {
+      console.log("Role loaded:", user.role);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      navigate(user.role === "admin" ? "/admin" : "/", { replace: true });
+    }
+  }, [signedInWaiting, user, navigate]);
+
+  // Safety fallback: 2s timeout for role resolution
+  useEffect(() => {
+    if (signedInWaiting && !user) {
+      timeoutRef.current = setTimeout(() => {
+        if (!user) {
+          console.log("Role loaded: null (timeout)");
+          setRoleTimeout(true);
+        }
+      }, 2000);
+      return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
+    }
+  }, [signedInWaiting, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setLoading(true);
-    const { error } = await signIn(email, password);
-    if (error) setError(error);
-    setLoading(false);
+    setSubmitting(true);
+    setRoleTimeout(false);
+    console.log("Submitting login");
+    try {
+      const { error } = await signIn(email, password);
+      if (error) {
+        console.log("Login result: error", error);
+        setError(error);
+      } else {
+        console.log("Login result: success");
+        setSignedInWaiting(true);
+      }
+    } catch (err: any) {
+      console.log("Login result: error", err);
+      setError(err?.message ?? "An unexpected error occurred.");
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const handleRetryRole = () => {
+    setRoleTimeout(false);
+    setSignedInWaiting(false);
+    setError("");
+    // Force re-check by signing out and letting user try again
+    signOut();
+  };
+
+  // Post-login waiting state
+  if (signedInWaiting && !roleTimeout) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Role timeout state
+  if (signedInWaiting && roleTimeout) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="w-full max-w-sm space-y-4 px-6 text-center">
+          <p className="text-destructive font-medium">
+            Signed in, but role not found. Please contact admin.
+          </p>
+          <Button onClick={handleRetryRole} variant="outline" className="w-full">
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (!mode) {
     return (
@@ -94,6 +169,12 @@ export default function Login() {
           </h1>
         </div>
 
+        {error && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <Label>Email</Label>
@@ -115,13 +196,12 @@ export default function Login() {
             />
           </div>
 
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
-
-          <Button type="submit" className="w-full" disabled={loading}>
-            <LogIn className="h-4 w-4 mr-2" />
-            {loading ? "Signing in..." : "Sign In"}
+          <Button type="submit" className="w-full" disabled={submitting}>
+            {submitting ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Signing in...</>
+            ) : (
+              <><LogIn className="h-4 w-4 mr-2" /> Sign In</>
+            )}
           </Button>
 
           <button

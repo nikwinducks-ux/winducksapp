@@ -26,13 +26,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function fetchRole(authUser: User): Promise<AuthUser | null> {
     try {
+      console.log("[Auth] Fetching role for", authUser.email);
       const { data, error } = await supabase
         .from("user_roles")
         .select("role, sp_id")
         .eq("user_id", authUser.id)
         .limit(1)
         .maybeSingle();
-      if (error || !data) return null;
+      if (error || !data) {
+        console.log("[Auth] Role fetch result: none", error?.message);
+        return null;
+      }
+      console.log("[Auth] Role resolved:", data.role);
       return {
         id: authUser.id,
         email: authUser.email ?? "",
