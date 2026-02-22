@@ -3,7 +3,7 @@ import { useRole } from "@/contexts/RoleContext";
 import {
   LayoutDashboard, Briefcase, Calendar, Zap, TrendingUp,
   Sliders, Scale, Users, FlaskConical, GitBranch, Plug,
-  ChevronLeft, ChevronRight, Shield, UserCircle,
+  ChevronLeft, ChevronRight, Shield, UserCircle, Contact,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -20,6 +20,7 @@ const adminLinks = [
   { to: "/admin/allocation", icon: Sliders, label: "Allocation Control" },
   { to: "/admin/fairness", icon: Scale, label: "Fairness Controls" },
   { to: "/admin/providers", icon: Users, label: "Service Providers" },
+  { to: "/admin/customers", icon: Contact, label: "Customers" },
   { to: "/admin/simulation", icon: FlaskConical, label: "Simulation" },
   { to: "/admin/workflow", icon: GitBranch, label: "Offer Workflow" },
   { to: "/admin/integrations", icon: Plug, label: "Integrations" },

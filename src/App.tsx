@@ -19,7 +19,12 @@ import PerformancePage from "./pages/sp/PerformancePage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AllocationControl from "./pages/admin/AllocationControl";
 import FairnessControls from "./pages/admin/FairnessControls";
-import SPProfiles from "./pages/admin/SPProfiles";
+import SPManagement from "./pages/admin/SPManagement";
+import SPDetail from "./pages/admin/SPDetail";
+import SPForm from "./pages/admin/SPForm";
+import CustomerManagement from "./pages/admin/CustomerManagement";
+import CustomerDetail from "./pages/admin/CustomerDetail";
+import CustomerForm from "./pages/admin/CustomerForm";
 import SimulationTool from "./pages/admin/SimulationTool";
 import OfferWorkflow from "./pages/admin/OfferWorkflow";
 import Integrations from "./pages/admin/Integrations";
@@ -44,7 +49,14 @@ function AppRoutes() {
         <Route path="/admin" element={role === "admin" ? <AdminDashboard /> : <Navigate to="/" replace />} />
         <Route path="/admin/allocation" element={<AllocationControl />} />
         <Route path="/admin/fairness" element={<FairnessControls />} />
-        <Route path="/admin/providers" element={<SPProfiles />} />
+        <Route path="/admin/providers" element={<SPManagement />} />
+        <Route path="/admin/providers/new" element={<SPForm />} />
+        <Route path="/admin/providers/:id" element={<SPDetail />} />
+        <Route path="/admin/providers/:id/edit" element={<SPForm />} />
+        <Route path="/admin/customers" element={<CustomerManagement />} />
+        <Route path="/admin/customers/new" element={<CustomerForm />} />
+        <Route path="/admin/customers/:id" element={<CustomerDetail />} />
+        <Route path="/admin/customers/:id/edit" element={<CustomerForm />} />
         <Route path="/admin/simulation" element={<SimulationTool />} />
         <Route path="/admin/workflow" element={<OfferWorkflow />} />
         <Route path="/admin/integrations" element={<Integrations />} />

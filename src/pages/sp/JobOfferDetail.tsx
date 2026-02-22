@@ -1,10 +1,12 @@
 import { useParams, Link } from "react-router-dom";
-import { jobs, declineReasons } from "@/data/mockData";
+import { jobs, serviceProviders, customers, declineReasons } from "@/data/mockData";
 import { ScoreBar } from "@/components/ScoreBar";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle } from "lucide-react";
-import { useState } from "react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, Info } from "lucide-react";
+import { useState, useMemo } from "react";
+import { haversineDistance, proximityScore, PROXIMITY_TOOLTIP } from "@/lib/proximity";
 
 export default function JobOfferDetail() {
   const { id } = useParams();
@@ -13,6 +15,20 @@ export default function JobOfferDetail() {
   const [declineReason, setDeclineReason] = useState("");
   const [accepted, setAccepted] = useState(false);
   const [declined, setDeclined] = useState(false);
+
+  // Use first SP as the "current" SP for the portal
+  const currentSp = serviceProviders[0];
+
+  const distanceInfo = useMemo(() => {
+    if (!job) return { distance: null, needsGeocoding: true, score: 0 };
+    const spAddr = currentSp.baseAddress;
+    const jobAddr = job.jobAddress;
+    if (spAddr.lat && spAddr.lng && jobAddr.lat && jobAddr.lng) {
+      const d = haversineDistance(spAddr.lat, spAddr.lng, jobAddr.lat, jobAddr.lng);
+      return { distance: d, needsGeocoding: false, score: proximityScore(d) };
+    }
+    return { distance: job.distance ?? null, needsGeocoding: true, score: job.scores?.proximity ?? 0 };
+  }, [job, currentSp]);
 
   if (!job) {
     return (
@@ -81,8 +97,15 @@ export default function JobOfferDetail() {
           <div className="flex items-center gap-3">
             <MapPin className="h-4 w-4 text-muted-foreground" />
             <div>
-              <p className="text-xs text-muted-foreground">Distance</p>
-              <p className="font-medium">{job.distance} km from you</p>
+              <p className="text-xs text-muted-foreground">Distance from you</p>
+              {distanceInfo.distance !== null ? (
+                <p className="font-medium">{distanceInfo.distance} km</p>
+              ) : (
+                <span className="status-badge bg-warning/10 text-warning">Needs geocoding</span>
+              )}
+              {distanceInfo.needsGeocoding && distanceInfo.distance !== null && (
+                <span className="text-xs text-muted-foreground ml-1">(estimated)</span>
+              )}
             </div>
           </div>
         </div>
@@ -95,7 +118,31 @@ export default function JobOfferDetail() {
           <p className="text-sm text-muted-foreground">Breakdown of your allocation score for this job</p>
           <div className="space-y-3">
             <ScoreBar label="Availability Fit" value={job.scores.availabilityFit} />
-            <ScoreBar label="Proximity" value={job.scores.proximity} />
+            <div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-sm text-muted-foreground">Proximity</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs text-xs">{PROXIMITY_TOOLTIP}</TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <div className="score-bar-track">
+                    <div className="score-bar" style={{ width: `${distanceInfo.score}%` }} />
+                  </div>
+                </div>
+                <span className="text-sm font-semibold w-12 text-right">{distanceInfo.score}%</span>
+              </div>
+              {distanceInfo.distance !== null && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {distanceInfo.distance} km → score {distanceInfo.score}
+                  {distanceInfo.needsGeocoding && " (estimated)"}
+                </p>
+              )}
+            </div>
             <ScoreBar label="Competency" value={job.scores.competency} />
             <ScoreBar label="Reliability" value={job.scores.reliability} />
             <ScoreBar label="Rating" value={job.scores.rating} />

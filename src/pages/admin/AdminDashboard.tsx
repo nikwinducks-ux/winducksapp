@@ -3,7 +3,7 @@ import { serviceProviders, jobs } from "@/data/mockData";
 import { Users, Briefcase, TrendingUp, AlertTriangle } from "lucide-react";
 
 export default function AdminDashboard() {
-  const activeSPs = serviceProviders.filter((s) => s.complianceStatus !== "Suspended").length;
+  const activeSPs = serviceProviders.filter((s) => s.status !== "Suspended").length;
   const pendingJobs = jobs.filter((j) => j.status === "pending").length;
   const completedJobs = jobs.filter((j) => j.status === "completed").length;
   const expiring = serviceProviders.filter((s) => s.complianceStatus === "Expiring").length;

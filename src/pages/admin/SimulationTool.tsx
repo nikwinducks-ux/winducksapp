@@ -1,34 +1,47 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { jobs, serviceProviders } from "@/data/mockData";
 import { ScoreBar } from "@/components/ScoreBar";
-import { FlaskConical, Trophy } from "lucide-react";
+import { haversineDistance, proximityScore, PROXIMITY_TOOLTIP } from "@/lib/proximity";
+import { FlaskConical, Trophy, Info } from "lucide-react";
 
-function generateScores() {
+function generateScores(jobId: string) {
+  const job = jobs.find((j) => j.id === jobId);
   return serviceProviders
-    .filter((sp) => sp.complianceStatus !== "Suspended")
-    .map((sp) => ({
-      sp,
-      scores: {
-        availability: Math.round(60 + Math.random() * 40),
-        proximity: Math.round(30 + Math.random() * 70),
-        competency: Math.round(70 + Math.random() * 30),
-        reliability: sp.reliabilityScore,
-        rating: Math.round(sp.rating * 20),
-        fairness: Math.round(Math.random() * 15 - 5),
-        final: 0,
-      },
-    }))
+    .filter((sp) => sp.status !== "Suspended")
+    .map((sp) => {
+      let proxScore: number;
+      let distKm: number | null = null;
+      if (job && sp.baseAddress.lat && sp.baseAddress.lng && job.jobAddress.lat && job.jobAddress.lng) {
+        distKm = haversineDistance(sp.baseAddress.lat, sp.baseAddress.lng, job.jobAddress.lat, job.jobAddress.lng);
+        proxScore = proximityScore(distKm);
+      } else {
+        proxScore = Math.round(30 + Math.random() * 70);
+      }
+      return {
+        sp,
+        distKm,
+        scores: {
+          availability: Math.round(60 + Math.random() * 40),
+          proximity: proxScore,
+          competency: Math.round(70 + Math.random() * 30),
+          reliability: sp.reliabilityScore,
+          rating: Math.round(sp.rating * 20),
+          fairness: Math.round(Math.random() * 15 - 5),
+          final: 0,
+        },
+      };
+    })
     .map((item) => {
       item.scores.final = Math.round(
-        (item.scores.availability * 0.2 +
-          item.scores.proximity * 0.15 +
-          item.scores.competency * 0.15 +
-          item.scores.reliability * 0.1 +
-          item.scores.rating * 0.15 +
-          item.scores.fairness * 0.05 + 50) /
-          1
+        item.scores.availability * 0.2 +
+        item.scores.proximity * 0.15 +
+        item.scores.competency * 0.15 +
+        item.scores.reliability * 0.1 +
+        item.scores.rating * 0.15 +
+        item.scores.fairness * 0.05 + 50
       );
       return item;
     })
@@ -43,7 +56,7 @@ export default function SimulationTool() {
   const runSimulation = () => {
     setRunning(true);
     setTimeout(() => {
-      setResults(generateScores());
+      setResults(generateScores(selectedJob));
       setRunning(false);
     }, 800);
   };
@@ -87,7 +100,8 @@ export default function SimulationTool() {
             </div>
             <p className="text-sm text-muted-foreground">
               {results[0].sp.name} scored highest with a final allocation score of {results[0].scores.final}.
-              Key strengths: availability fit ({results[0].scores.availability}%), reliability ({results[0].scores.reliability}%),
+              Key strengths: availability fit ({results[0].scores.availability}%), proximity ({results[0].scores.proximity}%
+              {results[0].distKm !== null && ` — ${results[0].distKm} km`}),
               and rating ({results[0].scores.rating}%).
               {results[0].scores.fairness > 0 && ` Additionally received a +${results[0].scores.fairness} fairness boost.`}
             </p>
@@ -106,11 +120,31 @@ export default function SimulationTool() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-3">
                       <p className="font-semibold">{item.sp.name}</p>
+                      <span className="text-xs text-muted-foreground">{item.sp.baseAddress.city}</span>
                       <span className="text-xl font-bold text-primary">{item.scores.final}</span>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-3">
                       <ScoreBar label="Availability" value={item.scores.availability} />
-                      <ScoreBar label="Proximity" value={item.scores.proximity} />
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-muted-foreground">Proximity</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs text-xs">{PROXIMITY_TOOLTIP}</TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 score-bar-track">
+                            <div className="score-bar" style={{ width: `${item.scores.proximity}%` }} />
+                          </div>
+                          <span className="text-xs font-semibold w-8 text-right">{item.scores.proximity}%</span>
+                        </div>
+                        {item.distKm !== null && (
+                          <p className="text-xs text-muted-foreground">{item.distKm} km</p>
+                        )}
+                      </div>
                       <ScoreBar label="Competency" value={item.scores.competency} />
                       <ScoreBar label="Reliability" value={item.scores.reliability} />
                       <ScoreBar label="Rating" value={item.scores.rating} />
