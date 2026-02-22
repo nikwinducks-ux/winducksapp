@@ -1,5 +1,6 @@
 import { useParams, Link } from "react-router-dom";
-import { jobs, serviceProviders, customers, declineReasons } from "@/data/mockData";
+import { useServiceProviders, useJobs } from "@/hooks/useSupabaseData";
+import { declineReasons } from "@/data/mockData";
 import { ScoreBar } from "@/components/ScoreBar";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,24 +11,25 @@ import { haversineDistance, proximityScore, PROXIMITY_TOOLTIP } from "@/lib/prox
 
 export default function JobOfferDetail() {
   const { id } = useParams();
+  const { data: serviceProviders = [] } = useServiceProviders();
+  const { data: jobs = [] } = useJobs();
   const job = jobs.find((j) => j.id === id);
   const [showDecline, setShowDecline] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
   const [accepted, setAccepted] = useState(false);
   const [declined, setDeclined] = useState(false);
 
-  // Use first SP as the "current" SP for the portal
   const currentSp = serviceProviders[0];
 
   const distanceInfo = useMemo(() => {
-    if (!job) return { distance: null, needsGeocoding: true, score: 0 };
+    if (!job || !currentSp) return { distance: null, needsGeocoding: true, score: 0 };
     const spAddr = currentSp.baseAddress;
     const jobAddr = job.jobAddress;
     if (spAddr.lat && spAddr.lng && jobAddr.lat && jobAddr.lng) {
       const d = haversineDistance(spAddr.lat, spAddr.lng, jobAddr.lat, jobAddr.lng);
       return { distance: d, needsGeocoding: false, score: proximityScore(d) };
     }
-    return { distance: job.distance ?? null, needsGeocoding: true, score: job.scores?.proximity ?? 0 };
+    return { distance: null, needsGeocoding: true, score: job.scores?.proximity ?? 0 };
   }, [job, currentSp]);
 
   if (!job) {
@@ -48,52 +50,21 @@ export default function JobOfferDetail() {
       <div>
         <div className="flex items-center gap-3">
           <h1 className="page-header">{job.id}</h1>
-          <span className={`status-badge ${job.status === "pending" ? "bg-warning/10 text-warning" : "bg-primary/10 text-primary"}`}>
+          <span className={`status-badge ${job.status === "pending" || job.status === "created" ? "bg-warning/10 text-warning" : "bg-primary/10 text-primary"}`}>
             {accepted ? "Accepted" : declined ? "Declined" : job.status}
           </span>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">Offer expires in 45:00 minutes</p>
       </div>
 
-      {/* Job Details */}
       <div className="metric-card space-y-4">
         <h2 className="section-title">Job Details</h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex items-center gap-3">
-            <User className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Customer</p>
-              <p className="font-medium">{job.customerName}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Address</p>
-              <p className="font-medium">{job.address}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Schedule</p>
-              <p className="font-medium">{job.scheduledDate} · {job.scheduledTime}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Duration</p>
-              <p className="font-medium">{job.estimatedDuration}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Payout</p>
-              <p className="text-xl font-bold text-primary">${job.payout}</p>
-            </div>
-          </div>
+          <div className="flex items-center gap-3"><User className="h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Customer</p><p className="font-medium">{job.customerName}</p></div></div>
+          <div className="flex items-center gap-3"><MapPin className="h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Address</p><p className="font-medium">{job.address}</p></div></div>
+          <div className="flex items-center gap-3"><Calendar className="h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Schedule</p><p className="font-medium">{job.scheduledDate} · {job.scheduledTime}</p></div></div>
+          <div className="flex items-center gap-3"><Clock className="h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Duration</p><p className="font-medium">{job.estimatedDuration}</p></div></div>
+          <div className="flex items-center gap-3"><DollarSign className="h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Payout</p><p className="text-xl font-bold text-primary">${job.payout}</p></div></div>
           <div className="flex items-center gap-3">
             <MapPin className="h-4 w-4 text-muted-foreground" />
             <div>
@@ -103,15 +74,11 @@ export default function JobOfferDetail() {
               ) : (
                 <span className="status-badge bg-warning/10 text-warning">Needs geocoding</span>
               )}
-              {distanceInfo.needsGeocoding && distanceInfo.distance !== null && (
-                <span className="text-xs text-muted-foreground ml-1">(estimated)</span>
-              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Allocation Transparency */}
       {job.scores && (
         <div className="metric-card space-y-4">
           <h2 className="section-title">Allocation Transparency</h2>
@@ -121,27 +88,13 @@ export default function JobOfferDetail() {
             <div>
               <div className="flex items-center gap-1.5 mb-1">
                 <span className="text-sm text-muted-foreground">Proximity</span>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs text-xs">{PROXIMITY_TOOLTIP}</TooltipContent>
-                </Tooltip>
+                <Tooltip><TooltipTrigger asChild><Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs">{PROXIMITY_TOOLTIP}</TooltipContent></Tooltip>
               </div>
               <div className="flex items-center gap-3">
-                <div className="flex-1">
-                  <div className="score-bar-track">
-                    <div className="score-bar" style={{ width: `${distanceInfo.score}%` }} />
-                  </div>
-                </div>
+                <div className="flex-1"><div className="score-bar-track"><div className="score-bar" style={{ width: `${distanceInfo.score}%` }} /></div></div>
                 <span className="text-sm font-semibold w-12 text-right">{distanceInfo.score}%</span>
               </div>
-              {distanceInfo.distance !== null && (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {distanceInfo.distance} km → score {distanceInfo.score}
-                  {distanceInfo.needsGeocoding && " (estimated)"}
-                </p>
-              )}
+              {distanceInfo.distance !== null && <p className="text-xs text-muted-foreground mt-0.5">{distanceInfo.distance} km → score {distanceInfo.score}</p>}
             </div>
             <ScoreBar label="Competency" value={job.scores.competency} />
             <ScoreBar label="Reliability" value={job.scores.reliability} />
@@ -164,8 +117,7 @@ export default function JobOfferDetail() {
         </div>
       )}
 
-      {/* Actions */}
-      {job.status === "pending" && !accepted && !declined && (
+      {(job.status === "pending" || job.status === "created") && !accepted && !declined && (
         <div className="metric-card space-y-4">
           <h2 className="section-title">Actions</h2>
           {!showDecline ? (
@@ -180,19 +132,13 @@ export default function JobOfferDetail() {
                 <p className="text-warning">Declining may affect your acceptance rate and reliability score.</p>
               </div>
               <Select value={declineReason} onValueChange={setDeclineReason}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select decline reason" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select decline reason" /></SelectTrigger>
                 <SelectContent>
-                  {declineReasons.map((reason) => (
-                    <SelectItem key={reason} value={reason}>{reason}</SelectItem>
-                  ))}
+                  {declineReasons.map((reason) => (<SelectItem key={reason} value={reason}>{reason}</SelectItem>))}
                 </SelectContent>
               </Select>
               <div className="flex gap-3">
-                <Button variant="destructive" disabled={!declineReason} onClick={() => setDeclined(true)} className="flex-1">
-                  Confirm Decline
-                </Button>
+                <Button variant="destructive" disabled={!declineReason} onClick={() => setDeclined(true)} className="flex-1">Confirm Decline</Button>
                 <Button variant="outline" onClick={() => setShowDecline(false)} className="flex-1">Cancel</Button>
               </div>
             </div>

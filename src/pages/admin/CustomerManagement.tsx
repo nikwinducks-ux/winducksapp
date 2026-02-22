@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { customers, type Customer, formatAddress, jobs } from "@/data/mockData";
+import { useCustomers, useArchiveCustomer } from "@/hooks/useSupabaseData";
+import { formatAddress } from "@/data/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, Plus, Eye, Pencil, Archive } from "lucide-react";
@@ -7,6 +8,8 @@ import { Link } from "react-router-dom";
 
 export default function CustomerManagement() {
   const [search, setSearch] = useState("");
+  const { data: customers = [], isLoading } = useCustomers();
+  const archiveMutation = useArchiveCustomer();
 
   const filtered = customers.filter(
     (c) =>
@@ -16,6 +19,8 @@ export default function CustomerManagement() {
         c.serviceAddress.city.toLowerCase().includes(search.toLowerCase()) ||
         c.tags.some((t) => t.toLowerCase().includes(search.toLowerCase())))
   );
+
+  if (isLoading) return <div className="py-20 text-center text-muted-foreground">Loading customers...</div>;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -43,7 +48,6 @@ export default function CustomerManagement() {
               <th className="pb-3 font-medium text-muted-foreground">Email</th>
               <th className="pb-3 font-medium text-muted-foreground">City</th>
               <th className="pb-3 font-medium text-muted-foreground">Tags</th>
-              <th className="pb-3 font-medium text-muted-foreground">Last Job</th>
               <th className="pb-3 font-medium text-muted-foreground">Actions</th>
             </tr>
           </thead>
@@ -61,7 +65,6 @@ export default function CustomerManagement() {
                     ))}
                   </div>
                 </td>
-                <td className="py-3 text-muted-foreground">{c.lastJobDate ?? "—"}</td>
                 <td className="py-3">
                   <div className="flex items-center gap-1">
                     <Link to={`/admin/customers/${c.id}`}>
@@ -70,7 +73,9 @@ export default function CustomerManagement() {
                     <Link to={`/admin/customers/${c.id}/edit`}>
                       <Button size="sm" variant="ghost" title="Edit"><Pencil className="h-4 w-4" /></Button>
                     </Link>
-                    <Button size="sm" variant="ghost" title="Archive"><Archive className="h-4 w-4" /></Button>
+                    <Button size="sm" variant="ghost" title="Archive" onClick={() => archiveMutation.mutate(c.id)}>
+                      <Archive className="h-4 w-4" />
+                    </Button>
                   </div>
                 </td>
               </tr>

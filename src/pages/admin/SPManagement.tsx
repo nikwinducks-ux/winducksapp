@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { serviceProviders, type ServiceProvider, formatAddress } from "@/data/mockData";
+import { useServiceProviders, useToggleSPStatus, useArchiveSP } from "@/hooks/useSupabaseData";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,15 +8,19 @@ import { Link } from "react-router-dom";
 
 export default function SPManagement() {
   const [search, setSearch] = useState("");
-  const [data] = useState<ServiceProvider[]>(serviceProviders);
+  const { data: providers = [], isLoading } = useServiceProviders();
+  const toggleStatus = useToggleSPStatus();
+  const archiveMutation = useArchiveSP();
 
-  const filtered = data.filter(
+  const filtered = providers.filter(
     (sp) =>
-      !sp.archived &&
+      sp.status !== "Archived" &&
       (sp.name.toLowerCase().includes(search.toLowerCase()) ||
         sp.baseAddress.city.toLowerCase().includes(search.toLowerCase()) ||
         sp.serviceCategories.some((c) => c.toLowerCase().includes(search.toLowerCase())))
   );
+
+  if (isLoading) return <div className="py-20 text-center text-muted-foreground">Loading providers...</div>;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -32,12 +36,7 @@ export default function SPManagement() {
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search name, city, category..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
+        <Input placeholder="Search name, city, category..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
       </div>
 
       <div className="metric-card overflow-x-auto">
@@ -67,10 +66,7 @@ export default function SPManagement() {
                   </div>
                 </td>
                 <td className="py-3">
-                  <StatusBadge
-                    label={sp.status}
-                    variant={sp.status === "Active" ? "valid" : "error"}
-                  />
+                  <StatusBadge label={sp.status} variant={sp.status === "Active" ? "valid" : "error"} />
                 </td>
                 <td className="py-3 text-muted-foreground">{sp.baseAddress.city}</td>
                 <td className="py-3">{sp.travelRadius} km</td>
@@ -97,10 +93,16 @@ export default function SPManagement() {
                     <Link to={`/admin/providers/${sp.id}/edit`}>
                       <Button size="sm" variant="ghost" title="Edit"><Pencil className="h-4 w-4" /></Button>
                     </Link>
-                    <Button size="sm" variant="ghost" title={sp.status === "Active" ? "Suspend" : "Unsuspend"}>
+                    <Button
+                      size="sm" variant="ghost"
+                      title={sp.status === "Active" ? "Suspend" : "Unsuspend"}
+                      onClick={() => toggleStatus.mutate({ id: sp.id, status: sp.status === "Active" ? "Suspended" : "Active" })}
+                    >
                       {sp.status === "Active" ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
                     </Button>
-                    <Button size="sm" variant="ghost" title="Archive"><Archive className="h-4 w-4" /></Button>
+                    <Button size="sm" variant="ghost" title="Archive" onClick={() => archiveMutation.mutate(sp.id)}>
+                      <Archive className="h-4 w-4" />
+                    </Button>
                   </div>
                 </td>
               </tr>

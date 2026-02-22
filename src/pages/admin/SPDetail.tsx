@@ -1,17 +1,20 @@
 import { useParams, Link } from "react-router-dom";
-import { serviceProviders, jobs, formatAddress } from "@/data/mockData";
+import { useServiceProvider, useJobs, useToggleSPStatus } from "@/hooks/useSupabaseData";
+import { formatAddress } from "@/data/mockData";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ScoreBar } from "@/components/ScoreBar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArrowLeft, MapPin, Pencil } from "lucide-react";
-import { useState } from "react";
 
 export default function SPDetail() {
   const { id } = useParams();
-  const sp = serviceProviders.find((s) => s.id === id);
-  const [suspended, setSuspended] = useState(sp?.status === "Suspended");
+  const { data: sp, isLoading } = useServiceProvider(id);
+  const { data: jobs = [] } = useJobs();
+  const toggleStatus = useToggleSPStatus();
+
+  if (isLoading) return <div className="py-20 text-center text-muted-foreground">Loading...</div>;
 
   if (!sp) {
     return (
@@ -22,6 +25,7 @@ export default function SPDetail() {
     );
   }
 
+  const suspended = sp.status === "Suspended";
   const spJobs = jobs.filter((j) => j.assignedSpId === sp.id);
 
   return (
@@ -38,7 +42,7 @@ export default function SPDetail() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="page-header">{sp.name}</h1>
-              <StatusBadge label={suspended ? "Suspended" : sp.status} variant={suspended ? "error" : "valid"} />
+              <StatusBadge label={sp.status} variant={suspended ? "error" : "valid"} />
               <StatusBadge label={sp.complianceStatus} variant={sp.complianceStatus === "Valid" ? "valid" : sp.complianceStatus === "Expiring" ? "warning" : "error"} />
             </div>
             <p className="text-sm text-muted-foreground">{sp.email} · {sp.phone}</p>
@@ -47,7 +51,10 @@ export default function SPDetail() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="text-sm">Suspended</span>
-            <Switch checked={suspended} onCheckedChange={setSuspended} />
+            <Switch
+              checked={suspended}
+              onCheckedChange={(checked) => toggleStatus.mutate({ id: sp.id, status: checked ? "Suspended" : "Active" })}
+            />
           </div>
           <Link to={`/admin/providers/${sp.id}/edit`}>
             <Button variant="outline" size="sm"><Pencil className="h-4 w-4 mr-2" />Edit</Button>
@@ -68,56 +75,18 @@ export default function SPDetail() {
           <div className="metric-card space-y-4 mt-4">
             <h2 className="section-title">Base Address</h2>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Street</p>
-                <p className="text-sm font-medium">{sp.baseAddress.street}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">City</p>
-                <p className="text-sm font-medium">{sp.baseAddress.city}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Province</p>
-                <p className="text-sm font-medium">{sp.baseAddress.province}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Postal Code</p>
-                <p className="text-sm font-medium">{sp.baseAddress.postalCode}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Coordinates</p>
-                <p className="text-sm font-medium">
-                  {sp.baseAddress.lat && sp.baseAddress.lng
-                    ? `${sp.baseAddress.lat}, ${sp.baseAddress.lng}`
-                    : "Not set"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Full Address</p>
-                <p className="text-sm font-medium flex items-center gap-1">
-                  <MapPin className="h-3 w-3 text-muted-foreground" />
-                  {formatAddress(sp.baseAddress)}
-                </p>
-              </div>
+              <div><p className="text-xs text-muted-foreground mb-1">Street</p><p className="text-sm font-medium">{sp.baseAddress.street}</p></div>
+              <div><p className="text-xs text-muted-foreground mb-1">City</p><p className="text-sm font-medium">{sp.baseAddress.city}</p></div>
+              <div><p className="text-xs text-muted-foreground mb-1">Province</p><p className="text-sm font-medium">{sp.baseAddress.province}</p></div>
+              <div><p className="text-xs text-muted-foreground mb-1">Postal Code</p><p className="text-sm font-medium">{sp.baseAddress.postalCode}</p></div>
+              <div><p className="text-xs text-muted-foreground mb-1">Coordinates</p><p className="text-sm font-medium">{sp.baseAddress.lat && sp.baseAddress.lng ? `${sp.baseAddress.lat}, ${sp.baseAddress.lng}` : "Not set"}</p></div>
+              <div><p className="text-xs text-muted-foreground mb-1">Full Address</p><p className="text-sm font-medium flex items-center gap-1"><MapPin className="h-3 w-3 text-muted-foreground" />{formatAddress(sp.baseAddress)}</p></div>
             </div>
-
             <div className="border-t pt-4 grid gap-4 sm:grid-cols-2">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Service Radius</p>
-                <p className="text-sm font-medium">{sp.travelRadius} km</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Max Jobs / Day</p>
-                <p className="text-sm font-medium">{sp.maxJobsPerDay}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Joined</p>
-                <p className="text-sm font-medium">{sp.joinedDate}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Notes</p>
-                <p className="text-sm font-medium">{sp.notes || "—"}</p>
-              </div>
+              <div><p className="text-xs text-muted-foreground mb-1">Service Radius</p><p className="text-sm font-medium">{sp.travelRadius} km</p></div>
+              <div><p className="text-xs text-muted-foreground mb-1">Max Jobs / Day</p><p className="text-sm font-medium">{sp.maxJobsPerDay}</p></div>
+              <div><p className="text-xs text-muted-foreground mb-1">Joined</p><p className="text-sm font-medium">{sp.joinedDate}</p></div>
+              <div><p className="text-xs text-muted-foreground mb-1">Notes</p><p className="text-sm font-medium">{sp.notes || "—"}</p></div>
             </div>
           </div>
         </TabsContent>
@@ -126,16 +95,12 @@ export default function SPDetail() {
           <div className="metric-card space-y-4 mt-4">
             <h2 className="section-title">Service Categories</h2>
             <div className="flex flex-wrap gap-2">
-              {sp.serviceCategories.map((c) => (
-                <span key={c} className="status-badge bg-primary/10 text-primary">{c}</span>
-              ))}
+              {sp.serviceCategories.map((c) => (<span key={c} className="status-badge bg-primary/10 text-primary">{c}</span>))}
             </div>
             <div className="border-t pt-4">
               <h2 className="section-title mb-3">Certifications</h2>
               <div className="flex flex-wrap gap-2">
-                {sp.certifications.map((c) => (
-                  <span key={c} className="status-badge bg-secondary text-secondary-foreground">{c}</span>
-                ))}
+                {sp.certifications.map((c) => (<span key={c} className="status-badge bg-secondary text-secondary-foreground">{c}</span>))}
               </div>
             </div>
           </div>
@@ -145,18 +110,9 @@ export default function SPDetail() {
           <div className="metric-card space-y-4 mt-4">
             <h2 className="section-title">Availability Settings</h2>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Auto-Accept</p>
-                <p className="text-sm font-medium">{sp.autoAccept ? "Enabled" : "Disabled"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Max Jobs / Day</p>
-                <p className="text-sm font-medium">{sp.maxJobsPerDay}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Travel Radius</p>
-                <p className="text-sm font-medium">{sp.travelRadius} km</p>
-              </div>
+              <div><p className="text-xs text-muted-foreground mb-1">Auto-Accept</p><p className="text-sm font-medium">{sp.autoAccept ? "Enabled" : "Disabled"}</p></div>
+              <div><p className="text-xs text-muted-foreground mb-1">Max Jobs / Day</p><p className="text-sm font-medium">{sp.maxJobsPerDay}</p></div>
+              <div><p className="text-xs text-muted-foreground mb-1">Travel Radius</p><p className="text-sm font-medium">{sp.travelRadius} km</p></div>
             </div>
             <div className="border-t pt-4">
               <h2 className="section-title mb-3">Assigned Jobs</h2>
@@ -180,14 +136,8 @@ export default function SPDetail() {
           <div className="metric-card space-y-4 mt-4">
             <h2 className="section-title">Compliance Details</h2>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Insurance Expiry</p>
-                <p className="text-sm font-medium">{sp.insuranceExpiry}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Compliance Status</p>
-                <StatusBadge label={sp.complianceStatus} variant={sp.complianceStatus === "Valid" ? "valid" : sp.complianceStatus === "Expiring" ? "warning" : "error"} />
-              </div>
+              <div><p className="text-xs text-muted-foreground mb-1">Insurance Expiry</p><p className="text-sm font-medium">{sp.insuranceExpiry}</p></div>
+              <div><p className="text-xs text-muted-foreground mb-1">Compliance Status</p><StatusBadge label={sp.complianceStatus} variant={sp.complianceStatus === "Valid" ? "valid" : sp.complianceStatus === "Expiring" ? "warning" : "error"} /></div>
             </div>
           </div>
         </TabsContent>
@@ -202,18 +152,9 @@ export default function SPDetail() {
               <ScoreBar label="Acceptance Rate" value={sp.acceptanceRate} />
             </div>
             <div className="border-t pt-4 grid gap-4 sm:grid-cols-3">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Rating</p>
-                <p className="text-lg font-bold">⭐ {sp.rating}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Total Jobs</p>
-                <p className="text-lg font-bold">{sp.totalJobsCompleted}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Avg Response</p>
-                <p className="text-lg font-bold">{sp.avgResponseTime}</p>
-              </div>
+              <div><p className="text-xs text-muted-foreground mb-1">Rating</p><p className="text-lg font-bold">⭐ {sp.rating}</p></div>
+              <div><p className="text-xs text-muted-foreground mb-1">Total Jobs</p><p className="text-lg font-bold">{sp.totalJobsCompleted}</p></div>
+              <div><p className="text-xs text-muted-foreground mb-1">Avg Response</p><p className="text-lg font-bold">{sp.avgResponseTime}</p></div>
             </div>
           </div>
         </TabsContent>

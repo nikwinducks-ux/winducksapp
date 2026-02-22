@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { RoleProvider, useRole } from "@/contexts/RoleContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { useSeedData } from "@/hooks/useSupabaseData";
 import NotFound from "./pages/NotFound";
 
 // SP Pages
@@ -33,6 +34,7 @@ const queryClient = new QueryClient();
 
 function AppRoutes() {
   const { role } = useRole();
+  useSeedData();
 
   return (
     <DashboardLayout>
