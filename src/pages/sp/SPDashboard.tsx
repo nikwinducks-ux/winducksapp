@@ -2,6 +2,7 @@ import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { serviceProviders, jobs } from "@/data/mockData";
 import { useRole } from "@/contexts/RoleContext";
+import { haversineDistance } from "@/lib/proximity";
 import { Briefcase, Clock, Star, TrendingUp, Shield, Scale } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -102,7 +103,13 @@ export default function SPDashboard() {
                 <p className="text-lg font-bold text-primary">${job.payout}</p>
               </div>
               <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                <span>{job.distance} km away</span>
+                <span>{(() => {
+                  const spData = serviceProviders.find(s => s.id === currentSpId);
+                  if (spData?.baseAddress.lat && spData?.baseAddress.lng && job.jobAddress.lat && job.jobAddress.lng) {
+                    return `${haversineDistance(spData.baseAddress.lat, spData.baseAddress.lng, job.jobAddress.lat, job.jobAddress.lng)} km away`;
+                  }
+                  return "Distance N/A";
+                })()}</span>
                 <span>·</span>
                 <span>{job.estimatedDuration}</span>
               </div>

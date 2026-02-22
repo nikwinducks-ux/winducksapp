@@ -1,7 +1,16 @@
-import { jobs } from "@/data/mockData";
+import { jobs, serviceProviders } from "@/data/mockData";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Link } from "react-router-dom";
 import { MapPin, Clock, DollarSign } from "lucide-react";
+import { haversineDistance } from "@/lib/proximity";
+
+function getDistanceDisplay(job: typeof jobs[0]) {
+  const sp = serviceProviders[0]; // current SP
+  if (sp.baseAddress.lat && sp.baseAddress.lng && job.jobAddress.lat && job.jobAddress.lng) {
+    return `${haversineDistance(sp.baseAddress.lat, sp.baseAddress.lng, job.jobAddress.lat, job.jobAddress.lng)} km`;
+  }
+  return job.distance ? `~${job.distance} km` : "N/A";
+}
 
 export default function JobOffers() {
   const pendingJobs = jobs.filter((j) => j.status === "pending");
@@ -30,7 +39,7 @@ export default function JobOffers() {
                 </div>
                 <p className="text-sm text-muted-foreground truncate mt-0.5">{job.address}</p>
                 <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{job.distance} km</span>
+                  <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{getDistanceDisplay(job)}</span>
                   <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{job.estimatedDuration}</span>
                   <span>{job.scheduledDate} · {job.scheduledTime}</span>
                 </div>

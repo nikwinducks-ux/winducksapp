@@ -1,0 +1,83 @@
+import { useState } from "react";
+import { customers, type Customer, formatAddress, jobs } from "@/data/mockData";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Search, Plus, Eye, Pencil, Archive } from "lucide-react";
+import { Link } from "react-router-dom";
+
+export default function CustomerManagement() {
+  const [search, setSearch] = useState("");
+
+  const filtered = customers.filter(
+    (c) =>
+      !c.archived &&
+      (c.name.toLowerCase().includes(search.toLowerCase()) ||
+        c.email.toLowerCase().includes(search.toLowerCase()) ||
+        c.serviceAddress.city.toLowerCase().includes(search.toLowerCase()) ||
+        c.tags.some((t) => t.toLowerCase().includes(search.toLowerCase())))
+  );
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="page-header">Customers</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{filtered.length} customers</p>
+        </div>
+        <Link to="/admin/customers/new">
+          <Button><Plus className="h-4 w-4 mr-2" />Add Customer</Button>
+        </Link>
+      </div>
+
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input placeholder="Search name, email, city, tag..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+      </div>
+
+      <div className="metric-card overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left">
+              <th className="pb-3 font-medium text-muted-foreground">Name</th>
+              <th className="pb-3 font-medium text-muted-foreground">Phone</th>
+              <th className="pb-3 font-medium text-muted-foreground">Email</th>
+              <th className="pb-3 font-medium text-muted-foreground">City</th>
+              <th className="pb-3 font-medium text-muted-foreground">Tags</th>
+              <th className="pb-3 font-medium text-muted-foreground">Last Job</th>
+              <th className="pb-3 font-medium text-muted-foreground">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((c) => (
+              <tr key={c.id} className="border-b last:border-0">
+                <td className="py-3 font-medium">{c.name}</td>
+                <td className="py-3 text-muted-foreground">{c.phone}</td>
+                <td className="py-3 text-muted-foreground">{c.email}</td>
+                <td className="py-3">{c.serviceAddress.city}</td>
+                <td className="py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {c.tags.map((t) => (
+                      <span key={t} className="status-badge bg-primary/10 text-primary">{t}</span>
+                    ))}
+                  </div>
+                </td>
+                <td className="py-3 text-muted-foreground">{c.lastJobDate ?? "—"}</td>
+                <td className="py-3">
+                  <div className="flex items-center gap-1">
+                    <Link to={`/admin/customers/${c.id}`}>
+                      <Button size="sm" variant="ghost" title="View"><Eye className="h-4 w-4" /></Button>
+                    </Link>
+                    <Link to={`/admin/customers/${c.id}/edit`}>
+                      <Button size="sm" variant="ghost" title="Edit"><Pencil className="h-4 w-4" /></Button>
+                    </Link>
+                    <Button size="sm" variant="ghost" title="Archive"><Archive className="h-4 w-4" /></Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
