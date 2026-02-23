@@ -270,65 +270,12 @@ export function useAcceptOffer() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ offerId, jobId, spId }: { offerId: string; jobId: string; spId: string }) => {
-      // 1. Check job still available
-      const { data: jobRow, error: fetchErr } = await supabase
-        .from("jobs")
-        .select("id, status, assigned_sp_id")
-        .eq("id", jobId)
-        .single();
-      if (fetchErr) throw new Error("Could not verify job availability.");
-      if (jobRow.assigned_sp_id) throw new Error("Job already assigned to another provider.");
-
-      // 2. Accept this offer
-      await supabase.from("offers")
-        .update({
-          status: "Accepted",
-          responded_at: new Date().toISOString(),
-          acceptance_source: "Manual",
-        } as any)
-        .eq("id", offerId);
-
-      // 3. Cancel/expire other pending offers for same job
-      await supabase.from("offers")
-        .update({ status: "Cancelled" } as any)
-        .eq("job_id", jobId)
-        .eq("status", "Pending")
-        .neq("id", offerId);
-
-      // 4. Assign job
-      const { error: jobErr } = await supabase.from("jobs").update({
-        assigned_sp_id: spId,
-        status: "Assigned",
-      }).eq("id", jobId).is("assigned_sp_id", null);
-      if (jobErr) throw new Error("Failed to accept job. It may have been taken.");
-
-      // 5. Audit
-      await supabase.from("job_assignments").insert({
-        job_id: jobId,
-        sp_id: spId,
-        assignment_type: "Offer",
-      } as any);
-
-      await supabase.from("job_status_events").insert({
-        job_id: jobId,
-        old_status: jobRow.status,
-        new_status: "Assigned",
-        changed_by_sp_id: spId,
-      });
-
-      // 6. Finalize allocation run if exists
-      const { data: offerRow } = await supabase
-        .from("offers")
-        .select("allocation_run_id")
-        .eq("id", offerId)
-        .single();
-      if (offerRow?.allocation_run_id) {
-        await supabase.from("allocation_runs").update({
-          selected_sp_id: spId,
-          finalized_at: new Date().toISOString(),
-        } as any).eq("id", offerRow.allocation_run_id);
-      }
+    mutationFn: async ({ offerId }: { offerId: string; jobId?: string; spId?: string }) => {
+      const { data, error } = await supabase.rpc("accept_offer", { _offer_id: offerId });
+      if (error) throw new Error(error.message);
+      const result = data as any;
+      if (result?.error) throw new Error(result.error);
+      return result;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["offers"] });
@@ -350,13 +297,13 @@ export function useDeclineOffer() {
 
   return useMutation({
     mutationFn: async ({ offerId, declineReason }: { offerId: string; declineReason: string }) => {
-      await supabase.from("offers")
-        .update({
-          status: "Declined",
-          responded_at: new Date().toISOString(),
-          decline_reason: declineReason,
-        } as any)
-        .eq("id", offerId);
+      const { data, error } = await supabase.rpc("decline_offer", {
+        _offer_id: offerId,
+        _reason: declineReason,
+      });
+      if (error) throw new Error(error.message);
+      const result = data as any;
+      if (result?.error) throw new Error(result.error);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["offers"] });
