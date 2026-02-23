@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, Info, MapPin, Radio } from "lucide-react";
 import { autofillCoords, SUPPORTED_CITIES } from "@/lib/coord-autofill";
 import { useToast } from "@/hooks/use-toast";
+import { normalizeUrgency } from "@/components/UrgencyBadge";
 
 // Generate time options in 15-min increments
 const TIME_OPTIONS: string[] = [];
@@ -173,7 +174,7 @@ export default function JobForm() {
       scheduledTime: form.scheduledTime,
       estimatedDuration,
       notes: form.notes,
-      urgency: form.urgency,
+      urgency: normalizeUrgency(form.urgency),
       isBroadcast: form.isBroadcast,
       broadcastRadiusKm: parseInt(form.broadcastRadiusKm) || 100,
       broadcastNote: form.broadcastNote,
