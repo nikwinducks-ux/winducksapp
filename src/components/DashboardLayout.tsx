@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Briefcase, Calendar, Zap, TrendingUp,
   Sliders, Scale, Users, FlaskConical, GitBranch, Plug, Tag,
   ChevronLeft, ChevronRight, Shield, UserCircle, Contact,
-  LogOut, ClipboardList, UserCog, Settings,
+  LogOut, ClipboardList, UserCog, Settings, TestTube,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -27,6 +27,7 @@ const adminLinks = [
   { to: "/admin/providers", icon: Users, label: "Service Providers" },
   { to: "/admin/customers", icon: Contact, label: "Customers" },
   { to: "/admin/simulation", icon: FlaskConical, label: "Simulation" },
+  { to: "/admin/qa", icon: TestTube, label: "Allocation QA" },
   { to: "/admin/workflow", icon: GitBranch, label: "Offer Workflow" },
   { to: "/admin/integrations", icon: Plug, label: "Integrations" },
   { to: "/admin/users", icon: UserCog, label: "Users" },

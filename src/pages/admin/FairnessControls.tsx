@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { fairnessConfig } from "@/data/mockData";
 import { HelpCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useActivePolicy, useSavePolicy } from "@/hooks/useAllocationData";
+import type { FairnessConfig } from "@/lib/allocation-engine";
 
-const tooltips: Record<string, string> = {
+const tooltips: Record<keyof FairnessConfig, string> = {
   rollingWindow: "The number of days over which fairness distribution is calculated.",
   maxSharePercent: "Maximum percentage of total jobs any single SP should receive.",
   cooldownHours: "Minimum hours between consecutive assignments to the same SP.",
@@ -15,10 +16,23 @@ const tooltips: Record<string, string> = {
 };
 
 export default function FairnessControls() {
-  const [config, setConfig] = useState({ ...fairnessConfig });
-  const [saved, setSaved] = useState(false);
+  const activePolicy = useActivePolicy();
+  const savePolicy = useSavePolicy();
 
-  const fields: { key: keyof typeof config; label: string; unit: string; min: number; max: number }[] = [
+  const [config, setConfig] = useState<FairnessConfig>({
+    rollingWindow: 30, maxSharePercent: 15, cooldownHours: 4,
+    minDistributionBoost: 5, newSpBoostDays: 30,
+  });
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    if (activePolicy && !initialized) {
+      setConfig(activePolicy.fairness_json);
+      setInitialized(true);
+    }
+  }, [activePolicy, initialized]);
+
+  const fields: { key: keyof FairnessConfig; label: string; unit: string; min: number; max: number }[] = [
     { key: "rollingWindow", label: "Rolling Window", unit: "days", min: 7, max: 90 },
     { key: "maxSharePercent", label: "Maximum Share %", unit: "%", min: 5, max: 50 },
     { key: "cooldownHours", label: "Cooldown After Assignment", unit: "hours", min: 0, max: 48 },
@@ -26,11 +40,25 @@ export default function FairnessControls() {
     { key: "newSpBoostDays", label: "New SP Boost Duration", unit: "days", min: 0, max: 90 },
   ];
 
+  const handleSave = () => {
+    if (!activePolicy) return;
+    const vNum = parseFloat(activePolicy.version_name.replace("Policy v", "")) || 1.0;
+    const newVersion = `Policy v${(vNum + 0.1).toFixed(1)}`;
+
+    savePolicy.mutate({
+      versionName: newVersion,
+      weights: activePolicy.weights_json,
+      fairness: config,
+    });
+  };
+
   return (
     <div className="space-y-8 animate-fade-in max-w-2xl">
       <div>
         <h1 className="page-header">Fairness Controls</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Configure fairness distribution parameters</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Configure fairness distribution parameters • Saved with policy version
+        </p>
       </div>
 
       <div className="metric-card space-y-6">
@@ -62,11 +90,8 @@ export default function FairnessControls() {
         ))}
       </div>
 
-      <Button
-        className="w-full sm:w-auto"
-        onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 2000); }}
-      >
-        {saved ? "✓ Saved" : "Save Fairness Config"}
+      <Button className="w-full sm:w-auto" onClick={handleSave} disabled={savePolicy.isPending}>
+        {savePolicy.isPending ? "Saving…" : "Save Fairness Config"}
       </Button>
     </div>
   );

@@ -32,6 +32,7 @@ import CustomerManagement from "./pages/admin/CustomerManagement";
 import CustomerDetail from "./pages/admin/CustomerDetail";
 import CustomerForm from "./pages/admin/CustomerForm";
 import SimulationTool from "./pages/admin/SimulationTool";
+import AllocationQA from "./pages/admin/AllocationQA";
 import OfferWorkflow from "./pages/admin/OfferWorkflow";
 import Integrations from "./pages/admin/Integrations";
 import JobManagement from "./pages/admin/JobManagement";
@@ -96,6 +97,7 @@ function AppRoutes() {
         <Route path="/admin/jobs/:id" element={<JobDetail />} />
         <Route path="/admin/jobs/:id/edit" element={<JobForm />} />
         <Route path="/admin/simulation" element={<SimulationTool />} />
+        <Route path="/admin/qa" element={<AllocationQA />} />
         <Route path="/admin/workflow" element={<OfferWorkflow />} />
         <Route path="/admin/integrations" element={<Integrations />} />
         <Route path="/admin/users" element={<UserManagement />} />
