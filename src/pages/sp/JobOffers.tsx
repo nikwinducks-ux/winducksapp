@@ -2,7 +2,7 @@ import { useServiceProviders, useJobs, useActiveServiceCategories } from "@/hook
 import { StatusBadge } from "@/components/StatusBadge";
 import { Link } from "react-router-dom";
 import { MapPin, Clock, DollarSign, FileText } from "lucide-react";
-import { haversineDistance } from "@/lib/proximity";
+import { computeProximityResult } from "@/lib/proximity";
 
 function UrgencyBadge({ urgency }: { urgency?: string }) {
   if (!urgency || urgency === "Scheduled") return <StatusBadge label="Scheduled" variant="info" />;
@@ -27,9 +27,9 @@ export default function JobOffers() {
   const otherJobs = jobs.filter((j) => !["pending", "created", "offered"].includes(j.status) || j.assignedSpId);
 
   function getDistanceDisplay(job: typeof jobs[0]) {
-    if (sp?.baseAddress.lat && sp?.baseAddress.lng && job.jobAddress.lat && job.jobAddress.lng) {
-      return `${haversineDistance(sp.baseAddress.lat, sp.baseAddress.lng, job.jobAddress.lat, job.jobAddress.lng)} km`;
-    }
+    if (!sp) return "N/A";
+    const result = computeProximityResult(sp.baseAddress, job.jobAddress);
+    if (result.distanceKm !== null) return `${result.distanceKm} km`;
     return "N/A";
   }
 
@@ -46,7 +46,7 @@ export default function JobOffers() {
         <h2 className="section-title mb-4">Pending Offers</h2>
         <div className="space-y-3">
           {pendingJobs.map((job) => (
-            <Link key={job.id} to={`/jobs/${job.id}`} className="metric-card flex items-center gap-4 hover:border-primary/30 transition-colors">
+            <Link key={job.dbId} to={`/jobs/${job.dbId}`} className="metric-card flex items-center gap-4 hover:border-primary/30 transition-colors">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-semibold truncate">{job.customerName}</p>

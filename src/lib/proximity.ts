@@ -1,3 +1,5 @@
+import type { Address } from "@/data/mockData";
+
 // Haversine formula for distance between two coordinates
 export function haversineDistance(
   lat1: number, lon1: number,
@@ -16,6 +18,44 @@ export function haversineDistance(
 
 function toRad(deg: number): number {
   return (deg * Math.PI) / 180;
+}
+
+// Normalize address string for comparison
+function normalizeAddr(s: string): string {
+  return (s || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+// Check if two addresses match (case-insensitive, trimmed)
+export function addressesMatch(a: Address, b: Address): boolean {
+  return (
+    normalizeAddr(a.street) === normalizeAddr(b.street) &&
+    normalizeAddr(a.city) === normalizeAddr(b.city) &&
+    normalizeAddr(a.province) === normalizeAddr(b.province) &&
+    normalizeAddr(a.postalCode) === normalizeAddr(b.postalCode)
+  );
+}
+
+export type DistanceSource = "coordinates" | "address_match" | "fallback";
+
+export interface ProximityResult {
+  distanceKm: number | null;
+  score: number;
+  source: DistanceSource;
+}
+
+// Compute proximity between an SP address and a job address
+export function computeProximityResult(spAddr: Address, jobAddr: Address): ProximityResult {
+  // 1. If both have coordinates, use Haversine
+  if (spAddr.lat && spAddr.lng && jobAddr.lat && jobAddr.lng) {
+    const d = haversineDistance(spAddr.lat, spAddr.lng, jobAddr.lat, jobAddr.lng);
+    return { distanceKm: d, score: proximityScore(d), source: "coordinates" };
+  }
+  // 2. Exact address match fallback
+  if (addressesMatch(spAddr, jobAddr)) {
+    return { distanceKm: 0, score: 100, source: "address_match" };
+  }
+  // 3. No data available
+  return { distanceKm: null, score: 50, source: "fallback" };
 }
 
 // Proximity score mapping: closer = higher score
@@ -43,4 +83,10 @@ export function proximityScore(distanceKm: number): number {
 }
 
 export const PROXIMITY_TOOLTIP =
-  "Proximity scoring: 0km = 100, 10km = 90, 25km = 70, 50km = 40, 75km = 10, >75km = 0. Calculated using straight-line (Haversine) distance between SP base address and job location.";
+  "Proximity scoring: 0km = 100, 10km = 90, 25km = 70, 50km = 40, 75km = 10, >75km = 0. Calculated using straight-line (Haversine) distance between SP base address and job location. When coordinates are missing, exact address match = 0km/100%.";
+
+export const DISTANCE_SOURCE_LABELS: Record<DistanceSource, string> = {
+  coordinates: "Coordinates",
+  address_match: "Address match",
+  fallback: "Fallback",
+};

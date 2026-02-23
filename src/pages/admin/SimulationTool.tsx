@@ -4,29 +4,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useServiceProviders, useJobs } from "@/hooks/useSupabaseData";
 import { ScoreBar } from "@/components/ScoreBar";
-import { haversineDistance, proximityScore, PROXIMITY_TOOLTIP } from "@/lib/proximity";
+import { computeProximityResult, PROXIMITY_TOOLTIP } from "@/lib/proximity";
 import { FlaskConical, Trophy, Info } from "lucide-react";
 import type { ServiceProvider, Job } from "@/data/mockData";
 
 function generateScores(jobId: string, jobs: Job[], serviceProviders: ServiceProvider[]) {
-  const job = jobs.find((j) => j.id === jobId);
+  const job = jobs.find((j) => j.dbId === jobId);
   return serviceProviders
     .filter((sp) => sp.status !== "Suspended")
     .map((sp) => {
-      let proxScore: number;
-      let distKm: number | null = null;
-      if (job && sp.baseAddress.lat && sp.baseAddress.lng && job.jobAddress.lat && job.jobAddress.lng) {
-        distKm = haversineDistance(sp.baseAddress.lat, sp.baseAddress.lng, job.jobAddress.lat, job.jobAddress.lng);
-        proxScore = proximityScore(distKm);
-      } else {
-        proxScore = Math.round(30 + Math.random() * 70);
-      }
+      const proxResult = job
+        ? computeProximityResult(sp.baseAddress, job.jobAddress)
+        : { distanceKm: null, score: Math.round(30 + Math.random() * 70), source: "fallback" as const };
       return {
         sp,
-        distKm,
+        distKm: proxResult.distanceKm,
         scores: {
           availability: Math.round(60 + Math.random() * 40),
-          proximity: proxScore,
+          proximity: proxResult.score,
           competency: Math.round(70 + Math.random() * 30),
           reliability: sp.reliabilityScore,
           rating: Math.round(sp.rating * 20),
@@ -80,7 +75,7 @@ export default function SimulationTool() {
             </SelectTrigger>
             <SelectContent>
               {jobs.map((job) => (
-                <SelectItem key={job.id} value={job.id}>
+                <SelectItem key={job.dbId} value={job.dbId}>
                   {job.id} — {job.customerName} ({job.serviceCategory})
                 </SelectItem>
               ))}

@@ -29,7 +29,7 @@ export default function JobDetail() {
   const assignJob = useAssignJob();
   const activeCategories = useActiveServiceCategories();
 
-  const job = jobs.find((j) => j.id === id);
+  const job = jobs.find((j) => j.dbId === id);
   const [showAssign, setShowAssign] = useState(searchParams.get("assign") === "true");
   const [selectedSpId, setSelectedSpId] = useState("");
 
@@ -48,7 +48,7 @@ export default function JobDetail() {
   const handleAssign = () => {
     if (!selectedSpId || !id) return;
     assignJob.mutate(
-      { jobId: id, spId: selectedSpId, assignedByUserId: user?.id ?? null },
+      { jobId: job!.dbId, spId: selectedSpId, assignedByUserId: user?.id ?? null },
       { onSuccess: () => setShowAssign(false) }
     );
   };
@@ -75,7 +75,7 @@ export default function JobDetail() {
           <UrgencyBadge urgency={job.urgency} />
         </div>
         <div className="flex gap-2">
-          <Link to={`/admin/jobs/${id}/edit`}>
+          <Link to={`/admin/jobs/${job.dbId}/edit`}>
             <Button variant="outline" size="sm"><Pencil className="h-4 w-4 mr-1" />Edit</Button>
           </Link>
           <Button size="sm" onClick={() => setShowAssign(true)}>
