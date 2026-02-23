@@ -1,6 +1,6 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { JobServicesDisplay } from "@/components/JobServicesDisplay";
-import { useJobs, useServiceProviders, useAssignJob, useActiveServiceCategories } from "@/hooks/useSupabaseData";
+import { useJobs, useServiceProviders, useAssignJob, useActiveServiceCategories, useServiceCategories } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOffers, useCreateManualOffer, useGenerateBroadcastOffers } from "@/hooks/useOfferData";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ export default function JobDetail() {
   const { user } = useAuth();
   const assignJob = useAssignJob();
   const activeCategories = useActiveServiceCategories();
+  const { data: allCategories = [] } = useServiceCategories();
   const { data: jobOffers = [], refetch: refetchOffers } = useOffers(id);
   const createManualOffer = useCreateManualOffer();
   const generateBroadcast = useGenerateBroadcastOffers();
@@ -161,7 +162,7 @@ export default function JobDetail() {
         {job.services && job.services.length > 0 && (
           <div className="metric-card space-y-3">
             <h2 className="section-title">Services ({job.services.length})</h2>
-            <JobServicesDisplay services={job.services} />
+            <JobServicesDisplay services={job.services} categories={allCategories} />
           </div>
         )}
 

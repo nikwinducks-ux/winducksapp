@@ -553,6 +553,7 @@ export type Database = {
       service_categories: {
         Row: {
           active: boolean
+          code: string
           created_at: string
           description: string | null
           display_order: number
@@ -562,6 +563,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          code?: string
           created_at?: string
           description?: string | null
           display_order?: number
@@ -571,6 +573,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          code?: string
           created_at?: string
           description?: string | null
           display_order?: number

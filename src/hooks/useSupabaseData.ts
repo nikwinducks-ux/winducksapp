@@ -106,6 +106,7 @@ function dbToJob(row: any, customers: Customer[]): Job {
 export interface ServiceCategory {
   id: string;
   name: string;
+  code: string;
   description: string;
   active: boolean;
   display_order: number;
@@ -134,7 +135,7 @@ export function useCreateServiceCategory() {
   const qc = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: async (form: { name: string; description: string; display_order: number }) => {
+    mutationFn: async (form: { name: string; code?: string; description: string; display_order: number }) => {
       const { error } = await supabase.from("service_categories").insert(form);
       if (error) throw error;
     },
@@ -152,7 +153,7 @@ export function useUpdateServiceCategory() {
   const qc = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: async ({ id, ...fields }: { id: string; name?: string; description?: string; active?: boolean; display_order?: number }) => {
+    mutationFn: async ({ id, ...fields }: { id: string; name?: string; code?: string; description?: string; active?: boolean; display_order?: number }) => {
       const { error } = await supabase.from("service_categories").update(fields).eq("id", id);
       if (error) throw error;
     },

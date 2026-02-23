@@ -13,23 +13,25 @@ export default function ServiceCategories() {
 
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newCode, setNewCode] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editCode, setEditCode] = useState("");
   const [editDesc, setEditDesc] = useState("");
 
   const handleAdd = () => {
     if (!newName.trim()) return;
     createCategory.mutate(
-      { name: newName.trim(), description: newDesc.trim(), display_order: categories.length + 1 },
-      { onSuccess: () => { setNewName(""); setNewDesc(""); setShowAdd(false); } }
+      { name: newName.trim(), code: newCode.trim(), description: newDesc.trim(), display_order: categories.length + 1 },
+      { onSuccess: () => { setNewName(""); setNewCode(""); setNewDesc(""); setShowAdd(false); } }
     );
   };
 
   const handleUpdate = (id: string) => {
     if (!editName.trim()) return;
     updateCategory.mutate(
-      { id, name: editName.trim(), description: editDesc.trim() },
+      { id, name: editName.trim(), code: editCode.trim(), description: editDesc.trim() },
       { onSuccess: () => setEditId(null) }
     );
   };
@@ -41,6 +43,7 @@ export default function ServiceCategories() {
   const startEdit = (cat: any) => {
     setEditId(cat.id);
     setEditName(cat.name);
+    setEditCode(cat.code || "");
     setEditDesc(cat.description || "");
   };
 
@@ -61,10 +64,14 @@ export default function ServiceCategories() {
       {showAdd && (
         <div className="metric-card space-y-3">
           <h2 className="section-title">New Category</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
               <Label>Name</Label>
               <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Roof Cleaning" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Code</Label>
+              <Input value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="e.g. rc" className="font-mono" />
             </div>
             <div className="space-y-1.5">
               <Label>Description (optional)</Label>
@@ -85,8 +92,9 @@ export default function ServiceCategories() {
           <div key={cat.id} className={`metric-card flex items-center gap-4 ${!cat.active ? "opacity-60" : ""}`}>
             {editId === cat.id ? (
               <div className="flex-1 flex items-center gap-3">
-                <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="max-w-[200px]" />
-                <Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="Description" className="max-w-[200px]" />
+                <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="max-w-[180px]" />
+                <Input value={editCode} onChange={(e) => setEditCode(e.target.value)} placeholder="Code" className="max-w-[80px] font-mono" />
+                <Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="Description" className="max-w-[180px]" />
                 <Button size="sm" variant="ghost" onClick={() => handleUpdate(cat.id)}><Check className="h-4 w-4" /></Button>
                 <Button size="sm" variant="ghost" onClick={() => setEditId(null)}><X className="h-4 w-4" /></Button>
               </div>
@@ -95,6 +103,7 @@ export default function ServiceCategories() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-semibold">{cat.name}</p>
+                    {cat.code && <span className="font-mono text-xs text-muted-foreground">({cat.code})</span>}
                     <StatusBadge label={cat.active ? "Active" : "Inactive"} variant={cat.active ? "valid" : "warning"} />
                   </div>
                   {cat.description && <p className="text-sm text-muted-foreground mt-0.5">{cat.description}</p>}
