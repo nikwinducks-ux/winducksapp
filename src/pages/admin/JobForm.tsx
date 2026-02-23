@@ -10,6 +10,44 @@ import { ArrowLeft } from "lucide-react";
 
 const SERVICE_TYPES = ["Window Cleaning", "Gutter Cleaning", "Pressure Washing"];
 
+// Generate time options in 15-min increments
+const TIME_OPTIONS: string[] = [];
+for (let h = 0; h < 24; h++) {
+  for (let m = 0; m < 60; m += 15) {
+    const hh = h.toString().padStart(2, "0");
+    const mm = m.toString().padStart(2, "0");
+    TIME_OPTIONS.push(`${hh}:${mm}`);
+  }
+}
+
+// Generate duration options in 15-min increments (15 min to 8 hours)
+const DURATION_OPTIONS: { value: string; label: string }[] = [];
+for (let mins = 15; mins <= 480; mins += 15) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  const label = h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+  DURATION_OPTIONS.push({ value: String(mins), label });
+}
+
+function formatTime12h(t: string): string {
+  if (!t) return "";
+  const [hh, mm] = t.split(":");
+  const h = parseInt(hh);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:${mm} ${ampm}`;
+}
+
+/** Convert legacy text duration (e.g. "2 hours", "1.5 hours", "90") to minutes string */
+function parseDurationToMinutes(val: string): string {
+  if (!val) return "";
+  const num = parseFloat(val);
+  if (!isNaN(num) && val.toLowerCase().includes("hour")) return String(Math.round(num * 60));
+  if (!isNaN(num) && num > 0 && num <= 24) return String(Math.round(num * 60)); // assume hours if small number
+  if (!isNaN(num) && num >= 15) return String(num); // already minutes
+  return "";
+}
+
 export default function JobForm() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -32,7 +70,7 @@ export default function JobForm() {
     lng: "",
     scheduledDate: "",
     scheduledTime: "",
-    estimatedDuration: "",
+    estimatedDurationMinutes: "",
   });
   const [loadingExisting, setLoadingExisting] = useState(isEdit);
 
@@ -55,7 +93,7 @@ export default function JobForm() {
           lng: data.job_lng?.toString() ?? "",
           scheduledDate: data.scheduled_date ?? "",
           scheduledTime: data.scheduled_time ?? "",
-          estimatedDuration: data.estimated_duration ?? "",
+          estimatedDurationMinutes: parseDurationToMinutes(data.estimated_duration) || data.estimated_duration || "",
         });
       }
       setLoadingExisting(false);
@@ -86,6 +124,12 @@ export default function JobForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const serviceCategory = form.serviceCategory === "custom" ? form.customService : form.serviceCategory;
+    // Convert minutes back to display string for storage
+    const mins = parseInt(form.estimatedDurationMinutes);
+    const estimatedDuration = !isNaN(mins) && mins > 0
+      ? (mins >= 60 ? `${Math.floor(mins / 60)}${mins % 60 > 0 ? `.${Math.round((mins % 60) / 60 * 10) / 10 * 10}` : ""} hours` : `${mins} minutes`)
+      : form.estimatedDurationMinutes;
+
     const payload = {
       customerId: form.customerId,
       serviceCategory,
@@ -99,7 +143,7 @@ export default function JobForm() {
       lng: form.lng,
       scheduledDate: form.scheduledDate,
       scheduledTime: form.scheduledTime,
-      estimatedDuration: form.estimatedDuration,
+      estimatedDuration,
     };
     if (isEdit && id) {
       updateJob.mutate({ id, ...payload }, { onSuccess: () => navigate("/admin/jobs") });
@@ -109,6 +153,14 @@ export default function JobForm() {
   };
 
   if (loadingExisting) return <div className="py-20 text-center text-muted-foreground">Loading...</div>;
+
+  const durationDisplay = (() => {
+    const mins = parseInt(form.estimatedDurationMinutes);
+    if (isNaN(mins) || mins <= 0) return undefined;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+  })();
 
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl">
@@ -191,11 +243,33 @@ export default function JobForm() {
             </div>
             <div className="space-y-1.5">
               <Label>Time</Label>
-              <Input value={form.scheduledTime} onChange={(e) => update("scheduledTime", e.target.value)} placeholder="e.g. 09:00 AM" />
+              <Select value={form.scheduledTime} onValueChange={(v) => update("scheduledTime", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select time">
+                    {form.scheduledTime ? formatTime12h(form.scheduledTime) : "Select time"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {TIME_OPTIONS.map((t) => (
+                    <SelectItem key={t} value={t}>{formatTime12h(t)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Estimated Duration</Label>
-              <Input value={form.estimatedDuration} onChange={(e) => update("estimatedDuration", e.target.value)} placeholder="e.g. 2 hours" />
+              <Select value={form.estimatedDurationMinutes} onValueChange={(v) => update("estimatedDurationMinutes", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select duration">
+                    {durationDisplay || "Select duration"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {DURATION_OPTIONS.map((d) => (
+                    <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>

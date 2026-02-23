@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Briefcase, Calendar, Zap, TrendingUp,
   Sliders, Scale, Users, FlaskConical, GitBranch, Plug,
   ChevronLeft, ChevronRight, Shield, UserCircle, Contact,
-  LogOut, ClipboardList, UserCog,
+  LogOut, ClipboardList, UserCog, Settings,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -15,6 +15,7 @@ const spLinks = [
   { to: "/availability", icon: Calendar, label: "Availability" },
   { to: "/auto-accept", icon: Zap, label: "Auto-Accept" },
   { to: "/performance", icon: TrendingUp, label: "Performance" },
+  { to: "/account", icon: Settings, label: "Account" },
 ];
 
 const adminLinks = [
