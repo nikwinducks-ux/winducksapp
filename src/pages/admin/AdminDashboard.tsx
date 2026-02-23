@@ -7,8 +7,8 @@ export default function AdminDashboard() {
   const { data: jobs = [] } = useJobs();
 
   const activeSPs = serviceProviders.filter((s) => s.status === "Active").length;
-  const pendingJobs = jobs.filter((j) => j.status === "pending" || j.status === "created").length;
-  const completedJobs = jobs.filter((j) => j.status === "completed").length;
+  const pendingJobs = jobs.filter((j) => j.status === "Created" || j.status === "Offered").length;
+  const completedJobs = jobs.filter((j) => j.status === "Completed").length;
   const expiring = serviceProviders.filter((s) => s.complianceStatus === "Expiring").length;
 
   return (

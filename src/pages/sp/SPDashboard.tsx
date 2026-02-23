@@ -15,8 +15,8 @@ export default function SPDashboard() {
   const sp = serviceProviders.find((s) => s.id === user?.spId) ?? serviceProviders[0];
   if (!sp) return <div className="py-20 text-center text-muted-foreground">Loading dashboard...</div>;
 
-  const assignedJobs = jobs.filter((j) => j.assignedSpId === sp.id && j.status === "assigned");
-  const pendingOffers = jobs.filter((j) => j.status === "pending" || j.status === "created").slice(0, 3);
+  const assignedJobs = jobs.filter((j) => j.assignedSpId === sp.id && (j.status === "Assigned" || j.status === "InProgress"));
+  const pendingOffers = jobs.filter((j) => j.status === "Created" || j.status === "Offered").slice(0, 3);
 
   const complianceVariant = sp.complianceStatus === "Valid" ? "valid" : sp.complianceStatus === "Expiring" ? "warning" : "error";
   const fairnessVariant = sp.fairnessStatus === "Within Target" ? "valid" : sp.fairnessStatus === "Above Target Share" ? "warning" : "info";

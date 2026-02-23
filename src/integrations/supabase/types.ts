@@ -342,6 +342,7 @@ export type Database = {
           assigned_sp_id: string | null
           broadcast_note: string
           broadcast_radius_km: number
+          completed_at: string | null
           created_at: string
           customer_id: string | null
           estimated_duration: string
@@ -361,6 +362,7 @@ export type Database = {
           scheduled_time: string
           scores: Json | null
           service_category: string
+          started_at: string | null
           status: string
           updated_at: string
           urgency: string
@@ -369,6 +371,7 @@ export type Database = {
           assigned_sp_id?: string | null
           broadcast_note?: string
           broadcast_radius_km?: number
+          completed_at?: string | null
           created_at?: string
           customer_id?: string | null
           estimated_duration?: string
@@ -388,6 +391,7 @@ export type Database = {
           scheduled_time?: string
           scores?: Json | null
           service_category?: string
+          started_at?: string | null
           status?: string
           updated_at?: string
           urgency?: string
@@ -396,6 +400,7 @@ export type Database = {
           assigned_sp_id?: string | null
           broadcast_note?: string
           broadcast_radius_km?: number
+          completed_at?: string | null
           created_at?: string
           customer_id?: string | null
           estimated_duration?: string
@@ -415,6 +420,7 @@ export type Database = {
           scheduled_time?: string
           scores?: Json | null
           service_category?: string
+          started_at?: string | null
           status?: string
           updated_at?: string
           urgency?: string

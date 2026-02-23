@@ -90,7 +90,7 @@ function dbToJob(row: any, customers: Customer[]): Job {
     scheduledDate: row.scheduled_date ?? "",
     scheduledTime: row.scheduled_time,
     payout: Number(row.payout),
-    status: row.status?.toLowerCase().replace(/\s/g, "-").replace("inprogress", "in-progress") as any,
+    status: row.status as any,
     assignedSpId: row.assigned_sp_id ?? undefined,
     scores: row.scores as AllocationScores | undefined,
     notes: row.notes ?? "",
@@ -585,12 +585,14 @@ export function useUpdateJobStatus() {
       jobDbId: string; oldStatus: string; newStatus: string;
       spId?: string; userId?: string; note?: string;
     }) => {
+      // Update job status — trigger enforces column-level security for SPs
       const { error: jobErr } = await supabase.from("jobs")
         .update({ status: newStatus })
         .eq("id", jobDbId);
       if (jobErr) throw jobErr;
 
-      await supabase.from("job_status_events").insert({
+      // Insert audit event
+      const { error: eventErr } = await supabase.from("job_status_events").insert({
         job_id: jobDbId,
         old_status: oldStatus,
         new_status: newStatus,
@@ -598,13 +600,14 @@ export function useUpdateJobStatus() {
         changed_by_user_id: userId ?? null,
         note: note ?? null,
       });
+      if (eventErr) console.error("Status event audit error:", eventErr);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
       toast({ title: "Status updated" });
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error updating status", description: err.message, variant: "destructive" });
     },
   });
 }

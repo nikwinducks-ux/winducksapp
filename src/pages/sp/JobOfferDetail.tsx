@@ -70,7 +70,7 @@ export default function JobOfferDetail() {
     );
   }
 
-  const isAccepted = job.status === "assigned" && job.assignedSpId === user.spId;
+  const isAccepted = job.status === "Assigned" && job.assignedSpId === user.spId;
   const isDeclined = myOffer?.status === "Declined";
   const isExpired = myOffer ? new Date(myOffer.expires_at) < new Date() && myOffer.status === "Pending" : false;
   const isPending = myOffer?.status === "Pending" && !isExpired;
