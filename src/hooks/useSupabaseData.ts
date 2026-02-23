@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useRef } from "react";
-import type { Address, Customer, ServiceProvider, Job, AllocationScores } from "@/data/mockData";
+import type { Address, Customer, ServiceProvider, Job, JobService, AllocationScores } from "@/data/mockData";
 
 // ===== Type mappers =====
 
@@ -223,9 +223,88 @@ export function useJobs() {
     queryFn: async () => {
       const { data, error } = await supabase.from("jobs").select("*").order("scheduled_date", { ascending: true });
       if (error) throw error;
-      return (data ?? []).map((r) => dbToJob(r, customers ?? []));
+      // Fetch all job_services in one query
+      const jobIds = (data ?? []).map((r: any) => r.id);
+      let servicesMap: Record<string, JobService[]> = {};
+      if (jobIds.length > 0) {
+        const { data: svcData } = await supabase
+          .from("job_services")
+          .select("*")
+          .in("job_id", jobIds);
+        for (const svc of (svcData ?? []) as any[]) {
+          if (!servicesMap[svc.job_id]) servicesMap[svc.job_id] = [];
+          servicesMap[svc.job_id].push({
+            id: svc.id,
+            job_id: svc.job_id,
+            service_category: svc.service_category,
+            quantity: svc.quantity,
+            unit_price: svc.unit_price != null ? Number(svc.unit_price) : null,
+            line_total: Number(svc.line_total),
+            notes: svc.notes ?? "",
+          });
+        }
+      }
+      return (data ?? []).map((r) => {
+        const job = dbToJob(r, customers ?? []);
+        job.services = servicesMap[r.id] ?? [];
+        return job;
+      });
     },
     enabled: (customers?.length ?? 0) >= 0,
+  });
+}
+
+// ===== Job Services =====
+
+export function useJobServices(jobId: string | undefined) {
+  return useQuery({
+    queryKey: ["job_services", jobId],
+    queryFn: async () => {
+      if (!jobId) return [];
+      const { data, error } = await supabase
+        .from("job_services")
+        .select("*")
+        .eq("job_id", jobId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []).map((svc: any) => ({
+        id: svc.id,
+        job_id: svc.job_id,
+        service_category: svc.service_category,
+        quantity: svc.quantity,
+        unit_price: svc.unit_price != null ? Number(svc.unit_price) : null,
+        line_total: Number(svc.line_total),
+        notes: svc.notes ?? "",
+      })) as JobService[];
+    },
+    enabled: !!jobId,
+  });
+}
+
+export function useSaveJobServices() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ jobId, services }: {
+      jobId: string;
+      services: { service_category: string; quantity: number; unit_price: number | null; line_total: number; notes: string }[];
+    }) => {
+      // Delete all existing services for job, then re-insert
+      const { error: delErr } = await supabase.from("job_services").delete().eq("job_id", jobId);
+      if (delErr) throw delErr;
+      if (services.length > 0) {
+        const rows = services.map(s => ({ job_id: jobId, ...s }));
+        const { error: insErr } = await supabase.from("job_services").insert(rows);
+        if (insErr) throw insErr;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["job_services"] });
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error saving services", description: err.message, variant: "destructive" });
+    },
   });
 }
 

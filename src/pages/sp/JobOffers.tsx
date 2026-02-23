@@ -1,5 +1,6 @@
 import { useServiceProviders, useJobs, useActiveServiceCategories } from "@/hooks/useSupabaseData";
 import { useSpOffers, useAllSpOffers, useExpireStaleOffers, type Offer } from "@/hooks/useOfferData";
+import { JobServicesSummary } from "@/components/JobServicesDisplay";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
@@ -205,7 +206,13 @@ export default function JobOffers() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold truncate">{job.customerName}</p>
-                      <StatusBadge label={isLegacy(job.serviceCategory) ? `(Legacy) ${job.serviceCategory}` : job.serviceCategory} variant="neutral" />
+                      <StatusBadge label={
+                        job.services && job.services.length > 0
+                          ? (job.services.length === 1
+                              ? (isLegacy(job.services[0].service_category) ? `(Legacy) ${job.services[0].service_category}` : job.services[0].service_category)
+                              : `${job.services[0].service_category} +${job.services.length - 1}`)
+                          : (isLegacy(job.serviceCategory) ? `(Legacy) ${job.serviceCategory}` : job.serviceCategory)
+                      } variant="neutral" />
                       <UrgencyBadge urgency={job.urgency} />
                       {offer.acceptance_source === "Broadcast" && <StatusBadge label="Broadcast" variant="warning" />}
                       <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -250,7 +257,11 @@ export default function JobOffers() {
                       <p className="font-semibold truncate">{job.customerName}</p>
                       <StatusBadge label={job.status} variant={variant} />
                     </div>
-                    <p className="text-sm text-muted-foreground truncate mt-0.5">{job.serviceCategory} · {job.scheduledDate}</p>
+                    <p className="text-sm text-muted-foreground truncate mt-0.5">
+                      {job.services && job.services.length > 0
+                        ? job.services.map(s => s.service_category).join(", ")
+                        : job.serviceCategory} · {job.scheduledDate}
+                    </p>
                   </div>
                   <p className="text-lg font-bold">${job.payout}</p>
                 </div>
