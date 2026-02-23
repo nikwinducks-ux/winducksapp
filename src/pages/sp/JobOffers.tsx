@@ -1,11 +1,12 @@
 import { useServiceProviders, useJobs, useActiveServiceCategories } from "@/hooks/useSupabaseData";
-import { useSpOffers, useExpireStaleOffers, type Offer } from "@/hooks/useOfferData";
+import { useSpOffers, useAllSpOffers, useExpireStaleOffers, type Offer } from "@/hooks/useOfferData";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Link } from "react-router-dom";
-import { MapPin, Clock, DollarSign, FileText, Timer } from "lucide-react";
+import { MapPin, Clock, DollarSign, FileText, Timer, ChevronDown, ChevronUp, Info, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { computeProximityResult } from "@/lib/proximity";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 function UrgencyBadge({ urgency }: { urgency?: string }) {
   if (!urgency || urgency === "Scheduled") return <StatusBadge label="Scheduled" variant="info" />;
@@ -20,15 +21,96 @@ function ScheduleText({ job }: { job: any }) {
   return <span>{job.scheduledDate} · {job.scheduledTime}</span>;
 }
 
+function DiagnosticsPanel({ user, spId, currentSp, allOffers, pendingOffers }: {
+  user: any;
+  spId: string | null;
+  currentSp: any;
+  allOffers: Offer[];
+  pendingOffers: Offer[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full">
+        <Info className="h-3.5 w-3.5" />
+        <span>Diagnostics</span>
+        {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-2 metric-card text-xs space-y-1.5">
+          <div className="grid gap-1 sm:grid-cols-2">
+            <span className="text-muted-foreground">User email:</span>
+            <span className="font-mono">{user?.email ?? "(none)"}</span>
+            <span className="text-muted-foreground">Resolved sp_id:</span>
+            <span className="font-mono">{spId ?? "(none)"}</span>
+            <span className="text-muted-foreground">SP name:</span>
+            <span>{currentSp?.name ?? "(not found)"}</span>
+            <span className="text-muted-foreground">Total offers (all statuses):</span>
+            <span className="font-semibold">{allOffers.length}</span>
+            <span className="text-muted-foreground">Pending offers:</span>
+            <span className="font-semibold">{pendingOffers.length}</span>
+          </div>
+          {pendingOffers.length === 0 && (
+            <p className="text-muted-foreground pt-1 border-t">No offers are targeted to this SP.</p>
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function EligibilityChecklist({ currentSp }: { currentSp: any }) {
+  if (!currentSp) return null;
+
+  const checks = [
+    { label: "SP Status: Active", ok: currentSp.status === "Active", value: currentSp.status },
+    { label: "Compliance: Valid", ok: currentSp.complianceStatus === "Valid", value: currentSp.complianceStatus },
+    { label: "Categories assigned", ok: currentSp.serviceCategories?.length > 0, value: currentSp.serviceCategories?.join(", ") || "(none)" },
+    { label: "Auto-accept enabled", ok: currentSp.autoAccept, value: currentSp.autoAccept ? "Yes" : "No", info: true },
+    { label: "Travel radius set", ok: currentSp.travelRadius > 0, value: `${currentSp.travelRadius} km` },
+  ];
+
+  return (
+    <div className="metric-card space-y-2">
+      <h3 className="text-sm font-semibold flex items-center gap-2">
+        <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+        Why am I not receiving offers?
+      </h3>
+      <div className="space-y-1.5">
+        {checks.map((c, i) => (
+          <div key={i} className="flex items-center gap-2 text-xs">
+            {c.ok ? (
+              <CheckCircle className="h-3.5 w-3.5 text-primary shrink-0" />
+            ) : (
+              <XCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
+            )}
+            <span className={c.ok ? "text-muted-foreground" : "text-foreground font-medium"}>
+              {c.label}
+            </span>
+            <span className="text-muted-foreground ml-auto">{c.value}</span>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground pt-1 border-t">
+        Offers are sent by the allocation engine based on job category, proximity, and availability. Contact admin if you believe there's an issue.
+      </p>
+    </div>
+  );
+}
+
 export default function JobOffers() {
   const { user } = useAuth();
   const { data: serviceProviders = [] } = useServiceProviders();
   const { data: jobs = [] } = useJobs();
   const activeCategories = useActiveServiceCategories();
-  const { data: pendingOffers = [], refetch } = useSpOffers(user?.spId);
+
+  const spId = user?.spId ?? null;
+  const { data: pendingOffers = [], refetch } = useSpOffers(spId);
+  const { data: allOffers = [] } = useAllSpOffers(spId);
   const expireStale = useExpireStaleOffers();
 
-  const currentSp = serviceProviders.find(sp => sp.id === user?.spId);
+  const currentSp = serviceProviders.find(sp => sp.id === spId);
 
   // Expire stale offers
   useEffect(() => {
@@ -47,7 +129,7 @@ export default function JobOffers() {
   // Map offers to jobs
   const offerJobs = useMemo(() => {
     return pendingOffers
-      .filter(o => new Date(o.expires_at) > new Date()) // Not expired
+      .filter(o => new Date(o.expires_at) > new Date())
       .map(offer => {
         const job = jobs.find(j => j.dbId === offer.job_id);
         return job ? { offer, job } : null;
@@ -56,7 +138,7 @@ export default function JobOffers() {
   }, [pendingOffers, jobs]);
 
   // Past jobs assigned to this SP
-  const myAssignedJobs = jobs.filter(j => j.assignedSpId === user?.spId);
+  const myAssignedJobs = jobs.filter(j => j.assignedSpId === spId);
 
   function getDistanceDisplay(job: typeof jobs[0]) {
     if (!currentSp) return "N/A";
@@ -74,11 +156,24 @@ export default function JobOffers() {
         <p className="mt-1 text-sm text-muted-foreground">{offerJobs.length} pending offer{offerJobs.length !== 1 ? "s" : ""}</p>
       </div>
 
+      {/* Diagnostics */}
+      <DiagnosticsPanel
+        user={user}
+        spId={spId}
+        currentSp={currentSp}
+        allOffers={allOffers}
+        pendingOffers={pendingOffers}
+      />
+
       <div>
         <h2 className="section-title mb-4">Pending Offers</h2>
         {offerJobs.length === 0 ? (
-          <div className="metric-card text-center py-8">
-            <p className="text-muted-foreground">No pending offers right now</p>
+          <div className="space-y-4">
+            <div className="metric-card text-center py-8">
+              <p className="text-muted-foreground">No pending offers right now</p>
+            </div>
+            {/* Show eligibility checklist when no offers */}
+            <EligibilityChecklist currentSp={currentSp} />
           </div>
         ) : (
           <div className="space-y-3">
