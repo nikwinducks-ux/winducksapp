@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArrowLeft, MapPin, Pencil } from "lucide-react";
+import SPLoginAccess from "@/components/admin/SPLoginAccess";
+import SPAvailabilityEditor from "@/components/admin/SPAvailabilityEditor";
 
 export default function SPDetail() {
   const { id } = useParams();
@@ -63,12 +65,13 @@ export default function SPDetail() {
       </div>
 
       <Tabs defaultValue="profile">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="competency">Competency</TabsTrigger>
           <TabsTrigger value="availability">Availability</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
+          <TabsTrigger value="login">Login & Access</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile">
@@ -107,29 +110,7 @@ export default function SPDetail() {
         </TabsContent>
 
         <TabsContent value="availability">
-          <div className="metric-card space-y-4 mt-4">
-            <h2 className="section-title">Availability Settings</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div><p className="text-xs text-muted-foreground mb-1">Auto-Accept</p><p className="text-sm font-medium">{sp.autoAccept ? "Enabled" : "Disabled"}</p></div>
-              <div><p className="text-xs text-muted-foreground mb-1">Max Jobs / Day</p><p className="text-sm font-medium">{sp.maxJobsPerDay}</p></div>
-              <div><p className="text-xs text-muted-foreground mb-1">Travel Radius</p><p className="text-sm font-medium">{sp.travelRadius} km</p></div>
-            </div>
-            <div className="border-t pt-4">
-              <h2 className="section-title mb-3">Assigned Jobs</h2>
-              {spJobs.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No jobs currently assigned.</p>
-              ) : (
-                <div className="space-y-2">
-                  {spJobs.map((j) => (
-                    <div key={j.id} className="flex items-center justify-between rounded-lg bg-secondary/50 p-3 text-sm">
-                      <span className="font-medium">{j.id} — {j.customerName}</span>
-                      <StatusBadge label={j.status} variant={j.status === "completed" ? "valid" : "info"} />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          <SPAvailabilityEditor spId={sp.id} />
         </TabsContent>
 
         <TabsContent value="compliance">
@@ -157,6 +138,10 @@ export default function SPDetail() {
               <div><p className="text-xs text-muted-foreground mb-1">Avg Response</p><p className="text-lg font-bold">{sp.avgResponseTime}</p></div>
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="login">
+          <SPLoginAccess spId={sp.id} spName={sp.name} />
         </TabsContent>
       </Tabs>
     </div>

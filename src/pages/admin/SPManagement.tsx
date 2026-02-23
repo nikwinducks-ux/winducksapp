@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useServiceProviders, useToggleSPStatus, useArchiveSP } from "@/hooks/useSupabaseData";
+import { supabase } from "@/integrations/supabase/client";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +13,48 @@ export default function SPManagement() {
   const { data: providers = [], isLoading } = useServiceProviders();
   const toggleStatus = useToggleSPStatus();
   const archiveMutation = useArchiveSP();
+
+  // Load login linkage data
+  const { data: loginMap = new Map() } = useQuery({
+    queryKey: ["sp_login_map"],
+    queryFn: async () => {
+      const [rolesRes, authRes] = await Promise.all([
+        supabase.from("user_roles").select("user_id, sp_id, role").eq("role", "sp"),
+        supabase.functions.invoke("create-user", { body: { action: "list-users" } }),
+      ]);
+      const roles = rolesRes.data ?? [];
+      const authUsers: { id: string; email: string }[] = authRes.data?.users ?? [];
+      const emailMap = new Map(authUsers.map((u) => [u.id, u.email]));
+
+      const result = new Map<string, { email: string }>();
+      for (const r of roles) {
+        if (r.sp_id) {
+          result.set(r.sp_id, { email: emailMap.get(r.user_id) ?? "" });
+        }
+      }
+      return result;
+    },
+  });
+
+  // Load availability summaries
+  const { data: availMap = new Map() } = useQuery({
+    queryKey: ["sp_availability_summary"],
+    queryFn: async () => {
+      const { data } = await supabase.from("sp_availability").select("sp_id, schedule_json, max_jobs_per_day");
+      const result = new Map<string, string>();
+      for (const row of data ?? []) {
+        const sched = row.schedule_json as any[];
+        if (Array.isArray(sched)) {
+          const enabledDays = sched.filter((s: any) => s.enabled).map((s: any) => s.day?.slice(0, 3));
+          const summary = enabledDays.length > 0
+            ? `${enabledDays.join(", ")}, ${row.max_jobs_per_day}/day`
+            : "No schedule";
+          result.set(row.sp_id, summary);
+        }
+      }
+      return result;
+    },
+  });
 
   const filtered = providers.filter(
     (sp) =>
@@ -45,68 +89,83 @@ export default function SPManagement() {
             <tr className="border-b text-left">
               <th className="pb-3 font-medium text-muted-foreground">Name</th>
               <th className="pb-3 font-medium text-muted-foreground">Status</th>
+              <th className="pb-3 font-medium text-muted-foreground">Login</th>
               <th className="pb-3 font-medium text-muted-foreground">City</th>
-              <th className="pb-3 font-medium text-muted-foreground">Radius</th>
               <th className="pb-3 font-medium text-muted-foreground">Categories</th>
+              <th className="pb-3 font-medium text-muted-foreground">Availability</th>
               <th className="pb-3 font-medium text-muted-foreground">Rating</th>
-              <th className="pb-3 font-medium text-muted-foreground">Reliability</th>
               <th className="pb-3 font-medium text-muted-foreground">Compliance</th>
               <th className="pb-3 font-medium text-muted-foreground">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((sp) => (
-              <tr key={sp.id} className="border-b last:border-0">
-                <td className="py-3 font-medium">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs">
-                      {sp.avatar}
+            {filtered.map((sp) => {
+              const login = loginMap.get(sp.id);
+              const availSummary = availMap.get(sp.id);
+              return (
+                <tr key={sp.id} className="border-b last:border-0">
+                  <td className="py-3 font-medium">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs">
+                        {sp.avatar}
+                      </div>
+                      {sp.name}
                     </div>
-                    {sp.name}
-                  </div>
-                </td>
-                <td className="py-3">
-                  <StatusBadge label={sp.status} variant={sp.status === "Active" ? "valid" : "error"} />
-                </td>
-                <td className="py-3 text-muted-foreground">{sp.baseAddress.city}</td>
-                <td className="py-3">{sp.travelRadius} km</td>
-                <td className="py-3">
-                  <div className="flex flex-wrap gap-1">
-                    {sp.serviceCategories.map((c) => (
-                      <span key={c} className="status-badge bg-secondary text-secondary-foreground">{c}</span>
-                    ))}
-                  </div>
-                </td>
-                <td className="py-3">⭐ {sp.rating}</td>
-                <td className="py-3">{sp.reliabilityScore}%</td>
-                <td className="py-3">
-                  <StatusBadge
-                    label={sp.complianceStatus}
-                    variant={sp.complianceStatus === "Valid" ? "valid" : sp.complianceStatus === "Expiring" ? "warning" : "error"}
-                  />
-                </td>
-                <td className="py-3">
-                  <div className="flex items-center gap-1">
-                    <Link to={`/admin/providers/${sp.id}`}>
-                      <Button size="sm" variant="ghost" title="View"><Eye className="h-4 w-4" /></Button>
-                    </Link>
-                    <Link to={`/admin/providers/${sp.id}/edit`}>
-                      <Button size="sm" variant="ghost" title="Edit"><Pencil className="h-4 w-4" /></Button>
-                    </Link>
-                    <Button
-                      size="sm" variant="ghost"
-                      title={sp.status === "Active" ? "Suspend" : "Unsuspend"}
-                      onClick={() => toggleStatus.mutate({ id: sp.id, status: sp.status === "Active" ? "Suspended" : "Active" })}
-                    >
-                      {sp.status === "Active" ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-                    </Button>
-                    <Button size="sm" variant="ghost" title="Archive" onClick={() => archiveMutation.mutate(sp.id)}>
-                      <Archive className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="py-3">
+                    <StatusBadge label={sp.status} variant={sp.status === "Active" ? "valid" : "error"} />
+                  </td>
+                  <td className="py-3">
+                    {login ? (
+                      <div>
+                        <p className="text-xs truncate max-w-[140px]">{login.email}</p>
+                        <StatusBadge label="Enabled" variant="valid" />
+                      </div>
+                    ) : (
+                      <StatusBadge label="Not Created" variant="warning" />
+                    )}
+                  </td>
+                  <td className="py-3 text-muted-foreground">{sp.baseAddress.city}</td>
+                  <td className="py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {sp.serviceCategories.map((c) => (
+                        <span key={c} className="status-badge bg-secondary text-secondary-foreground">{c}</span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="py-3 text-xs text-muted-foreground max-w-[160px] truncate">
+                    {availSummary || `${sp.maxJobsPerDay}/day, ${sp.travelRadius}km`}
+                  </td>
+                  <td className="py-3">⭐ {sp.rating}</td>
+                  <td className="py-3">
+                    <StatusBadge
+                      label={sp.complianceStatus}
+                      variant={sp.complianceStatus === "Valid" ? "valid" : sp.complianceStatus === "Expiring" ? "warning" : "error"}
+                    />
+                  </td>
+                  <td className="py-3">
+                    <div className="flex items-center gap-1">
+                      <Link to={`/admin/providers/${sp.id}`}>
+                        <Button size="sm" variant="ghost" title="View"><Eye className="h-4 w-4" /></Button>
+                      </Link>
+                      <Link to={`/admin/providers/${sp.id}/edit`}>
+                        <Button size="sm" variant="ghost" title="Edit"><Pencil className="h-4 w-4" /></Button>
+                      </Link>
+                      <Button
+                        size="sm" variant="ghost"
+                        title={sp.status === "Active" ? "Suspend" : "Unsuspend"}
+                        onClick={() => toggleStatus.mutate({ id: sp.id, status: sp.status === "Active" ? "Suspended" : "Active" })}
+                      >
+                        {sp.status === "Active" ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                      </Button>
+                      <Button size="sm" variant="ghost" title="Archive" onClick={() => archiveMutation.mutate(sp.id)}>
+                        <Archive className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
