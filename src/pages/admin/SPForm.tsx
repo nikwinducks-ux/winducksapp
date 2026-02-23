@@ -1,14 +1,12 @@
 import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useServiceProvider, useCreateSP, useUpdateSP } from "@/hooks/useSupabaseData";
+import { useServiceProvider, useCreateSP, useUpdateSP, useActiveServiceCategories } from "@/hooks/useSupabaseData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft } from "lucide-react";
-
-const ALL_CATEGORIES = ["Window Cleaning", "Gutter Cleaning", "Pressure Washing"];
 
 export default function SPForm() {
   const { id } = useParams();
@@ -17,6 +15,7 @@ export default function SPForm() {
   const { data: existing, isLoading } = useServiceProvider(id);
   const createMutation = useCreateSP();
   const updateMutation = useUpdateSP();
+  const activeCategories = useActiveServiceCategories();
 
   const [form, setForm] = useState<null | {
     name: string; email: string; phone: string; status: string;
@@ -115,10 +114,10 @@ export default function SPForm() {
           <div>
             <Label className="mb-2 block">Service Categories</Label>
             <div className="flex flex-wrap gap-2">
-              {ALL_CATEGORIES.map((cat) => (
-                <button key={cat} type="button" onClick={() => toggleCategory(cat)}
-                  className={`status-badge cursor-pointer transition-colors ${formData.categories.includes(cat) ? "bg-primary/10 text-primary border border-primary/30" : "bg-secondary text-secondary-foreground border border-transparent"}`}>
-                  {cat}
+              {activeCategories.map((cat) => (
+                <button key={cat.id} type="button" onClick={() => toggleCategory(cat.name)}
+                  className={`status-badge cursor-pointer transition-colors ${formData.categories.includes(cat.name) ? "bg-primary/10 text-primary border border-primary/30" : "bg-secondary text-secondary-foreground border border-transparent"}`}>
+                  {cat.name}
                 </button>
               ))}
             </div>

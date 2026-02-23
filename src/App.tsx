@@ -37,6 +37,7 @@ import JobManagement from "./pages/admin/JobManagement";
 import JobForm from "./pages/admin/JobForm";
 import JobDetail from "./pages/admin/JobDetail";
 import UserManagement from "./pages/admin/UserManagement";
+import ServiceCategories from "./pages/admin/ServiceCategories";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 
@@ -96,6 +97,7 @@ function AppRoutes() {
         <Route path="/admin/workflow" element={<OfferWorkflow />} />
         <Route path="/admin/integrations" element={<Integrations />} />
         <Route path="/admin/users" element={<UserManagement />} />
+        <Route path="/admin/categories" element={<ServiceCategories />} />
 
         <Route path="*" element={<NotFound />} />
       </Routes>
