@@ -159,6 +159,41 @@ export type Database = {
           },
         ]
       }
+      availability_events: {
+        Row: {
+          changed_at: string
+          changed_by_user_id: string | null
+          changes_json: Json
+          id: string
+          note: string | null
+          sp_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by_user_id?: string | null
+          changes_json?: Json
+          id?: string
+          note?: string | null
+          sp_id: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by_user_id?: string | null
+          changes_json?: Json
+          id?: string
+          note?: string | null
+          sp_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "availability_events_sp_id_fkey"
+            columns: ["sp_id"]
+            isOneToOne: false
+            referencedRelation: "service_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address_city: string
@@ -596,6 +631,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      sp_availability: {
+        Row: {
+          blackout_dates: string[]
+          id: string
+          max_jobs_per_day: number
+          schedule_json: Json
+          sp_id: string
+          travel_radius_km: number
+          updated_at: string
+        }
+        Insert: {
+          blackout_dates?: string[]
+          id?: string
+          max_jobs_per_day?: number
+          schedule_json?: Json
+          sp_id: string
+          travel_radius_km?: number
+          updated_at?: string
+        }
+        Update: {
+          blackout_dates?: string[]
+          id?: string
+          max_jobs_per_day?: number
+          schedule_json?: Json
+          sp_id?: string
+          travel_radius_km?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sp_availability_sp_id_fkey"
+            columns: ["sp_id"]
+            isOneToOne: true
+            referencedRelation: "service_providers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
