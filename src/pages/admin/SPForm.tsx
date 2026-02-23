@@ -6,11 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MapPin } from "lucide-react";
+import { autofillCoords, SUPPORTED_CITIES } from "@/lib/coord-autofill";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SPForm() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const isEdit = !!id;
   const { data: existing, isLoading } = useServiceProvider(id);
   const createMutation = useCreateSP();
@@ -51,6 +54,15 @@ export default function SPForm() {
         ? formData.categories.filter((c) => c !== cat)
         : [...formData.categories, cat],
     });
+  };
+  const handleAutofillCoords = () => {
+    const result = autofillCoords(formData.city);
+    if (result) {
+      setForm({ ...formData, lat: String(result.lat), lng: String(result.lng) });
+      toast({ title: "Coordinates filled", description: `Approximate coords for ${formData.city}` });
+    } else {
+      toast({ title: "City not supported", description: `Supported: ${SUPPORTED_CITIES.join(", ")}. Enter coordinates manually.`, variant: "destructive" });
+    }
   };
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
@@ -100,8 +112,13 @@ export default function SPForm() {
             <div className="space-y-1.5"><Label>Province / State</Label><Input value={formData.province} onChange={(e) => update("province", e.target.value)} required /></div>
             <div className="space-y-1.5"><Label>Postal / Zip Code</Label><Input value={formData.postalCode} onChange={(e) => update("postalCode", e.target.value)} required /></div>
             <div className="space-y-1.5"><Label>Country</Label><Input value={formData.country} onChange={(e) => update("country", e.target.value)} required /></div>
-            <div className="space-y-1.5"><Label>Latitude (optional)</Label><Input value={formData.lat} onChange={(e) => update("lat", e.target.value)} placeholder="e.g. 51.0447" /></div>
-            <div className="space-y-1.5"><Label>Longitude (optional)</Label><Input value={formData.lng} onChange={(e) => update("lng", e.target.value)} placeholder="e.g. -114.0719" /></div>
+            <div className="space-y-1.5"><Label>Latitude</Label><Input value={formData.lat} onChange={(e) => update("lat", e.target.value)} placeholder="e.g. 51.0447" /></div>
+            <div className="space-y-1.5"><Label>Longitude</Label><Input value={formData.lng} onChange={(e) => update("lng", e.target.value)} placeholder="e.g. -114.0719" /></div>
+            <div className="sm:col-span-2">
+              <Button type="button" variant="outline" size="sm" onClick={handleAutofillCoords} className="gap-1.5">
+                <MapPin className="h-3.5 w-3.5" /> Auto-fill coordinates (approx)
+              </Button>
+            </div>
           </div>
         </div>
 
