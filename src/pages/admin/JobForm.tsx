@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useCustomers, useCreateJob, useUpdateJob } from "@/hooks/useSupabaseData";
+import { useCustomers, useCreateJob, useUpdateJob, useActiveServiceCategories } from "@/hooks/useSupabaseData";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft } from "lucide-react";
-
-const SERVICE_TYPES = ["Window Cleaning", "Gutter Cleaning", "Pressure Washing"];
+import { ArrowLeft, Info } from "lucide-react";
 
 // Generate time options in 15-min increments
 const TIME_OPTIONS: string[] = [];
@@ -38,21 +37,27 @@ function formatTime12h(t: string): string {
   return `${h12}:${mm} ${ampm}`;
 }
 
-/** Convert legacy text duration (e.g. "2 hours", "1.5 hours", "90") to minutes string */
 function parseDurationToMinutes(val: string): string {
   if (!val) return "";
   const num = parseFloat(val);
   if (!isNaN(num) && val.toLowerCase().includes("hour")) return String(Math.round(num * 60));
-  if (!isNaN(num) && num > 0 && num <= 24) return String(Math.round(num * 60)); // assume hours if small number
-  if (!isNaN(num) && num >= 15) return String(num); // already minutes
+  if (!isNaN(num) && num > 0 && num <= 24) return String(Math.round(num * 60));
+  if (!isNaN(num) && num >= 15) return String(num);
   return "";
 }
+
+const URGENCY_OPTIONS = [
+  { value: "Scheduled", label: "Scheduled", helper: "" },
+  { value: "ASAP", label: "ASAP", helper: "Dispatch as soon as an SP is available." },
+  { value: "AnytimeSoon", label: "Anytime soon", helper: "Flexible timing; assign when available." },
+];
 
 export default function JobForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = !!id;
   const { data: customers = [] } = useCustomers();
+  const activeCategories = useActiveServiceCategories();
   const createJob = useCreateJob();
   const updateJob = useUpdateJob();
 
@@ -71,6 +76,8 @@ export default function JobForm() {
     scheduledDate: "",
     scheduledTime: "",
     estimatedDurationMinutes: "",
+    notes: "",
+    urgency: "Scheduled",
   });
   const [loadingExisting, setLoadingExisting] = useState(isEdit);
 
@@ -79,10 +86,11 @@ export default function JobForm() {
     (async () => {
       const { data } = await supabase.from("jobs").select("*").eq("id", id).single();
       if (data) {
+        const catNames = activeCategories.map((c) => c.name);
         setForm({
           customerId: data.customer_id ?? "",
-          serviceCategory: SERVICE_TYPES.includes(data.service_category) ? data.service_category : "custom",
-          customService: SERVICE_TYPES.includes(data.service_category) ? "" : data.service_category,
+          serviceCategory: catNames.includes(data.service_category) ? data.service_category : "custom",
+          customService: catNames.includes(data.service_category) ? "" : data.service_category,
           payout: String(data.payout),
           street: data.job_address_street,
           city: data.job_address_city,
@@ -94,11 +102,13 @@ export default function JobForm() {
           scheduledDate: data.scheduled_date ?? "",
           scheduledTime: data.scheduled_time ?? "",
           estimatedDurationMinutes: parseDurationToMinutes(data.estimated_duration) || data.estimated_duration || "",
+          notes: (data as any).notes ?? "",
+          urgency: (data as any).urgency ?? "Scheduled",
         });
       }
       setLoadingExisting(false);
     })();
-  }, [id, isEdit]);
+  }, [id, isEdit, activeCategories.length]);
 
   // Auto-fill address from customer
   useEffect(() => {
@@ -124,7 +134,6 @@ export default function JobForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const serviceCategory = form.serviceCategory === "custom" ? form.customService : form.serviceCategory;
-    // Convert minutes back to display string for storage
     const mins = parseInt(form.estimatedDurationMinutes);
     const estimatedDuration = !isNaN(mins) && mins > 0
       ? (mins >= 60 ? `${Math.floor(mins / 60)}${mins % 60 > 0 ? `.${Math.round((mins % 60) / 60 * 10) / 10 * 10}` : ""} hours` : `${mins} minutes`)
@@ -144,6 +153,8 @@ export default function JobForm() {
       scheduledDate: form.scheduledDate,
       scheduledTime: form.scheduledTime,
       estimatedDuration,
+      notes: form.notes,
+      urgency: form.urgency,
     };
     if (isEdit && id) {
       updateJob.mutate({ id, ...payload }, { onSuccess: () => navigate("/admin/jobs") });
@@ -161,6 +172,8 @@ export default function JobForm() {
     const m = mins % 60;
     return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
   })();
+
+  const urgencyHelper = URGENCY_OPTIONS.find((u) => u.value === form.urgency)?.helper;
 
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl">
@@ -189,7 +202,7 @@ export default function JobForm() {
               <Select value={form.serviceCategory} onValueChange={(v) => update("serviceCategory", v)}>
                 <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                 <SelectContent>
-                  {SERVICE_TYPES.map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}
+                  {activeCategories.map((t) => (<SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>))}
                   <SelectItem value="custom">Custom...</SelectItem>
                 </SelectContent>
               </Select>
@@ -211,38 +224,45 @@ export default function JobForm() {
           <h2 className="section-title">Job Location</h2>
           <p className="text-xs text-muted-foreground">Defaults to customer address. Override below if different.</p>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>Street</Label>
-              <Input value={form.street} onChange={(e) => update("street", e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>City</Label>
-              <Input value={form.city} onChange={(e) => update("city", e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Province</Label>
-              <Input value={form.province} onChange={(e) => update("province", e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Postal Code</Label>
-              <Input value={form.postalCode} onChange={(e) => update("postalCode", e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Country</Label>
-              <Input value={form.country} onChange={(e) => update("country", e.target.value)} />
-            </div>
+            <div className="space-y-1.5 sm:col-span-2"><Label>Street</Label><Input value={form.street} onChange={(e) => update("street", e.target.value)} /></div>
+            <div className="space-y-1.5"><Label>City</Label><Input value={form.city} onChange={(e) => update("city", e.target.value)} /></div>
+            <div className="space-y-1.5"><Label>Province</Label><Input value={form.province} onChange={(e) => update("province", e.target.value)} /></div>
+            <div className="space-y-1.5"><Label>Postal Code</Label><Input value={form.postalCode} onChange={(e) => update("postalCode", e.target.value)} /></div>
+            <div className="space-y-1.5"><Label>Country</Label><Input value={form.country} onChange={(e) => update("country", e.target.value)} /></div>
           </div>
         </div>
 
         <div className="metric-card space-y-4">
-          <h2 className="section-title">Scheduling (optional)</h2>
+          <h2 className="section-title">Urgency & Scheduling</h2>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Urgency</Label>
+              <div className="flex gap-3">
+                {URGENCY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => update("urgency", opt.value)}
+                    className={`status-badge cursor-pointer transition-colors ${form.urgency === opt.value ? "bg-primary/10 text-primary border border-primary/30" : "bg-secondary text-secondary-foreground border border-transparent"}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {urgencyHelper && (
+                <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                  <Info className="h-3 w-3" />{urgencyHelper}
+                </p>
+              )}
+            </div>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Date</Label>
-              <Input type="date" value={form.scheduledDate} onChange={(e) => update("scheduledDate", e.target.value)} />
+              <Label>Date {form.urgency !== "Scheduled" && <span className="text-muted-foreground">(optional)</span>}</Label>
+              <Input type="date" value={form.scheduledDate} onChange={(e) => update("scheduledDate", e.target.value)} required={form.urgency === "Scheduled"} />
             </div>
             <div className="space-y-1.5">
-              <Label>Time</Label>
+              <Label>Time {form.urgency !== "Scheduled" && <span className="text-muted-foreground">(optional)</span>}</Label>
               <Select value={form.scheduledTime} onValueChange={(v) => update("scheduledTime", v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select time">
@@ -272,6 +292,16 @@ export default function JobForm() {
               </Select>
             </div>
           </div>
+        </div>
+
+        <div className="metric-card space-y-4">
+          <h2 className="section-title">Notes</h2>
+          <Textarea
+            value={form.notes}
+            onChange={(e) => update("notes", e.target.value)}
+            placeholder="Add any special instructions, access notes, or details for the SP..."
+            rows={4}
+          />
         </div>
 
         <div className="flex gap-3">

@@ -24,7 +24,7 @@ function dbToCustomer(row: any): Customer {
     notes: row.notes,
     tags: row.tags ?? [],
     archived: row.status === "Archived",
-    lastJobDate: undefined, // computed separately if needed
+    lastJobDate: undefined,
   };
 }
 
@@ -92,7 +92,74 @@ function dbToJob(row: any, customers: Customer[]): Job {
     status: row.status?.toLowerCase().replace(/\s/g, "-") as any,
     assignedSpId: row.assigned_sp_id ?? undefined,
     scores: row.scores as AllocationScores | undefined,
+    notes: row.notes ?? "",
+    urgency: row.urgency ?? "Scheduled",
   };
+}
+
+// ===== Service Categories =====
+
+export interface ServiceCategory {
+  id: string;
+  name: string;
+  description: string;
+  active: boolean;
+  display_order: number;
+}
+
+export function useServiceCategories() {
+  return useQuery({
+    queryKey: ["service_categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("service_categories")
+        .select("*")
+        .order("display_order", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as ServiceCategory[];
+    },
+  });
+}
+
+export function useActiveServiceCategories() {
+  const { data: all = [] } = useServiceCategories();
+  return all.filter((c) => c.active);
+}
+
+export function useCreateServiceCategory() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (form: { name: string; description: string; display_order: number }) => {
+      const { error } = await supabase.from("service_categories").insert(form);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["service_categories"] });
+      toast({ title: "Category created" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+}
+
+export function useUpdateServiceCategory() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ id, ...fields }: { id: string; name?: string; description?: string; active?: boolean; display_order?: number }) => {
+      const { error } = await supabase.from("service_categories").update(fields).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["service_categories"] });
+      toast({ title: "Category updated" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
 }
 
 // ===== Hooks =====
@@ -346,6 +413,7 @@ export function useCreateJob() {
       customerId: string; serviceCategory: string; payout: string;
       street: string; city: string; province: string; postalCode: string; country: string;
       lat: string; lng: string; scheduledDate: string; scheduledTime: string; estimatedDuration: string;
+      notes?: string; urgency?: string;
     }) => {
       const { error } = await supabase.from("jobs").insert({
         customer_id: form.customerId || null,
@@ -361,6 +429,8 @@ export function useCreateJob() {
         scheduled_date: form.scheduledDate || null,
         scheduled_time: form.scheduledTime,
         estimated_duration: form.estimatedDuration,
+        notes: form.notes ?? "",
+        urgency: form.urgency ?? "Scheduled",
         status: "Created",
       });
       if (error) throw error;
@@ -383,6 +453,7 @@ export function useUpdateJob() {
       id: string; customerId: string; serviceCategory: string; payout: string;
       street: string; city: string; province: string; postalCode: string; country: string;
       lat: string; lng: string; scheduledDate: string; scheduledTime: string; estimatedDuration: string;
+      notes?: string; urgency?: string;
     }) => {
       const { error } = await supabase.from("jobs").update({
         customer_id: form.customerId || null,
@@ -398,6 +469,8 @@ export function useUpdateJob() {
         scheduled_date: form.scheduledDate || null,
         scheduled_time: form.scheduledTime,
         estimated_duration: form.estimatedDuration,
+        notes: form.notes ?? "",
+        urgency: form.urgency ?? "Scheduled",
       }).eq("id", id);
       if (error) throw error;
     },
@@ -418,14 +491,12 @@ export function useAssignJob() {
     mutationFn: async ({ jobId, spId, assignedByUserId }: {
       jobId: string; spId: string; assignedByUserId: string | null;
     }) => {
-      // Update job status + assigned SP
       const { error: jobErr } = await supabase.from("jobs").update({
         assigned_sp_id: spId,
         status: "Assigned",
       }).eq("id", jobId);
       if (jobErr) throw jobErr;
 
-      // Insert assignment audit record
       const { error: assignErr } = await supabase.from("job_assignments").insert({
         job_id: jobId,
         sp_id: spId,
@@ -520,7 +591,7 @@ export function useSeedData() {
         { job_number: "JOB-1006", custName: "Diana Prince", spName: "Mike Thompson", service_category: "Window Cleaning", estimated_duration: "2 hours", scheduled_date: "2026-02-25", scheduled_time: "11:00 AM", payout: 175, status: "Assigned", job_address_street: "100 Crowfoot Way NW", job_address_city: "Calgary", job_address_region: "AB", job_address_postal: "T3G 4J2", job_address_country: "Canada", job_lat: 51.123, job_lng: -114.206, scores: { availabilityFit: 90, proximity: 90, competency: 85, reliability: 92, rating: 96, fairnessAdjustment: 4, finalScore: 90 } },
         { job_number: "JOB-1007", custName: "Bruce Wayne", spName: null, service_category: "Pressure Washing", estimated_duration: "5 hours", scheduled_date: "2026-02-26", scheduled_time: "08:00 AM", payout: 420, status: "Created", job_address_street: "900 Deerfoot Trail NE", job_address_city: "Calgary", job_address_region: "AB", job_address_postal: "T2A 5G6", job_address_country: "Canada", job_lat: 51.048, job_lng: -113.985, scores: { availabilityFit: 70, proximity: 55, competency: 92, reliability: 94, rating: 96, fairnessAdjustment: 6, finalScore: 82 } },
         { job_number: "JOB-1008", custName: "Clark Kent", spName: "Emily Rodriguez", service_category: "Window Cleaning", estimated_duration: "1 hour", scheduled_date: "2026-02-26", scheduled_time: "03:00 PM", payout: 95, status: "Completed", job_address_street: "200 University Dr NW", job_address_city: "Calgary", job_address_region: "AB", job_address_postal: "T2N 1N4", job_address_country: "Canada", job_lat: 51.078, job_lng: -114.13, scores: { availabilityFit: 96, proximity: 96, competency: 82, reliability: 90, rating: 94, fairnessAdjustment: 2, finalScore: 93 } },
-        { job_number: "JOB-1009", custName: "Peter Parker", spName: null, service_category: "Gutter Cleaning", estimated_duration: "2 hours", scheduled_date: "2026-02-27", scheduled_time: "10:00 AM", payout: 190, status: "Cancelled", job_address_street: "750 9th Ave SE", job_address_city: "Calgary", job_address_region: "AB", job_address_postal: "T2G 0S3", job_address_country: "Canada", job_lat: 51.045, job_lng: -114.053, scores: { availabilityFit: 60, proximity: 75, competency: 85, reliability: 80, rating: 88, fairnessAdjustment: 12, finalScore: 78 } },
+        { job_number: "JOB-1009", custName: "Peter Parker", spName: null, service_category: "Gutter Cleaning", estimated_duration: "2 hours", scheduled_date: "2026-02-27", scheduled_time: "10:00 AM", payout: 190, status: "Created", job_address_street: "750 9th Ave SE", job_address_city: "Calgary", job_address_region: "AB", job_address_postal: "T2G 0S3", job_address_country: "Canada", job_lat: 51.045, job_lng: -114.053, scores: { availabilityFit: 60, proximity: 75, competency: 85, reliability: 80, rating: 88, fairnessAdjustment: 12, finalScore: 78 } },
         { job_number: "JOB-1010", custName: "Tony Stark", spName: null, service_category: "Pressure Washing", estimated_duration: "3 hours", scheduled_date: "2026-02-27", scheduled_time: "01:00 PM", payout: 290, status: "Created", job_address_street: "500 4th St SW", job_address_city: "Calgary", job_address_region: "AB", job_address_postal: "T2P 2V6", job_address_country: "Canada", job_lat: 51.049, job_lng: -114.072, scores: { availabilityFit: 82, proximity: 85, competency: 78, reliability: 88, rating: 92, fairnessAdjustment: 7, finalScore: 86 } },
       ];
 
@@ -541,26 +612,22 @@ export function useSeedData() {
         job_address_country: j.job_address_country,
         job_lat: j.job_lat,
         job_lng: j.job_lng,
-        scores: j.scores,
+        scores: j.scores ?? null,
       }));
 
       const { error: jobErr } = await supabase.from("jobs").insert(jobRows);
       if (jobErr) console.error("Seed jobs error:", jobErr);
 
-      // Refresh queries
+      // Trigger seed-users edge function
+      try {
+        await supabase.functions.invoke("seed-users");
+      } catch (e) {
+        console.warn("seed-users function call failed (may already be seeded):", e);
+      }
+
       qc.invalidateQueries({ queryKey: ["customers"] });
       qc.invalidateQueries({ queryKey: ["service_providers"] });
       qc.invalidateQueries({ queryKey: ["jobs"] });
-      console.log("✅ Seed data inserted successfully");
-
-      // Seed auth users via edge function
-      try {
-        const { data, error } = await supabase.functions.invoke("seed-users");
-        if (error) console.error("Seed users error:", error);
-        else console.log("✅ Auth users seeded:", data);
-      } catch (e) {
-        console.error("Seed users edge function error:", e);
-      }
     })();
   }, [qc]);
 }

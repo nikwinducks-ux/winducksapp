@@ -131,6 +131,7 @@ export type Database = {
           job_lat: number | null
           job_lng: number | null
           job_number: string
+          notes: string
           payout: number
           scheduled_date: string | null
           scheduled_time: string
@@ -138,6 +139,7 @@ export type Database = {
           service_category: string
           status: string
           updated_at: string
+          urgency: string
         }
         Insert: {
           assigned_sp_id?: string | null
@@ -153,6 +155,7 @@ export type Database = {
           job_lat?: number | null
           job_lng?: number | null
           job_number?: string
+          notes?: string
           payout?: number
           scheduled_date?: string | null
           scheduled_time?: string
@@ -160,6 +163,7 @@ export type Database = {
           service_category?: string
           status?: string
           updated_at?: string
+          urgency?: string
         }
         Update: {
           assigned_sp_id?: string | null
@@ -175,6 +179,7 @@ export type Database = {
           job_lat?: number | null
           job_lng?: number | null
           job_number?: string
+          notes?: string
           payout?: number
           scheduled_date?: string | null
           scheduled_time?: string
@@ -182,6 +187,7 @@ export type Database = {
           service_category?: string
           status?: string
           updated_at?: string
+          urgency?: string
         }
         Relationships: [
           {
@@ -199,6 +205,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      service_categories: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          display_order: number
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       service_providers: {
         Row: {

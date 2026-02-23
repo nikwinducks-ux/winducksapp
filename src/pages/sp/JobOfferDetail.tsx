@@ -1,18 +1,33 @@
 import { useParams, Link } from "react-router-dom";
-import { useServiceProviders, useJobs } from "@/hooks/useSupabaseData";
+import { useServiceProviders, useJobs, useActiveServiceCategories } from "@/hooks/useSupabaseData";
 import { declineReasons } from "@/data/mockData";
 import { ScoreBar } from "@/components/ScoreBar";
+import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, Info } from "lucide-react";
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, Info, FileText } from "lucide-react";
 import { useState, useMemo } from "react";
 import { haversineDistance, proximityScore, PROXIMITY_TOOLTIP } from "@/lib/proximity";
+
+function UrgencyBadge({ urgency }: { urgency?: string }) {
+  if (!urgency || urgency === "Scheduled") return <StatusBadge label="Scheduled" variant="info" />;
+  if (urgency === "ASAP") return <StatusBadge label="ASAP" variant="error" />;
+  return <StatusBadge label="Anytime soon" variant="warning" />;
+}
+
+function ScheduleDisplay({ job }: { job: any }) {
+  const urgency = job.urgency || "Scheduled";
+  if (urgency === "ASAP") return <p className="font-medium">ASAP — dispatch as soon as possible</p>;
+  if (urgency === "AnytimeSoon") return <p className="font-medium">Anytime soon — flexible timing</p>;
+  return <p className="font-medium">{job.scheduledDate} · {job.scheduledTime}</p>;
+}
 
 export default function JobOfferDetail() {
   const { id } = useParams();
   const { data: serviceProviders = [] } = useServiceProviders();
   const { data: jobs = [] } = useJobs();
+  const activeCategories = useActiveServiceCategories();
   const job = jobs.find((j) => j.id === id);
   const [showDecline, setShowDecline] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
@@ -20,6 +35,7 @@ export default function JobOfferDetail() {
   const [declined, setDeclined] = useState(false);
 
   const currentSp = serviceProviders[0];
+  const isLegacy = job && activeCategories.length > 0 && !activeCategories.some((c) => c.name === job.serviceCategory);
 
   const distanceInfo = useMemo(() => {
     if (!job || !currentSp) return { distance: null, needsGeocoding: true, score: 0 };
@@ -48,11 +64,12 @@ export default function JobOfferDetail() {
       </Link>
 
       <div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <h1 className="page-header">{job.id}</h1>
           <span className={`status-badge ${job.status === "pending" || job.status === "created" ? "bg-warning/10 text-warning" : "bg-primary/10 text-primary"}`}>
             {accepted ? "Accepted" : declined ? "Declined" : job.status}
           </span>
+          <UrgencyBadge urgency={job.urgency} />
         </div>
         <p className="mt-1 text-sm text-muted-foreground">Offer expires in 45:00 minutes</p>
       </div>
@@ -62,7 +79,10 @@ export default function JobOfferDetail() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex items-center gap-3"><User className="h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Customer</p><p className="font-medium">{job.customerName}</p></div></div>
           <div className="flex items-center gap-3"><MapPin className="h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Address</p><p className="font-medium">{job.address}</p></div></div>
-          <div className="flex items-center gap-3"><Calendar className="h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Schedule</p><p className="font-medium">{job.scheduledDate} · {job.scheduledTime}</p></div></div>
+          <div className="flex items-center gap-3">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <div><p className="text-xs text-muted-foreground">Schedule</p><ScheduleDisplay job={job} /></div>
+          </div>
           <div className="flex items-center gap-3"><Clock className="h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Duration</p><p className="font-medium">{job.estimatedDuration}</p></div></div>
           <div className="flex items-center gap-3"><DollarSign className="h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Payout</p><p className="text-xl font-bold text-primary">${job.payout}</p></div></div>
           <div className="flex items-center gap-3">
@@ -76,8 +96,23 @@ export default function JobOfferDetail() {
               )}
             </div>
           </div>
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="text-xs text-muted-foreground">Service Category</p>
+              <p className="font-medium">{isLegacy ? `(Legacy) ${job.serviceCategory}` : job.serviceCategory}</p>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Job Notes */}
+      {job.notes && (
+        <div className="metric-card space-y-3">
+          <h2 className="section-title flex items-center gap-2"><FileText className="h-4 w-4" />Job Notes</h2>
+          <p className="text-sm whitespace-pre-wrap">{job.notes}</p>
+        </div>
+      )}
 
       {job.scores && (
         <div className="metric-card space-y-4">

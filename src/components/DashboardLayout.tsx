@@ -2,7 +2,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, Briefcase, Calendar, Zap, TrendingUp,
-  Sliders, Scale, Users, FlaskConical, GitBranch, Plug,
+  Sliders, Scale, Users, FlaskConical, GitBranch, Plug, Tag,
   ChevronLeft, ChevronRight, Shield, UserCircle, Contact,
   LogOut, ClipboardList, UserCog, Settings,
 } from "lucide-react";
@@ -21,6 +21,7 @@ const spLinks = [
 const adminLinks = [
   { to: "/admin", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/admin/jobs", icon: Briefcase, label: "Jobs" },
+  { to: "/admin/categories", icon: Tag, label: "Service Categories" },
   { to: "/admin/allocation", icon: Sliders, label: "Allocation Control" },
   { to: "/admin/fairness", icon: Scale, label: "Fairness Controls" },
   { to: "/admin/providers", icon: Users, label: "Service Providers" },

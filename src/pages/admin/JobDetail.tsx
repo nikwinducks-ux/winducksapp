@@ -1,11 +1,24 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { useJobs, useServiceProviders, useAssignJob } from "@/hooks/useSupabaseData";
+import { useJobs, useServiceProviders, useAssignJob, useActiveServiceCategories } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatusBadge } from "@/components/StatusBadge";
-import { ArrowLeft, MapPin, Calendar, Clock, DollarSign, User, Pencil, UserPlus } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, Clock, DollarSign, User, Pencil, UserPlus, AlertCircle, FileText } from "lucide-react";
 import { useState } from "react";
+
+function UrgencyBadge({ urgency }: { urgency?: string }) {
+  if (!urgency || urgency === "Scheduled") return <StatusBadge label="Scheduled" variant="info" />;
+  if (urgency === "ASAP") return <StatusBadge label="ASAP" variant="error" />;
+  return <StatusBadge label="Anytime soon" variant="warning" />;
+}
+
+function ScheduleDisplay({ job }: { job: any }) {
+  const urgency = job.urgency || "Scheduled";
+  if (urgency === "ASAP") return <p className="font-medium">ASAP — dispatch as soon as possible</p>;
+  if (urgency === "AnytimeSoon") return <p className="font-medium">Anytime soon — flexible timing</p>;
+  return <p className="font-medium">{job.scheduledDate || "Not scheduled"} {job.scheduledTime && `· ${job.scheduledTime}`}</p>;
+}
 
 export default function JobDetail() {
   const { id } = useParams();
@@ -14,6 +27,7 @@ export default function JobDetail() {
   const { data: providers = [] } = useServiceProviders();
   const { user } = useAuth();
   const assignJob = useAssignJob();
+  const activeCategories = useActiveServiceCategories();
 
   const job = jobs.find((j) => j.id === id);
   const [showAssign, setShowAssign] = useState(searchParams.get("assign") === "true");
@@ -29,7 +43,7 @@ export default function JobDetail() {
   }
 
   const assignedSp = providers.find((sp) => sp.id === job.assignedSpId);
-  const customer = null; // we show customerName directly
+  const isLegacyCategory = activeCategories.length > 0 && !activeCategories.some((c) => c.name === job.serviceCategory);
 
   const handleAssign = () => {
     if (!selectedSpId || !id) return;
@@ -58,6 +72,7 @@ export default function JobDetail() {
         <div className="flex items-center gap-3">
           <h1 className="page-header">{job.id}</h1>
           <StatusBadge label={job.status} variant={statusVariant(job.status) as any} />
+          <UrgencyBadge urgency={job.urgency} />
         </div>
         <div className="flex gap-2">
           <Link to={`/admin/jobs/${id}/edit`}>
@@ -95,7 +110,7 @@ export default function JobDetail() {
           </div>
           <div className="flex items-center gap-3">
             <Calendar className="h-4 w-4 text-muted-foreground" />
-            <div><p className="text-xs text-muted-foreground">Schedule</p><p className="font-medium">{job.scheduledDate || "Not scheduled"} {job.scheduledTime && `· ${job.scheduledTime}`}</p></div>
+            <div><p className="text-xs text-muted-foreground">Schedule</p><ScheduleDisplay job={job} /></div>
           </div>
           <div className="flex items-center gap-3">
             <Clock className="h-4 w-4 text-muted-foreground" />
@@ -105,8 +120,23 @@ export default function JobDetail() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
             <div><p className="text-xs text-muted-foreground">Payout</p><p className="text-xl font-bold text-primary">${job.payout}</p></div>
           </div>
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="text-xs text-muted-foreground">Service Category</p>
+              <p className="font-medium">{isLegacyCategory ? `(Legacy) ${job.serviceCategory}` : job.serviceCategory}</p>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Notes */}
+      {job.notes && (
+        <div className="metric-card space-y-3">
+          <h2 className="section-title flex items-center gap-2"><FileText className="h-4 w-4" />Job Notes</h2>
+          <p className="text-sm whitespace-pre-wrap">{job.notes}</p>
+        </div>
+      )}
 
       {/* Assignment panel */}
       <div className="metric-card space-y-4">
@@ -130,7 +160,7 @@ export default function JobDetail() {
 
         {showAssign && (
           <div className="border-t pt-4 space-y-3">
-            <Label className="text-sm font-medium">Select Service Provider</Label>
+            <label className="text-sm font-medium">Select Service Provider</label>
             <Select value={selectedSpId} onValueChange={setSelectedSpId}>
               <SelectTrigger><SelectValue placeholder="Choose an SP..." /></SelectTrigger>
               <SelectContent>
@@ -152,8 +182,4 @@ export default function JobDetail() {
       </div>
     </div>
   );
-}
-
-function Label({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <label className={className}>{children}</label>;
 }
