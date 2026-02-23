@@ -1,12 +1,20 @@
 import type { JobService } from "@/data/mockData";
+import type { ServiceCategory } from "@/hooks/useSupabaseData";
 import { Briefcase } from "lucide-react";
 
 interface Props {
   services: JobService[];
+  categories?: ServiceCategory[];
   compact?: boolean;
 }
 
-export function JobServicesDisplay({ services, compact = false }: Props) {
+function getCode(name: string, categories?: ServiceCategory[]): string {
+  if (!categories) return name;
+  const cat = categories.find((c) => c.name === name);
+  return cat?.code || name;
+}
+
+export function JobServicesDisplay({ services, categories, compact = false }: Props) {
   if (!services || services.length === 0) return null;
 
   if (compact) {
@@ -28,7 +36,10 @@ export function JobServicesDisplay({ services, compact = false }: Props) {
           <Briefcase className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
-              <span className="font-medium">{svc.service_category}</span>
+              <span className="font-medium">
+                {svc.service_category}
+                {categories && <span className="text-muted-foreground ml-1 text-xs">({getCode(svc.service_category, categories)})</span>}
+              </span>
               <span className="text-muted-foreground shrink-0">
                 {svc.quantity > 1 ? `${svc.quantity} × ` : ""}
                 {svc.unit_price != null ? `$${svc.unit_price}` : ""}
@@ -41,6 +52,22 @@ export function JobServicesDisplay({ services, compact = false }: Props) {
       ))}
     </div>
   );
+}
+
+/** Compact codes string for Jobs list: "wc + gc + pw" or "wc(2) + gc" */
+export function JobServicesCodesSummary({ services, categories, fallbackCategory }: { services?: JobService[]; categories?: ServiceCategory[]; fallbackCategory?: string }) {
+  if (!services || services.length === 0) {
+    if (fallbackCategory) {
+      const code = getCode(fallbackCategory, categories);
+      return <span className="font-mono text-xs">{code}</span>;
+    }
+    return <span className="text-muted-foreground">—</span>;
+  }
+  const parts = services.map((svc) => {
+    const code = getCode(svc.service_category, categories);
+    return svc.quantity > 1 ? `${code}(${svc.quantity})` : code;
+  });
+  return <span className="font-mono text-xs">{parts.join(" + ")}</span>;
 }
 
 export function JobServicesSummary({ services }: { services: JobService[] }) {

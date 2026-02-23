@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { JobServicesDisplay } from "@/components/JobServicesDisplay";
-import { useJobs, useServiceProviders, useActiveServiceCategories, useUpdateJobStatus } from "@/hooks/useSupabaseData";
+import { useJobs, useServiceProviders, useActiveServiceCategories, useUpdateJobStatus, useServiceCategories } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,7 @@ export default function SPJobDetail() {
   const { data: jobs = [], isLoading } = useJobs();
   const { data: providers = [] } = useServiceProviders();
   const activeCategories = useActiveServiceCategories();
+  const { data: allCategories = [] } = useServiceCategories();
   const updateStatus = useUpdateJobStatus();
 
   const job = jobs.find((j) => j.dbId === id || j.id === id);
@@ -138,7 +139,7 @@ export default function SPJobDetail() {
       {job.services && job.services.length > 0 && (
         <div className="metric-card space-y-3">
           <h2 className="section-title">Services ({job.services.length})</h2>
-          <JobServicesDisplay services={job.services} />
+          <JobServicesDisplay services={job.services} categories={allCategories} />
         </div>
       )}
 

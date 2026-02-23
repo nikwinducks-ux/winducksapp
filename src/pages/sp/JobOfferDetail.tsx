@@ -1,5 +1,5 @@
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useServiceProviders, useJobs, useActiveServiceCategories } from "@/hooks/useSupabaseData";
+import { useServiceProviders, useJobs, useActiveServiceCategories, useServiceCategories } from "@/hooks/useSupabaseData";
 import { JobServicesDisplay } from "@/components/JobServicesDisplay";
 import { useAcceptOffer, useDeclineOffer, useOffers } from "@/hooks/useOfferData";
 import { useAuth } from "@/contexts/AuthContext";
@@ -30,6 +30,7 @@ export default function JobOfferDetail() {
   const { data: serviceProviders = [] } = useServiceProviders();
   const { data: jobs = [] } = useJobs();
   const activeCategories = useActiveServiceCategories();
+  const { data: allCategories = [] } = useServiceCategories();
   const { data: jobOffers = [] } = useOffers(id);
   const acceptOffer = useAcceptOffer();
   const declineOffer = useDeclineOffer();
@@ -156,7 +157,7 @@ export default function JobOfferDetail() {
       {job.services && job.services.length > 0 && (
         <div className="metric-card space-y-3">
           <h2 className="section-title">Services ({job.services.length})</h2>
-          <JobServicesDisplay services={job.services} />
+          <JobServicesDisplay services={job.services} categories={allCategories} />
         </div>
       )}
 
