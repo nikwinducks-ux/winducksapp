@@ -157,6 +157,7 @@ export default function SPLoginAccess({ spId, spName }: Props) {
 
   // Reset password
   const [showReset, setShowReset] = useState(false);
+  const [showResetLink, setShowResetLink] = useState(false);
   const [resetPassword, setResetPassword] = useState(() => generatePassword());
 
   const resetPw = useMutation({
@@ -171,6 +172,22 @@ export default function SPLoginAccess({ spId, spName }: Props) {
     onSuccess: () => {
       toast({ title: "Password reset", description: "New password has been set." });
       setShowReset(false);
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  // Send password reset email
+  const sendResetLink = useMutation({
+    mutationFn: async () => {
+      if (!hasLogin || !linkage?.email) throw new Error("No login exists for this SP");
+      const { error } = await supabase.auth.resetPasswordForEmail(linkage.email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Reset link sent", description: `Password reset email sent to ${linkage?.email}` });
+      setShowResetLink(false);
     },
     onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
@@ -208,12 +225,15 @@ export default function SPLoginAccess({ spId, spName }: Props) {
 
       {/* Actions */}
       <div className="metric-card space-y-4">
-        {hasLogin ? (
+      {hasLogin ? (
           <>
             <h3 className="text-sm font-semibold">Account Actions</h3>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => { setResetPassword(generatePassword()); setShowReset(!showReset); }}>
-                <RotateCcw className="h-4 w-4 mr-2" />Reset Password
+              <Button variant="outline" size="sm" onClick={() => { setResetPassword(generatePassword()); setShowReset(!showReset); setShowResetLink(false); }}>
+                <RotateCcw className="h-4 w-4 mr-2" />Set New Password
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => { setShowResetLink(!showResetLink); setShowReset(false); }}>
+                <RotateCcw className="h-4 w-4 mr-2" />Send Reset Link
               </Button>
             </div>
 
@@ -229,6 +249,17 @@ export default function SPLoginAccess({ spId, spName }: Props) {
                 </div>
                 <Button size="sm" onClick={() => resetPw.mutate()} disabled={resetPw.isPending}>
                   {resetPw.isPending ? "Resetting..." : "Confirm Reset"}
+                </Button>
+              </div>
+            )}
+
+            {showResetLink && (
+              <div className="rounded-lg border p-4 space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  This will send a password reset email to <strong>{linkage?.email}</strong>. The SP will receive a link to set their own password.
+                </p>
+                <Button size="sm" onClick={() => sendResetLink.mutate()} disabled={sendResetLink.isPending}>
+                  {sendResetLink.isPending ? "Sending..." : "Send Password Reset Email"}
                 </Button>
               </div>
             )}

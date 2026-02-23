@@ -1,14 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Shield, UserCircle, LogIn, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
   const navigate = useNavigate();
   const { signIn, user, signOut } = useAuth();
+  const { toast } = useToast();
   const [mode, setMode] = useState<"admin" | "sp" | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,6 +19,9 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
   const [signedInWaiting, setSignedInWaiting] = useState(false);
   const [roleTimeout, setRoleTimeout] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [sendingReset, setSendingReset] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Navigate once user/role is resolved
@@ -206,12 +212,55 @@ export default function Login() {
 
           <button
             type="button"
+            onClick={() => { setShowForgot(true); setForgotEmail(email); }}
+            className="w-full text-sm text-primary hover:underline"
+          >
+            Forgot password?
+          </button>
+
+          <button
+            type="button"
             onClick={() => { setMode(null); setError(""); }}
             className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             ← Back to login options
           </button>
         </form>
+
+        {showForgot && (
+          <div className="metric-card p-4 space-y-3">
+            <h3 className="text-sm font-semibold">Reset Password</h3>
+            <p className="text-xs text-muted-foreground">Enter your email to receive a password reset link.</p>
+            <Input
+              type="email"
+              value={forgotEmail}
+              onChange={(e) => setForgotEmail(e.target.value)}
+              placeholder="your@email.com"
+            />
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                disabled={sendingReset || !forgotEmail}
+                onClick={async () => {
+                  setSendingReset(true);
+                  const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+                    redirectTo: `${window.location.origin}/reset-password`,
+                  });
+                  setSendingReset(false);
+                  if (error) {
+                    toast({ title: "Error", description: error.message, variant: "destructive" });
+                  } else {
+                    toast({ title: "Reset link sent", description: "Check your email for a password reset link." });
+                    setShowForgot(false);
+                  }
+                }}
+              >
+                {sendingReset ? "Sending..." : "Send Reset Link"}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setShowForgot(false)}>Cancel</Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
