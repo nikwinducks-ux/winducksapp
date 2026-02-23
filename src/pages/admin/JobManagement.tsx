@@ -83,13 +83,13 @@ export default function JobManagement() {
                 <td className="py-3 text-muted-foreground">{job.scheduledDate}</td>
                 <td className="py-3">
                   <div className="flex items-center gap-1">
-                    <Link to={`/admin/jobs/${job.id}`}>
+                    <Link to={`/admin/jobs/${job.dbId}`}>
                       <Button size="sm" variant="ghost" title="View"><Eye className="h-4 w-4" /></Button>
                     </Link>
-                    <Link to={`/admin/jobs/${job.id}/edit`}>
+                    <Link to={`/admin/jobs/${job.dbId}/edit`}>
                       <Button size="sm" variant="ghost" title="Edit"><Pencil className="h-4 w-4" /></Button>
                     </Link>
-                    <Link to={`/admin/jobs/${job.id}?assign=true`}>
+                    <Link to={`/admin/jobs/${job.dbId}?assign=true`}>
                       <Button size="sm" variant="ghost" title="Assign SP"><UserPlus className="h-4 w-4" /></Button>
                     </Link>
                   </div>

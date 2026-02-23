@@ -5,7 +5,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, FileText, Briefcase } from "lucide-react";
 import { useMemo } from "react";
-import { haversineDistance } from "@/lib/proximity";
+import { computeProximityResult, DISTANCE_SOURCE_LABELS } from "@/lib/proximity";
 
 function UrgencyBadge({ urgency }: { urgency?: string }) {
   if (!urgency || urgency === "Scheduled") return <StatusBadge label="Scheduled" variant="info" />;
@@ -51,12 +51,7 @@ export default function SPJobDetail() {
 
   const distanceInfo = useMemo(() => {
     if (!job || !currentSp) return null;
-    const spAddr = currentSp.baseAddress;
-    const jobAddr = job.jobAddress;
-    if (spAddr.lat && spAddr.lng && jobAddr.lat && jobAddr.lng) {
-      return haversineDistance(spAddr.lat, spAddr.lng, jobAddr.lat, jobAddr.lng);
-    }
-    return null;
+    return computeProximityResult(currentSp.baseAddress, job.jobAddress);
   }, [job, currentSp]);
 
   if (!user?.spId) {
@@ -131,10 +126,14 @@ export default function SPJobDetail() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
             <div><p className="text-xs text-muted-foreground">Payout</p><p className="text-xl font-bold text-primary">${job.payout}</p></div>
           </div>
-          {distanceInfo !== null && (
+          {distanceInfo !== null && distanceInfo.distanceKm !== null && (
             <div className="flex items-center gap-3">
               <MapPin className="h-4 w-4 text-muted-foreground" />
-              <div><p className="text-xs text-muted-foreground">Distance</p><p className="font-medium">{distanceInfo} km</p></div>
+              <div>
+                <p className="text-xs text-muted-foreground">Distance</p>
+                <p className="font-medium">{distanceInfo.distanceKm} km</p>
+                <p className="text-xs text-muted-foreground">Source: {DISTANCE_SOURCE_LABELS[distanceInfo.source]}</p>
+              </div>
             </div>
           )}
           <div className="flex items-center gap-3">

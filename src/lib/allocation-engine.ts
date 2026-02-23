@@ -1,4 +1,4 @@
-import { haversineDistance, proximityScore } from "./proximity";
+import { haversineDistance, proximityScore, computeProximityResult } from "./proximity";
 import type { ServiceProvider, Job } from "@/data/mockData";
 
 // ===== Types =====
@@ -71,12 +71,9 @@ function computeAvailability(sp: ServiceProvider): number {
   return sp.acceptanceRate;
 }
 
-function computeProximity(sp: ServiceProvider, job: Job): { score: number; distKm: number | null } {
-  if (sp.baseAddress.lat && sp.baseAddress.lng && job.jobAddress.lat && job.jobAddress.lng) {
-    const distKm = haversineDistance(sp.baseAddress.lat, sp.baseAddress.lng, job.jobAddress.lat, job.jobAddress.lng);
-    return { score: proximityScore(distKm), distKm };
-  }
-  return { score: 50, distKm: null }; // Default when coords missing
+function computeProximityFactor(sp: ServiceProvider, job: Job): { score: number; distKm: number | null } {
+  const result = computeProximityResult(sp.baseAddress, job.jobAddress);
+  return { score: result.score, distKm: result.distanceKm };
 }
 
 function computeCompetency(sp: ServiceProvider, job: Job): number {
@@ -219,7 +216,7 @@ export function runAllocation(
   const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0) || 1;
 
   const candidates: CandidateResult[] = serviceProviders.map((sp) => {
-    const { score: proxScore, distKm } = computeProximity(sp, job);
+    const { score: proxScore, distKm } = computeProximityFactor(sp, job);
 
     const factorScores = {
       availability: computeAvailability(sp),

@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, Info, FileText } from "lucide-react";
 import { useState, useMemo } from "react";
-import { haversineDistance, proximityScore, PROXIMITY_TOOLTIP } from "@/lib/proximity";
+import { computeProximityResult, PROXIMITY_TOOLTIP, DISTANCE_SOURCE_LABELS } from "@/lib/proximity";
 
 function UrgencyBadge({ urgency }: { urgency?: string }) {
   if (!urgency || urgency === "Scheduled") return <StatusBadge label="Scheduled" variant="info" />;
@@ -32,7 +32,7 @@ export default function JobOfferDetail() {
   const { data: jobs = [] } = useJobs();
   const activeCategories = useActiveServiceCategories();
   const acceptMutation = useAcceptJobOffer();
-  const job = jobs.find((j) => j.id === id);
+  const job = jobs.find((j) => j.dbId === id);
   const [showDecline, setShowDecline] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
   const [declined, setDeclined] = useState(false);
@@ -41,14 +41,14 @@ export default function JobOfferDetail() {
   const isLegacy = job && activeCategories.length > 0 && !activeCategories.some((c) => c.name === job.serviceCategory);
 
   const distanceInfo = useMemo(() => {
-    if (!job || !currentSp) return { distance: null, needsGeocoding: true, score: 0 };
-    const spAddr = currentSp.baseAddress;
-    const jobAddr = job.jobAddress;
-    if (spAddr.lat && spAddr.lng && jobAddr.lat && jobAddr.lng) {
-      const d = haversineDistance(spAddr.lat, spAddr.lng, jobAddr.lat, jobAddr.lng);
-      return { distance: d, needsGeocoding: false, score: proximityScore(d) };
-    }
-    return { distance: null, needsGeocoding: true, score: job.scores?.proximity ?? 0 };
+    if (!job || !currentSp) return { distance: null, needsGeocoding: true, score: 0, source: "fallback" as const };
+    const result = computeProximityResult(currentSp.baseAddress, job.jobAddress);
+    return {
+      distance: result.distanceKm,
+      needsGeocoding: result.source === "fallback",
+      score: result.score,
+      source: result.source,
+    };
   }, [job, currentSp]);
 
   // SP linkage check
@@ -120,7 +120,10 @@ export default function JobOfferDetail() {
             <div>
               <p className="text-xs text-muted-foreground">Distance from you</p>
               {distanceInfo.distance !== null ? (
-                <p className="font-medium">{distanceInfo.distance} km</p>
+                <>
+                  <p className="font-medium">{distanceInfo.distance} km</p>
+                  <p className="text-xs text-muted-foreground">Source: {DISTANCE_SOURCE_LABELS[distanceInfo.source]}</p>
+                </>
               ) : (
                 <span className="status-badge bg-warning/10 text-warning">Needs geocoding</span>
               )}
