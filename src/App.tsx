@@ -18,6 +18,7 @@ import AvailabilitySettings from "./pages/sp/AvailabilitySettings";
 import AutoAcceptSettings from "./pages/sp/AutoAcceptSettings";
 import PerformancePage from "./pages/sp/PerformancePage";
 import MyJobs from "./pages/sp/MyJobs";
+import SPJobDetail from "./pages/sp/SPJobDetail";
 import AccountPage from "./pages/sp/AccountPage";
 
 // Admin Pages
@@ -75,6 +76,7 @@ function AppRoutes() {
         <Route path="/auto-accept" element={<AutoAcceptSettings />} />
         <Route path="/performance" element={<PerformancePage />} />
         <Route path="/my-jobs" element={<MyJobs />} />
+        <Route path="/sp/jobs/:id" element={<SPJobDetail />} />
         <Route path="/account" element={<AccountPage />} />
 
         {/* Admin Routes */}
