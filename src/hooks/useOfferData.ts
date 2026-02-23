@@ -451,13 +451,20 @@ export function useGenerateBroadcastOffers() {
     }) => {
       const broadcastRadius = job.broadcastRadiusKm ?? 100;
       
+      // Cancel any existing pending broadcast offers for this job first
+      await supabase.from("offers")
+        .update({ status: "Cancelled" } as any)
+        .eq("job_id", job.dbId)
+        .eq("status", "Pending")
+        .eq("acceptance_source", "Broadcast");
+
       // Filter eligible SPs by hard gates only
       const eligibleSps = serviceProviders.filter(sp => {
         if (sp.status !== "Active") return false;
         if (sp.complianceStatus !== "Valid") return false;
         if (!sp.serviceCategories.some(c => c.toLowerCase() === job.serviceCategory.toLowerCase())) return false;
         
-        // Distance check: within SP travel radius AND broadcast radius
+        // Distance check: within broadcast radius
         if (sp.baseAddress.lat && sp.baseAddress.lng && job.jobAddress.lat && job.jobAddress.lng) {
           const dist = haversineDistance(sp.baseAddress.lat, sp.baseAddress.lng, job.jobAddress.lat, job.jobAddress.lng);
           if (dist > broadcastRadius) return false;
@@ -467,7 +474,7 @@ export function useGenerateBroadcastOffers() {
       });
 
       if (eligibleSps.length === 0) {
-        throw new Error("No eligible SPs found within broadcast radius.");
+        throw new Error("No eligible SPs found within broadcast radius. Check that SPs are Active, Compliant, have matching categories, and are within " + broadcastRadius + "km.");
       }
 
       const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000).toISOString();

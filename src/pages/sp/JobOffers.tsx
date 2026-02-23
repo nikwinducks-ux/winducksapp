@@ -61,10 +61,10 @@ function DiagnosticsPanel({ user, spId, currentSp, allOffers, pendingOffers }: {
 
           {currentSp && (
             <div className="pt-2 border-t space-y-1">
-              <p className="font-semibold text-muted-foreground">Auto-Accept Settings</p>
+              <p className="font-semibold text-muted-foreground">Auto-Accept Settings <span className="font-normal">(from service_providers table)</span></p>
               <div className="grid gap-1 sm:grid-cols-2">
                 <span className="text-muted-foreground">Auto-Accept Enabled:</span>
-                <span className={currentSp.autoAccept ? "text-primary font-semibold" : ""}>{currentSp.autoAccept ? "Yes" : "No"}</span>
+                <span className={currentSp.autoAccept ? "text-primary font-semibold" : "font-semibold text-destructive"}>{currentSp.autoAccept ? "Yes ✓" : "No ✗"}</span>
                 <span className="text-muted-foreground">Allowed categories:</span>
                 <span>{currentSp.serviceCategories?.length ?? 0} ({currentSp.serviceCategories?.join(", ") || "none"})</span>
                 <span className="text-muted-foreground">Travel radius:</span>

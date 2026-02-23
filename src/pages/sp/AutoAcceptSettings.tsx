@@ -4,41 +4,55 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { AlertCircle } from "lucide-react";
-import { useServiceCategories } from "@/hooks/useSupabaseData";
+import { useServiceCategories, useServiceProvider } from "@/hooks/useSupabaseData";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function AutoAcceptSettings() {
-  const [enabled, setEnabled] = useState(true);
-  const [maxDistance, setMaxDistance] = useState(25);
-  const [minPayout, setMinPayout] = useState(100);
-  const [maxJobsPerDay, setMaxJobsPerDay] = useState(5);
-  const [selectedCategories, setSelectedCategories] = useState<Record<string, boolean>>({});
-  const [blockAboveTarget, setBlockAboveTarget] = useState(true);
-  const [saved, setSaved] = useState(false);
-  const [initialized, setInitialized] = useState(false);
-
+  const { user } = useAuth();
+  const spId = user?.spId ?? null;
+  const { data: currentSp, isLoading: spLoading } = useServiceProvider(spId ?? undefined);
   const { data: allCategories = [], isLoading: categoriesLoading } = useServiceCategories();
   const activeCategories = allCategories
     .filter((c) => c.active)
     .sort((a, b) => a.display_order - b.display_order || a.name.localeCompare(b.name));
 
-  // Initialize selections once categories load
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  // Local form state — initialized from DB
+  const [enabled, setEnabled] = useState(false);
+  const [maxDistance, setMaxDistance] = useState(25);
+  const [minPayout, setMinPayout] = useState(100);
+  const [maxJobsPerDay, setMaxJobsPerDay] = useState(5);
+  const [selectedCategories, setSelectedCategories] = useState<Record<string, boolean>>({});
+  const [blockAboveTarget, setBlockAboveTarget] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [initialized, setInitialized] = useState(false);
+
+  // Initialize from DB when SP loads
   useEffect(() => {
-    if (activeCategories.length > 0 && !initialized) {
-      const initial: Record<string, boolean> = {};
+    if (currentSp && !initialized) {
+      setEnabled(currentSp.autoAccept);
+      setMaxDistance(currentSp.travelRadius);
+      setMaxJobsPerDay(currentSp.maxJobsPerDay);
+      // Initialize category selections based on SP's current categories
+      const catMap: Record<string, boolean> = {};
       activeCategories.forEach((cat) => {
-        initial[cat.name] = false;
+        catMap[cat.name] = currentSp.serviceCategories.includes(cat.name);
       });
-      setSelectedCategories(initial);
+      setSelectedCategories(catMap);
       setInitialized(true);
     }
-  }, [activeCategories, initialized]);
+  }, [currentSp, activeCategories, initialized]);
 
-  // Keep selections in sync when categories change (new ones added)
+  // Keep selections in sync when new categories are added
   useEffect(() => {
     if (initialized && activeCategories.length > 0) {
       setSelectedCategories((prev) => {
         const updated = { ...prev };
-        // Add new categories
         activeCategories.forEach((cat) => {
           if (!(cat.name in updated)) {
             updated[cat.name] = false;
@@ -53,6 +67,37 @@ export default function AutoAcceptSettings() {
   const inactiveSelected = Object.keys(selectedCategories).filter(
     (name) => selectedCategories[name] && !activeCategories.some((c) => c.name === name)
   );
+
+  const handleSave = async () => {
+    if (!spId) return;
+    setSaving(true);
+    try {
+      // The single source of truth is the service_providers table
+      const allowedCategories = Object.entries(selectedCategories)
+        .filter(([, v]) => v)
+        .map(([k]) => k);
+
+      const { error } = await supabase.from("service_providers").update({
+        auto_accept: enabled,
+        service_radius_km: maxDistance,
+        max_jobs_per_day: maxJobsPerDay,
+        categories: allowedCategories,
+      }).eq("id", spId);
+
+      if (error) throw error;
+
+      // Invalidate queries so diagnostics refresh immediately
+      qc.invalidateQueries({ queryKey: ["service_providers"] });
+      toast({ title: "Settings saved", description: "Auto-accept settings updated." });
+    } catch (err: any) {
+      toast({ title: "Error saving", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (spLoading) return <p className="text-sm text-muted-foreground p-4">Loading…</p>;
+  if (!spId) return <p className="text-sm text-muted-foreground p-4">No linked SP account found.</p>;
 
   return (
     <div className="space-y-8 animate-fade-in max-w-2xl">
@@ -124,7 +169,6 @@ export default function AutoAcceptSettings() {
                     <span className="text-sm font-medium">{cat.name}</span>
                   </label>
                 ))}
-                {/* Show inactive saved categories */}
                 {inactiveSelected.map((name) => (
                   <label key={name} className="flex items-center gap-3 cursor-pointer opacity-60">
                     <Switch
@@ -155,9 +199,10 @@ export default function AutoAcceptSettings() {
 
       <Button
         className="w-full sm:w-auto"
-        onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 2000); }}
+        onClick={handleSave}
+        disabled={saving}
       >
-        {saved ? "✓ Saved" : "Save Settings"}
+        {saving ? "Saving…" : "Save Settings"}
       </Button>
     </div>
   );
