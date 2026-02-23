@@ -90,7 +90,7 @@ function dbToJob(row: any, customers: Customer[]): Job {
     scheduledDate: row.scheduled_date ?? "",
     scheduledTime: row.scheduled_time,
     payout: Number(row.payout),
-    status: row.status?.toLowerCase().replace(/\s/g, "-") as any,
+    status: row.status?.toLowerCase().replace(/\s/g, "-").replace("inprogress", "in-progress") as any,
     assignedSpId: row.assigned_sp_id ?? undefined,
     scores: row.scores as AllocationScores | undefined,
     notes: row.notes ?? "",
@@ -416,6 +416,7 @@ export function useCreateJob() {
       lat: string; lng: string; scheduledDate: string; scheduledTime: string; estimatedDuration: string;
       notes?: string; urgency?: string;
     }) => {
+      // job_number is auto-assigned by DB trigger (assign_job_number)
       const { error } = await supabase.from("jobs").insert({
         customer_id: form.customerId || null,
         service_category: form.serviceCategory,
@@ -548,6 +549,14 @@ export function useAcceptJobOffer() {
         assignment_type: "Offer",
       });
       if (assignErr) console.error("Assignment audit error:", assignErr);
+
+      // 4. Insert status event audit
+      await supabase.from("job_status_events").insert({
+        job_id: jobDbId,
+        old_status: jobRow.status,
+        new_status: "Assigned",
+        changed_by_sp_id: spId,
+      });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
@@ -555,6 +564,38 @@ export function useAcceptJobOffer() {
     },
     onError: (err: any) => {
       toast({ title: "Could not accept job", description: err.message, variant: "destructive" });
+    },
+  });
+}
+
+export function useUpdateJobStatus() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ jobDbId, oldStatus, newStatus, spId, userId, note }: {
+      jobDbId: string; oldStatus: string; newStatus: string;
+      spId?: string; userId?: string; note?: string;
+    }) => {
+      const { error: jobErr } = await supabase.from("jobs")
+        .update({ status: newStatus })
+        .eq("id", jobDbId);
+      if (jobErr) throw jobErr;
+
+      await supabase.from("job_status_events").insert({
+        job_id: jobDbId,
+        old_status: oldStatus,
+        new_status: newStatus,
+        changed_by_sp_id: spId ?? null,
+        changed_by_user_id: userId ?? null,
+        note: note ?? null,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      toast({ title: "Status updated" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 }

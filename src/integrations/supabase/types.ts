@@ -116,6 +116,47 @@ export type Database = {
           },
         ]
       }
+      job_status_events: {
+        Row: {
+          changed_at: string
+          changed_by_sp_id: string | null
+          changed_by_user_id: string | null
+          id: string
+          job_id: string
+          new_status: string
+          note: string | null
+          old_status: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by_sp_id?: string | null
+          changed_by_user_id?: string | null
+          id?: string
+          job_id: string
+          new_status: string
+          note?: string | null
+          old_status: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by_sp_id?: string | null
+          changed_by_user_id?: string | null
+          id?: string
+          job_id?: string
+          new_status?: string
+          note?: string | null
+          old_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_status_events_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           assigned_sp_id: string | null

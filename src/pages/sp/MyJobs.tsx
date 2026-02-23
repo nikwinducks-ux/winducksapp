@@ -2,6 +2,7 @@ import { useJobs } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { MapPin, Clock, DollarSign, Calendar, FileText } from "lucide-react";
+import { Link } from "react-router-dom";
 
 function UrgencyBadge({ urgency }: { urgency?: string }) {
   if (!urgency || urgency === "Scheduled") return <StatusBadge label="Scheduled" variant="info" />;
@@ -21,7 +22,14 @@ export default function MyJobs() {
   const { data: jobs = [], isLoading } = useJobs();
 
   const myJobs = jobs.filter((j) => j.assignedSpId === user?.spId);
-  const activeJobs = myJobs.filter((j) => !["completed", "cancelled"].includes(j.status));
+  const activeJobs = myJobs
+    .filter((j) => !["completed", "cancelled"].includes(j.status))
+    .sort((a, b) => {
+      if (a.scheduledDate && b.scheduledDate) return a.scheduledDate.localeCompare(b.scheduledDate);
+      if (a.scheduledDate) return -1;
+      if (b.scheduledDate) return 1;
+      return 0;
+    });
   const pastJobs = myJobs.filter((j) => ["completed", "cancelled"].includes(j.status));
 
   if (isLoading) return <div className="py-20 text-center text-muted-foreground">Loading jobs...</div>;
@@ -44,28 +52,30 @@ export default function MyJobs() {
           <h2 className="section-title mb-4">Active Jobs</h2>
           <div className="space-y-3">
             {activeJobs.map((job) => (
-              <div key={job.id} className="metric-card space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold">{job.id}</p>
-                    <StatusBadge label={job.status} variant="info" />
-                    <UrgencyBadge urgency={job.urgency} />
+              <Link key={job.id} to={`/sp/jobs/${job.dbId}`} className="block">
+                <div className="metric-card space-y-2 hover:border-primary/30 transition-colors cursor-pointer">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold">{job.id}</p>
+                      <StatusBadge label={job.status === "in-progress" ? "In Progress" : job.status} variant={job.status === "in-progress" ? "warning" : "info"} />
+                      <UrgencyBadge urgency={job.urgency} />
+                    </div>
+                    <p className="text-xl font-bold text-primary flex items-center gap-1"><DollarSign className="h-4 w-4" />{job.payout}</p>
                   </div>
-                  <p className="text-xl font-bold text-primary flex items-center gap-1"><DollarSign className="h-4 w-4" />{job.payout}</p>
+                  <p className="text-sm font-medium">{job.customerName} — {job.serviceCategory}</p>
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                    <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{job.address}</span>
+                    <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /><ScheduleText job={job} /></span>
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{job.estimatedDuration || "—"}</span>
+                  </div>
+                  {job.notes && (
+                    <p className="text-xs text-muted-foreground flex items-start gap-1 mt-1">
+                      <FileText className="h-3 w-3 mt-0.5 shrink-0" />
+                      <span className="truncate">{job.notes.slice(0, 120)}{job.notes.length > 120 ? "..." : ""}</span>
+                    </p>
+                  )}
                 </div>
-                <p className="text-sm font-medium">{job.customerName} — {job.serviceCategory}</p>
-                <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
-                  <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{job.address}</span>
-                  <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /><ScheduleText job={job} /></span>
-                  <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{job.estimatedDuration || "—"}</span>
-                </div>
-                {job.notes && (
-                  <p className="text-xs text-muted-foreground flex items-start gap-1 mt-1">
-                    <FileText className="h-3 w-3 mt-0.5 shrink-0" />
-                    <span className="truncate">{job.notes.slice(0, 120)}{job.notes.length > 120 ? "..." : ""}</span>
-                  </p>
-                )}
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -76,17 +86,19 @@ export default function MyJobs() {
           <h2 className="section-title mb-4">Past Jobs</h2>
           <div className="space-y-3">
             {pastJobs.map((job) => (
-              <div key={job.id} className="metric-card opacity-80 flex items-center gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold truncate">{job.customerName}</p>
-                    <StatusBadge label={job.status} variant={job.status === "completed" ? "valid" : "warning"} />
-                    <UrgencyBadge urgency={job.urgency} />
+              <Link key={job.id} to={`/sp/jobs/${job.dbId}`} className="block">
+                <div className="metric-card opacity-80 flex items-center gap-4 hover:border-primary/30 transition-colors cursor-pointer">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold truncate">{job.id}</p>
+                      <StatusBadge label={job.status} variant={job.status === "completed" ? "valid" : "warning"} />
+                      <UrgencyBadge urgency={job.urgency} />
+                    </div>
+                    <p className="text-sm text-muted-foreground truncate mt-0.5">{job.customerName} · {job.serviceCategory} · {job.scheduledDate}</p>
                   </div>
-                  <p className="text-sm text-muted-foreground truncate mt-0.5">{job.serviceCategory} · {job.scheduledDate}</p>
+                  <p className="text-lg font-bold">${job.payout}</p>
                 </div>
-                <p className="text-lg font-bold">${job.payout}</p>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
