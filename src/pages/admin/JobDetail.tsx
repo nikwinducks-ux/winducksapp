@@ -7,14 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/StatusBadge";
+import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { ArrowLeft, MapPin, Calendar, Clock, DollarSign, User, Pencil, UserPlus, AlertCircle, FileText, Send, Radio } from "lucide-react";
 import { useState } from "react";
-
-function UrgencyBadge({ urgency }: { urgency?: string }) {
-  if (!urgency || urgency === "Scheduled") return <StatusBadge label="Scheduled" variant="info" />;
-  if (urgency === "ASAP") return <StatusBadge label="ASAP" variant="error" />;
-  return <StatusBadge label="Anytime soon" variant="warning" />;
-}
 
 function ScheduleDisplay({ job }: { job: any }) {
   const urgency = job.urgency || "Scheduled";
