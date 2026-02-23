@@ -30,6 +30,9 @@ function DiagnosticsPanel({ user, spId, currentSp, allOffers, pendingOffers }: {
 }) {
   const [open, setOpen] = useState(false);
 
+  const broadcastOffers = pendingOffers.filter(o => o.acceptance_source === "Broadcast");
+  const allocationOffers = pendingOffers.filter(o => o.acceptance_source !== "Broadcast");
+
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full">
@@ -38,7 +41,7 @@ function DiagnosticsPanel({ user, spId, currentSp, allOffers, pendingOffers }: {
         {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="mt-2 metric-card text-xs space-y-1.5">
+        <div className="mt-2 metric-card text-xs space-y-3">
           <div className="grid gap-1 sm:grid-cols-2">
             <span className="text-muted-foreground">User email:</span>
             <span className="font-mono">{user?.email ?? "(none)"}</span>
@@ -50,9 +53,32 @@ function DiagnosticsPanel({ user, spId, currentSp, allOffers, pendingOffers }: {
             <span className="font-semibold">{allOffers.length}</span>
             <span className="text-muted-foreground">Pending offers:</span>
             <span className="font-semibold">{pendingOffers.length}</span>
+            <span className="text-muted-foreground">↳ Allocation offers:</span>
+            <span>{allocationOffers.length}</span>
+            <span className="text-muted-foreground">↳ Broadcast offers:</span>
+            <span>{broadcastOffers.length}</span>
           </div>
+
+          {currentSp && (
+            <div className="pt-2 border-t space-y-1">
+              <p className="font-semibold text-muted-foreground">Auto-Accept Settings</p>
+              <div className="grid gap-1 sm:grid-cols-2">
+                <span className="text-muted-foreground">Auto-Accept Enabled:</span>
+                <span className={currentSp.autoAccept ? "text-primary font-semibold" : ""}>{currentSp.autoAccept ? "Yes" : "No"}</span>
+                <span className="text-muted-foreground">Allowed categories:</span>
+                <span>{currentSp.serviceCategories?.length ?? 0} ({currentSp.serviceCategories?.join(", ") || "none"})</span>
+                <span className="text-muted-foreground">Travel radius:</span>
+                <span>{currentSp.travelRadius} km</span>
+                <span className="text-muted-foreground">Max jobs/day:</span>
+                <span>{currentSp.maxJobsPerDay}</span>
+              </div>
+            </div>
+          )}
+
           {pendingOffers.length === 0 && (
-            <p className="text-muted-foreground pt-1 border-t">No offers are targeted to this SP.</p>
+            <p className="text-muted-foreground pt-1 border-t">
+              No offers are targeted to this SP. Offers have not been generated for this SP — ask admin to generate offers.
+            </p>
           )}
         </div>
       </CollapsibleContent>
@@ -186,6 +212,7 @@ export default function JobOffers() {
                       <p className="font-semibold truncate">{job.customerName}</p>
                       <StatusBadge label={isLegacy(job.serviceCategory) ? `(Legacy) ${job.serviceCategory}` : job.serviceCategory} variant="neutral" />
                       <UrgencyBadge urgency={job.urgency} />
+                      {offer.acceptance_source === "Broadcast" && <StatusBadge label="Broadcast" variant="warning" />}
                       <span className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Timer className="h-3 w-3" /> {minutesLeft}m left
                       </span>

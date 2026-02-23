@@ -1,13 +1,13 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useJobs, useServiceProviders, useAssignJob, useActiveServiceCategories } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
-import { useOffers, useCreateManualOffer } from "@/hooks/useOfferData";
+import { useOffers, useCreateManualOffer, useGenerateBroadcastOffers } from "@/hooks/useOfferData";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/StatusBadge";
-import { ArrowLeft, MapPin, Calendar, Clock, DollarSign, User, Pencil, UserPlus, AlertCircle, FileText, Send } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, Clock, DollarSign, User, Pencil, UserPlus, AlertCircle, FileText, Send, Radio } from "lucide-react";
 import { useState } from "react";
 
 function UrgencyBadge({ urgency }: { urgency?: string }) {
@@ -33,6 +33,7 @@ export default function JobDetail() {
   const activeCategories = useActiveServiceCategories();
   const { data: jobOffers = [], refetch: refetchOffers } = useOffers(id);
   const createManualOffer = useCreateManualOffer();
+  const generateBroadcast = useGenerateBroadcastOffers();
 
   const job = jobs.find((j) => j.dbId === id);
   const [showAssign, setShowAssign] = useState(searchParams.get("assign") === "true");
@@ -40,6 +41,7 @@ export default function JobDetail() {
   const [showSendOffer, setShowSendOffer] = useState(false);
   const [offerSpId, setOfferSpId] = useState("");
   const [offerExpiry, setOfferExpiry] = useState(10);
+  const [broadcastExpiry, setBroadcastExpiry] = useState(30);
 
   if (!job) {
     return (
@@ -105,6 +107,7 @@ export default function JobDetail() {
           <h1 className="page-header">{job.id}</h1>
           <StatusBadge label={job.status} variant={statusVariant(job.status) as any} />
           <UrgencyBadge urgency={job.urgency} />
+          {job.isBroadcast && <StatusBadge label="Broadcast" variant="warning" />}
         </div>
         <div className="flex gap-2">
           <Link to={`/admin/jobs/${job.dbId}/edit`}>
@@ -174,9 +177,24 @@ export default function JobDetail() {
       <div className="metric-card space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="section-title">Offers</h2>
-          <Button size="sm" variant="outline" onClick={() => setShowSendOffer(!showSendOffer)}>
-            <Send className="h-4 w-4 mr-1" />Send Offer to SP
-          </Button>
+          <div className="flex gap-2">
+            {job.isBroadcast && (
+              <Button size="sm" variant="outline" onClick={async () => {
+                await generateBroadcast.mutateAsync({
+                  job,
+                  serviceProviders: providers,
+                  expiryMinutes: broadcastExpiry,
+                  createdBy: user?.id ?? "system",
+                });
+                refetchOffers();
+              }} disabled={generateBroadcast.isPending}>
+                <Radio className="h-4 w-4 mr-1" />{generateBroadcast.isPending ? "Broadcasting..." : "Broadcast Offers"}
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={() => setShowSendOffer(!showSendOffer)}>
+              <Send className="h-4 w-4 mr-1" />Send Offer to SP
+            </Button>
+          </div>
         </div>
 
         {showSendOffer && (
@@ -222,12 +240,16 @@ export default function JobDetail() {
                     <p className="font-medium text-sm">{sp?.name ?? offer.sp_id.slice(0, 8)}</p>
                     <p className="text-xs text-muted-foreground">
                       {offer.acceptance_source === "AutoAccept" && "⚡ Auto-accepted • "}
+                      {offer.acceptance_source === "Broadcast" && "📡 Broadcast • "}
                       Offered {new Date(offer.offered_at).toLocaleString()}
                       {offer.expires_at && ` • Expires ${new Date(offer.expires_at).toLocaleTimeString()}`}
                       {offer.decline_reason && ` • Reason: ${offer.decline_reason}`}
                     </p>
                   </div>
-                  <StatusBadge label={isExpired ? "Expired" : offer.status} variant={offerVariant(isExpired ? "Expired" : offer.status) as any} />
+                  <div className="flex items-center gap-2">
+                    {offer.acceptance_source === "Broadcast" && <StatusBadge label="Broadcast" variant="warning" />}
+                    <StatusBadge label={isExpired ? "Expired" : offer.status} variant={offerVariant(isExpired ? "Expired" : offer.status) as any} />
+                  </div>
                 </div>
               );
             })}

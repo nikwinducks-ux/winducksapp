@@ -340,10 +340,13 @@ export type Database = {
       jobs: {
         Row: {
           assigned_sp_id: string | null
+          broadcast_note: string
+          broadcast_radius_km: number
           created_at: string
           customer_id: string | null
           estimated_duration: string
           id: string
+          is_broadcast: boolean
           job_address_city: string
           job_address_country: string
           job_address_postal: string
@@ -364,10 +367,13 @@ export type Database = {
         }
         Insert: {
           assigned_sp_id?: string | null
+          broadcast_note?: string
+          broadcast_radius_km?: number
           created_at?: string
           customer_id?: string | null
           estimated_duration?: string
           id?: string
+          is_broadcast?: boolean
           job_address_city?: string
           job_address_country?: string
           job_address_postal?: string
@@ -388,10 +394,13 @@ export type Database = {
         }
         Update: {
           assigned_sp_id?: string | null
+          broadcast_note?: string
+          broadcast_radius_km?: number
           created_at?: string
           customer_id?: string | null
           estimated_duration?: string
           id?: string
+          is_broadcast?: boolean
           job_address_city?: string
           job_address_country?: string
           job_address_postal?: string

@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Info, MapPin } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { ArrowLeft, Info, MapPin, Radio } from "lucide-react";
 import { autofillCoords, SUPPORTED_CITIES } from "@/lib/coord-autofill";
 import { useToast } from "@/hooks/use-toast";
 
@@ -81,6 +82,9 @@ export default function JobForm() {
     estimatedDurationMinutes: "",
     notes: "",
     urgency: "Scheduled",
+    isBroadcast: false,
+    broadcastRadiusKm: "100",
+    broadcastNote: "",
   });
   const [loadingExisting, setLoadingExisting] = useState(isEdit);
 
@@ -107,6 +111,9 @@ export default function JobForm() {
           estimatedDurationMinutes: parseDurationToMinutes(data.estimated_duration) || data.estimated_duration || "",
           notes: (data as any).notes ?? "",
           urgency: (data as any).urgency ?? "Scheduled",
+          isBroadcast: (data as any).is_broadcast ?? false,
+          broadcastRadiusKm: String((data as any).broadcast_radius_km ?? 100),
+          broadcastNote: (data as any).broadcast_note ?? "",
         });
       }
       setLoadingExisting(false);
@@ -151,7 +158,7 @@ export default function JobForm() {
       ? (mins >= 60 ? `${Math.floor(mins / 60)}${mins % 60 > 0 ? `.${Math.round((mins % 60) / 60 * 10) / 10 * 10}` : ""} hours` : `${mins} minutes`)
       : form.estimatedDurationMinutes;
 
-    const payload = {
+    const payload: any = {
       customerId: form.customerId,
       serviceCategory,
       payout: form.payout,
@@ -167,6 +174,9 @@ export default function JobForm() {
       estimatedDuration,
       notes: form.notes,
       urgency: form.urgency,
+      isBroadcast: form.isBroadcast,
+      broadcastRadiusKm: parseInt(form.broadcastRadiusKm) || 100,
+      broadcastNote: form.broadcastNote,
     };
     if (isEdit && id) {
       updateJob.mutate({ id, ...payload }, { onSuccess: () => navigate("/admin/jobs") });
@@ -307,6 +317,35 @@ export default function JobForm() {
               </Select>
             </div>
           </div>
+        </div>
+
+        {/* Broadcast Mode */}
+        <div className="metric-card space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="section-title flex items-center gap-2"><Radio className="h-4 w-4" />Broadcast Mode</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Bypass allocation — send offers to all eligible SPs within radius</p>
+            </div>
+            <Switch checked={form.isBroadcast} onCheckedChange={(v) => setForm(f => ({ ...f, isBroadcast: v }))} />
+          </div>
+          {form.isBroadcast && (
+            <div className="space-y-3 pt-2 border-t">
+              <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/5 p-3">
+                <Info className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                <p className="text-xs">Creates offers for all eligible SPs within radius. First accept wins.</p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Broadcast Radius (km)</Label>
+                  <Input type="number" min={1} max={500} value={form.broadcastRadiusKm} onChange={(e) => update("broadcastRadiusKm", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Note (optional)</Label>
+                  <Input value={form.broadcastNote} onChange={(e) => update("broadcastNote", e.target.value)} placeholder="e.g., Open to all SPs in radius" />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="metric-card space-y-4">

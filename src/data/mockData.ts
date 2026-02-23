@@ -72,6 +72,9 @@ export interface Job {
   scores?: AllocationScores;
   notes?: string;
   urgency?: string;
+  isBroadcast?: boolean;
+  broadcastRadiusKm?: number;
+  broadcastNote?: string;
 }
 
 export interface AllocationScores {
