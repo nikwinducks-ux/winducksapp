@@ -102,29 +102,38 @@ export type Database = {
         Row: {
           created_at: string
           created_by_user_id: string | null
+          finalized_at: string | null
           id: string
           job_id: string
           label: string | null
           policy_id: string
           selected_sp_id: string | null
+          strategy: string
+          top_n: number
         }
         Insert: {
           created_at?: string
           created_by_user_id?: string | null
+          finalized_at?: string | null
           id?: string
           job_id: string
           label?: string | null
           policy_id: string
           selected_sp_id?: string | null
+          strategy?: string
+          top_n?: number
         }
         Update: {
           created_at?: string
           created_by_user_id?: string | null
+          finalized_at?: string | null
           id?: string
           job_id?: string
           label?: string | null
           policy_id?: string
           selected_sp_id?: string | null
+          strategy?: string
+          top_n?: number
         }
         Relationships: [
           {
@@ -379,6 +388,73 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offers: {
+        Row: {
+          acceptance_source: string
+          allocation_run_id: string | null
+          created_at: string
+          created_by: string
+          decline_reason: string | null
+          expires_at: string
+          id: string
+          job_id: string
+          offered_at: string
+          responded_at: string | null
+          sp_id: string
+          status: string
+        }
+        Insert: {
+          acceptance_source?: string
+          allocation_run_id?: string | null
+          created_at?: string
+          created_by?: string
+          decline_reason?: string | null
+          expires_at?: string
+          id?: string
+          job_id: string
+          offered_at?: string
+          responded_at?: string | null
+          sp_id: string
+          status?: string
+        }
+        Update: {
+          acceptance_source?: string
+          allocation_run_id?: string | null
+          created_at?: string
+          created_by?: string
+          decline_reason?: string | null
+          expires_at?: string
+          id?: string
+          job_id?: string
+          offered_at?: string
+          responded_at?: string | null
+          sp_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offers_allocation_run_id_fkey"
+            columns: ["allocation_run_id"]
+            isOneToOne: false
+            referencedRelation: "allocation_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offers_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offers_sp_id_fkey"
+            columns: ["sp_id"]
+            isOneToOne: false
+            referencedRelation: "service_providers"
             referencedColumns: ["id"]
           },
         ]

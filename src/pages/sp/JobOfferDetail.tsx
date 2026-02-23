@@ -1,5 +1,6 @@
-import { useParams, Link, useNavigate } from "react-router-dom";
-import { useServiceProviders, useJobs, useActiveServiceCategories, useAcceptJobOffer } from "@/hooks/useSupabaseData";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useServiceProviders, useJobs, useActiveServiceCategories } from "@/hooks/useSupabaseData";
+import { useAcceptOffer, useDeclineOffer, useOffers } from "@/hooks/useOfferData";
 import { useAuth } from "@/contexts/AuthContext";
 import { declineReasons } from "@/data/mockData";
 import { ScoreBar } from "@/components/ScoreBar";
@@ -7,7 +8,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, Info, FileText } from "lucide-react";
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, Info, FileText, Timer } from "lucide-react";
 import { useState, useMemo } from "react";
 import { computeProximityResult, PROXIMITY_TOOLTIP, DISTANCE_SOURCE_LABELS } from "@/lib/proximity";
 
@@ -26,32 +27,35 @@ function ScheduleDisplay({ job }: { job: any }) {
 
 export default function JobOfferDetail() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const offerId = searchParams.get("offer");
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data: serviceProviders = [] } = useServiceProviders();
   const { data: jobs = [] } = useJobs();
   const activeCategories = useActiveServiceCategories();
-  const acceptMutation = useAcceptJobOffer();
+  const { data: jobOffers = [] } = useOffers(id);
+  const acceptOffer = useAcceptOffer();
+  const declineOffer = useDeclineOffer();
   const job = jobs.find((j) => j.dbId === id);
   const [showDecline, setShowDecline] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
-  const [declined, setDeclined] = useState(false);
 
   const currentSp = serviceProviders.find((sp) => sp.id === user?.spId);
   const isLegacy = job && activeCategories.length > 0 && !activeCategories.some((c) => c.name === job.serviceCategory);
 
+  // Find the specific offer for this SP
+  const myOffer = useMemo(() => {
+    if (offerId) return jobOffers.find(o => o.id === offerId);
+    return jobOffers.find(o => o.sp_id === user?.spId && o.status === "Pending");
+  }, [jobOffers, offerId, user?.spId]);
+
   const distanceInfo = useMemo(() => {
     if (!job || !currentSp) return { distance: null, needsGeocoding: true, score: 0, source: "fallback" as const };
     const result = computeProximityResult(currentSp.baseAddress, job.jobAddress);
-    return {
-      distance: result.distanceKm,
-      needsGeocoding: result.source === "fallback",
-      score: result.score,
-      source: result.source,
-    };
+    return { distance: result.distanceKm, needsGeocoding: result.source === "fallback", score: result.score, source: result.source };
   }, [job, currentSp]);
 
-  // SP linkage check
   if (!user?.spId) {
     return (
       <div className="flex flex-col items-center justify-center py-20 metric-card max-w-lg mx-auto text-center space-y-2">
@@ -71,18 +75,26 @@ export default function JobOfferDetail() {
     );
   }
 
-  const isAvailable = (job.status === "pending" || job.status === "created" || job.status === "offered") && !job.assignedSpId;
   const isAccepted = job.status === "assigned" && job.assignedSpId === user.spId;
+  const isDeclined = myOffer?.status === "Declined";
+  const isExpired = myOffer ? new Date(myOffer.expires_at) < new Date() && myOffer.status === "Pending" : false;
+  const isPending = myOffer?.status === "Pending" && !isExpired;
+  const minutesLeft = myOffer && isPending
+    ? Math.max(0, Math.round((new Date(myOffer.expires_at).getTime() - Date.now()) / 60000))
+    : null;
 
   const handleAccept = () => {
-    acceptMutation.mutate(
-      { jobDbId: job.dbId, spId: user.spId! },
-      {
-        onSuccess: () => {
-          // Navigate to my-jobs after short delay for toast visibility
-          setTimeout(() => navigate("/my-jobs"), 800);
-        },
-      }
+    if (!myOffer) return;
+    acceptOffer.mutate(
+      { offerId: myOffer.id, jobId: job.dbId, spId: user.spId! },
+      { onSuccess: () => setTimeout(() => navigate("/my-jobs"), 800) }
+    );
+  };
+
+  const handleDecline = () => {
+    if (!myOffer || !declineReason) return;
+    declineOffer.mutate(
+      { offerId: myOffer.id, declineReason },
     );
   };
 
@@ -95,12 +107,17 @@ export default function JobOfferDetail() {
       <div>
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="page-header">{job.id}</h1>
-          <span className={`status-badge ${isAccepted ? "bg-primary/10 text-primary" : isAvailable ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground"}`}>
-            {isAccepted ? "Accepted" : declined ? "Declined" : job.status}
-          </span>
+          {isAccepted && <StatusBadge label="Accepted" variant="valid" />}
+          {isDeclined && <StatusBadge label="Declined" variant="warning" />}
+          {isExpired && <StatusBadge label="Expired" variant="warning" />}
+          {isPending && <StatusBadge label="Pending" variant="info" />}
           <UrgencyBadge urgency={job.urgency} />
         </div>
-        {isAvailable && !declined && <p className="mt-1 text-sm text-muted-foreground">Offer expires in 45:00 minutes</p>}
+        {isPending && minutesLeft !== null && (
+          <p className="mt-1 text-sm text-muted-foreground flex items-center gap-1">
+            <Timer className="h-3.5 w-3.5" /> Offer expires in {minutesLeft} minutes
+          </p>
+        )}
       </div>
 
       {/* Job Details card */}
@@ -187,19 +204,15 @@ export default function JobOfferDetail() {
       )}
 
       {/* Actions */}
-      {isAvailable && !declined && (
+      {isPending && (
         <div className="metric-card space-y-4">
           <h2 className="section-title">Actions</h2>
           {!showDecline ? (
             <div className="flex gap-3">
-              <Button
-                className="flex-1"
-                onClick={handleAccept}
-                disabled={acceptMutation.isPending}
-              >
-                {acceptMutation.isPending ? "Accepting…" : "Accept Job"}
+              <Button className="flex-1" onClick={handleAccept} disabled={acceptOffer.isPending}>
+                {acceptOffer.isPending ? "Accepting…" : "Accept Job"}
               </Button>
-              <Button variant="outline" className="flex-1" onClick={() => setShowDecline(true)} disabled={acceptMutation.isPending}>Decline Job</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setShowDecline(true)} disabled={acceptOffer.isPending}>Decline Job</Button>
             </div>
           ) : (
             <div className="space-y-4">
@@ -214,7 +227,9 @@ export default function JobOfferDetail() {
                 </SelectContent>
               </Select>
               <div className="flex gap-3">
-                <Button variant="destructive" disabled={!declineReason} onClick={() => setDeclined(true)} className="flex-1">Confirm Decline</Button>
+                <Button variant="destructive" disabled={!declineReason || declineOffer.isPending} onClick={handleDecline} className="flex-1">
+                  {declineOffer.isPending ? "Declining…" : "Confirm Decline"}
+                </Button>
                 <Button variant="outline" onClick={() => setShowDecline(false)} className="flex-1">Cancel</Button>
               </div>
             </div>
@@ -229,10 +244,17 @@ export default function JobOfferDetail() {
         </div>
       )}
 
-      {declined && (
+      {isDeclined && (
         <div className="metric-card border-destructive/30 bg-destructive/5 text-center py-6">
           <p className="text-lg font-semibold text-destructive">Job Declined</p>
-          <p className="text-sm text-muted-foreground mt-1">Reason: {declineReason}</p>
+          <p className="text-sm text-muted-foreground mt-1">Reason: {myOffer?.decline_reason}</p>
+        </div>
+      )}
+
+      {isExpired && (
+        <div className="metric-card border-warning/30 bg-warning/5 text-center py-6">
+          <p className="text-lg font-semibold text-warning">Offer Expired</p>
+          <p className="text-sm text-muted-foreground mt-1">This offer is no longer available.</p>
         </div>
       )}
     </div>
