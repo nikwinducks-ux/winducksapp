@@ -56,6 +56,69 @@ export function useSpOffers(spId: string | null | undefined) {
   });
 }
 
+/** All offers for an SP (all statuses) — used for diagnostics */
+export function useAllSpOffers(spId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["offers", "sp-all", spId],
+    queryFn: async () => {
+      if (!spId) return [];
+      const { data, error } = await supabase
+        .from("offers")
+        .select("*")
+        .eq("sp_id", spId)
+        .order("offered_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Offer[];
+    },
+    enabled: !!spId,
+  });
+}
+
+/** Create a manual offer from admin */
+export function useCreateManualOffer() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({
+      jobId,
+      spId,
+      expiryMinutes = 10,
+      createdBy = "system",
+    }: {
+      jobId: string;
+      spId: string;
+      expiryMinutes?: number;
+      createdBy?: string;
+    }) => {
+      const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000).toISOString();
+      const { error } = await supabase.from("offers").insert({
+        job_id: jobId,
+        sp_id: spId,
+        status: "Pending",
+        expires_at: expiresAt,
+        acceptance_source: "Manual",
+        created_by: createdBy,
+      } as any);
+      if (error) throw error;
+
+      // Update job status to Offered if still Created
+      await supabase.from("jobs")
+        .update({ status: "Offered" })
+        .eq("id", jobId)
+        .in("status", ["Created", "Offered"]);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["offers"] });
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      toast({ title: "Offer sent", description: "Manual offer created for this SP." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error creating offer", description: err.message, variant: "destructive" });
+    },
+  });
+}
+
 // ===== Auto-accept evaluation =====
 
 function evaluateAutoAccept(

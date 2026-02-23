@@ -1,10 +1,13 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useJobs, useServiceProviders, useAssignJob, useActiveServiceCategories } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOffers, useCreateManualOffer } from "@/hooks/useOfferData";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/StatusBadge";
-import { ArrowLeft, MapPin, Calendar, Clock, DollarSign, User, Pencil, UserPlus, AlertCircle, FileText } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, Clock, DollarSign, User, Pencil, UserPlus, AlertCircle, FileText, Send } from "lucide-react";
 import { useState } from "react";
 
 function UrgencyBadge({ urgency }: { urgency?: string }) {
@@ -28,10 +31,15 @@ export default function JobDetail() {
   const { user } = useAuth();
   const assignJob = useAssignJob();
   const activeCategories = useActiveServiceCategories();
+  const { data: jobOffers = [], refetch: refetchOffers } = useOffers(id);
+  const createManualOffer = useCreateManualOffer();
 
   const job = jobs.find((j) => j.dbId === id);
   const [showAssign, setShowAssign] = useState(searchParams.get("assign") === "true");
   const [selectedSpId, setSelectedSpId] = useState("");
+  const [showSendOffer, setShowSendOffer] = useState(false);
+  const [offerSpId, setOfferSpId] = useState("");
+  const [offerExpiry, setOfferExpiry] = useState(10);
 
   if (!job) {
     return (
@@ -53,11 +61,35 @@ export default function JobDetail() {
     );
   };
 
+  const handleSendOffer = async () => {
+    if (!offerSpId || !id) return;
+    await createManualOffer.mutateAsync({
+      jobId: id,
+      spId: offerSpId,
+      expiryMinutes: offerExpiry,
+      createdBy: user?.id ?? "system",
+    });
+    setShowSendOffer(false);
+    setOfferSpId("");
+    refetchOffers();
+  };
+
   const statusVariant = (s: string) => {
     switch (s) {
       case "assigned": return "info";
       case "completed": return "valid";
       case "cancelled": return "warning";
+      default: return "neutral";
+    }
+  };
+
+  const offerVariant = (s: string) => {
+    switch (s) {
+      case "Accepted": return "valid";
+      case "Pending": return "info";
+      case "Declined": return "warning";
+      case "Expired": return "warning";
+      case "Cancelled": return "error";
       default: return "neutral";
     }
   };
@@ -137,6 +169,71 @@ export default function JobDetail() {
           <p className="text-sm whitespace-pre-wrap">{job.notes}</p>
         </div>
       )}
+
+      {/* Offers panel */}
+      <div className="metric-card space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="section-title">Offers</h2>
+          <Button size="sm" variant="outline" onClick={() => setShowSendOffer(!showSendOffer)}>
+            <Send className="h-4 w-4 mr-1" />Send Offer to SP
+          </Button>
+        </div>
+
+        {showSendOffer && (
+          <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-sm">Service Provider</Label>
+                <Select value={offerSpId} onValueChange={setOfferSpId}>
+                  <SelectTrigger><SelectValue placeholder="Select an SP..." /></SelectTrigger>
+                  <SelectContent>
+                    {providers.filter(sp => sp.status === "Active").map(sp => (
+                      <SelectItem key={sp.id} value={sp.id}>
+                        {sp.name} — {sp.baseAddress.city}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">Expiry (minutes)</Label>
+                <Input type="number" min={1} max={60} value={offerExpiry} onChange={e => setOfferExpiry(parseInt(e.target.value) || 10)} className="w-24" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSendOffer} disabled={!offerSpId || createManualOffer.isPending}>
+                {createManualOffer.isPending ? "Sending..." : "Send Offer"}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setShowSendOffer(false)}>Cancel</Button>
+            </div>
+          </div>
+        )}
+
+        {jobOffers.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No offers sent for this job yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {jobOffers.map(offer => {
+              const sp = providers.find(s => s.id === offer.sp_id);
+              const isExpired = offer.status === "Pending" && new Date(offer.expires_at) < new Date();
+              return (
+                <div key={offer.id} className="flex items-center gap-4 rounded-lg border p-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm">{sp?.name ?? offer.sp_id.slice(0, 8)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {offer.acceptance_source === "AutoAccept" && "⚡ Auto-accepted • "}
+                      Offered {new Date(offer.offered_at).toLocaleString()}
+                      {offer.expires_at && ` • Expires ${new Date(offer.expires_at).toLocaleTimeString()}`}
+                      {offer.decline_reason && ` • Reason: ${offer.decline_reason}`}
+                    </p>
+                  </div>
+                  <StatusBadge label={isExpired ? "Expired" : offer.status} variant={offerVariant(isExpired ? "Expired" : offer.status) as any} />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Assignment panel */}
       <div className="metric-card space-y-4">
