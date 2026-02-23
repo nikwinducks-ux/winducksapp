@@ -6,22 +6,28 @@ export const URGENCY_PRIORITY: Record<string, number> = {
   Scheduled: 2,
 };
 
-const urgencyStyle = (urgency: string) => {
-  switch (urgency) {
-    case "ASAP":
-      return "bg-red-100 text-red-700 border-red-300";
-    case "Anytime soon":
-      return "bg-yellow-100 text-yellow-800 border-yellow-300";
-    default:
-      return "bg-green-100 text-green-700 border-green-300";
-  }
+/** Normalize any urgency string to a canonical value. */
+export function normalizeUrgency(raw?: string | null): "ASAP" | "Anytime soon" | "Scheduled" {
+  if (!raw) return "Scheduled";
+  const key = raw.trim().toLowerCase().replace(/[\s_-]+/g, "");
+  if (key === "asap") return "ASAP";
+  if (key.startsWith("anytime")) return "Anytime soon";
+  if (key.startsWith("sched")) return "Scheduled";
+  if (import.meta.env.DEV) console.warn(`Unknown urgency value: "${raw}", defaulting to Scheduled`);
+  return "Scheduled";
+}
+
+const STYLE_MAP: Record<string, string> = {
+  ASAP: "bg-red-100 text-red-700 border-red-300",
+  "Anytime soon": "bg-yellow-100 text-yellow-800 border-yellow-300",
+  Scheduled: "bg-green-100 text-green-700 border-green-300",
 };
 
 export function UrgencyBadge({ urgency }: { urgency?: string }) {
-  const label = urgency || "Scheduled";
+  const canonical = normalizeUrgency(urgency);
   return (
-    <Badge variant="outline" className={`text-xs font-medium ${urgencyStyle(label)}`}>
-      {label}
+    <Badge variant="outline" className={`text-xs font-medium ${STYLE_MAP[canonical]}`}>
+      {canonical}
     </Badge>
   );
 }
