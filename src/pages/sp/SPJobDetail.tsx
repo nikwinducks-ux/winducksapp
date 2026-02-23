@@ -7,11 +7,7 @@ import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, File
 import { useMemo } from "react";
 import { computeProximityResult, DISTANCE_SOURCE_LABELS } from "@/lib/proximity";
 
-function UrgencyBadge({ urgency }: { urgency?: string }) {
-  if (!urgency || urgency === "Scheduled") return <StatusBadge label="Scheduled" variant="info" />;
-  if (urgency === "ASAP") return <StatusBadge label="ASAP" variant="error" />;
-  return <StatusBadge label="Anytime soon" variant="warning" />;
-}
+import { UrgencyBadge } from "@/components/UrgencyBadge";
 
 function ScheduleDisplay({ job }: { job: any }) {
   const urgency = job.urgency || "Scheduled";

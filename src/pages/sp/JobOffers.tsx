@@ -2,17 +2,12 @@ import { useServiceProviders, useJobs, useActiveServiceCategories } from "@/hook
 import { useSpOffers, useAllSpOffers, useExpireStaleOffers, type Offer } from "@/hooks/useOfferData";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
+import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { Link } from "react-router-dom";
 import { MapPin, Clock, DollarSign, FileText, Timer, ChevronDown, ChevronUp, Info, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { computeProximityResult } from "@/lib/proximity";
 import { useEffect, useMemo, useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-
-function UrgencyBadge({ urgency }: { urgency?: string }) {
-  if (!urgency || urgency === "Scheduled") return <StatusBadge label="Scheduled" variant="info" />;
-  if (urgency === "ASAP") return <StatusBadge label="ASAP" variant="error" />;
-  return <StatusBadge label="Anytime soon" variant="warning" />;
-}
 
 function ScheduleText({ job }: { job: any }) {
   const urgency = job.urgency || "Scheduled";

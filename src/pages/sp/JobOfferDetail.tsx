@@ -5,18 +5,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { declineReasons } from "@/data/mockData";
 import { ScoreBar } from "@/components/ScoreBar";
 import { StatusBadge } from "@/components/StatusBadge";
+import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, Info, FileText, Timer } from "lucide-react";
 import { useState, useMemo } from "react";
 import { computeProximityResult, PROXIMITY_TOOLTIP, DISTANCE_SOURCE_LABELS } from "@/lib/proximity";
-
-function UrgencyBadge({ urgency }: { urgency?: string }) {
-  if (!urgency || urgency === "Scheduled") return <StatusBadge label="Scheduled" variant="info" />;
-  if (urgency === "ASAP") return <StatusBadge label="ASAP" variant="error" />;
-  return <StatusBadge label="Anytime soon" variant="warning" />;
-}
 
 function ScheduleDisplay({ job }: { job: any }) {
   const urgency = job.urgency || "Scheduled";

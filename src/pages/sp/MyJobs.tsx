@@ -1,14 +1,9 @@
 import { useJobs } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
+import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { MapPin, Clock, DollarSign, Calendar, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
-
-function UrgencyBadge({ urgency }: { urgency?: string }) {
-  if (!urgency || urgency === "Scheduled") return <StatusBadge label="Scheduled" variant="info" />;
-  if (urgency === "ASAP") return <StatusBadge label="ASAP" variant="error" />;
-  return <StatusBadge label="Anytime soon" variant="warning" />;
-}
 
 function ScheduleText({ job }: { job: any }) {
   const urgency = job.urgency || "Scheduled";

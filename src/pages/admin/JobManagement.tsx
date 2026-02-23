@@ -1,22 +1,12 @@
 import { useState } from "react";
 import { useJobs, useServiceProviders } from "@/hooks/useSupabaseData";
 import { StatusBadge } from "@/components/StatusBadge";
+import { UrgencyBadge, URGENCY_PRIORITY } from "@/components/UrgencyBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Plus, Eye, Pencil, UserPlus } from "lucide-react";
 import { Link } from "react-router-dom";
-
-const URGENCY_PRIORITY: Record<string, number> = { "ASAP": 0, "Anytime soon": 1, "Scheduled": 2 };
-
-const urgencyBadgeStyle = (u: string) => {
-  switch (u) {
-    case "ASAP": return "bg-destructive/15 text-destructive border-destructive/30";
-    case "Anytime soon": return "bg-warning/15 text-warning border-warning/30";
-    default: return "bg-secondary text-secondary-foreground border-border";
-  }
-};
 
 export default function JobManagement() {
   const [search, setSearch] = useState("");
@@ -134,9 +124,7 @@ export default function JobManagement() {
                 <td className="py-3 font-medium">${job.payout}</td>
                 <td className="py-3 text-muted-foreground">{job.jobAddress.city}</td>
                 <td className="py-3">
-                  <Badge variant="outline" className={`text-xs font-medium ${urgencyBadgeStyle(job.urgency || "Scheduled")}`}>
-                    {job.urgency || "Scheduled"}
-                  </Badge>
+                  <UrgencyBadge urgency={job.urgency} />
                 </td>
                 <td className="py-3">
                   <StatusBadge label={job.status} variant={statusVariant(job.status) as any} />
