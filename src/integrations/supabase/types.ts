@@ -14,6 +14,142 @@ export type Database = {
   }
   public: {
     Tables: {
+      allocation_policies: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by_user_id: string | null
+          fairness_json: Json
+          id: string
+          version_name: string
+          weights_json: Json
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by_user_id?: string | null
+          fairness_json?: Json
+          id?: string
+          version_name: string
+          weights_json?: Json
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by_user_id?: string | null
+          fairness_json?: Json
+          id?: string
+          version_name?: string
+          weights_json?: Json
+        }
+        Relationships: []
+      }
+      allocation_run_candidates: {
+        Row: {
+          allocation_run_id: string
+          eligibility_status: string
+          exclusion_reason: string | null
+          factor_scores_json: Json
+          fairness_adjustment: number
+          final_score: number
+          id: string
+          rank: number
+          sp_id: string
+          weighted_score: number
+        }
+        Insert: {
+          allocation_run_id: string
+          eligibility_status?: string
+          exclusion_reason?: string | null
+          factor_scores_json?: Json
+          fairness_adjustment?: number
+          final_score?: number
+          id?: string
+          rank?: number
+          sp_id: string
+          weighted_score?: number
+        }
+        Update: {
+          allocation_run_id?: string
+          eligibility_status?: string
+          exclusion_reason?: string | null
+          factor_scores_json?: Json
+          fairness_adjustment?: number
+          final_score?: number
+          id?: string
+          rank?: number
+          sp_id?: string
+          weighted_score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "allocation_run_candidates_allocation_run_id_fkey"
+            columns: ["allocation_run_id"]
+            isOneToOne: false
+            referencedRelation: "allocation_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "allocation_run_candidates_sp_id_fkey"
+            columns: ["sp_id"]
+            isOneToOne: false
+            referencedRelation: "service_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      allocation_runs: {
+        Row: {
+          created_at: string
+          created_by_user_id: string | null
+          id: string
+          job_id: string
+          label: string | null
+          policy_id: string
+          selected_sp_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id?: string | null
+          id?: string
+          job_id: string
+          label?: string | null
+          policy_id: string
+          selected_sp_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string | null
+          id?: string
+          job_id?: string
+          label?: string | null
+          policy_id?: string
+          selected_sp_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "allocation_runs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "allocation_runs_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "allocation_policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "allocation_runs_selected_sp_id_fkey"
+            columns: ["selected_sp_id"]
+            isOneToOne: false
+            referencedRelation: "service_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address_city: string

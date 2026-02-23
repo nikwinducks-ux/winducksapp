@@ -1,22 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { allocationWeights } from "@/data/mockData";
+import { useAllocationPolicies, useActivePolicy, useSavePolicy, useActivatePolicy } from "@/hooks/useAllocationData";
+import type { AllocationWeights } from "@/lib/allocation-engine";
 
-interface WeightConfig {
-  availability: number;
-  proximity: number;
-  competency: number;
-  jobHistory: number;
-  customerRating: number;
-  reliability: number;
-  responsiveness: number;
-  safetyCompliance: number;
-  fairness: number;
-}
-
-const labels: Record<keyof WeightConfig, string> = {
+const labels: Record<keyof AllocationWeights, string> = {
   availability: "Availability Weight",
   proximity: "Proximity Weight",
   competency: "Competency Weight",
@@ -29,28 +18,49 @@ const labels: Record<keyof WeightConfig, string> = {
 };
 
 export default function AllocationControl() {
-  const [weights, setWeights] = useState<WeightConfig>({
-    availability: allocationWeights.availability,
-    proximity: allocationWeights.proximity,
-    competency: allocationWeights.competency,
-    jobHistory: allocationWeights.jobHistory,
-    customerRating: allocationWeights.customerRating,
-    reliability: allocationWeights.reliability,
-    responsiveness: allocationWeights.responsiveness,
-    safetyCompliance: allocationWeights.safetyCompliance,
-    fairness: allocationWeights.fairness,
+  const activePolicy = useActivePolicy();
+  const { data: allPolicies = [] } = useAllocationPolicies();
+  const savePolicy = useSavePolicy();
+  const activatePolicy = useActivatePolicy();
+
+  const [weights, setWeights] = useState<AllocationWeights>({
+    availability: 20, proximity: 15, competency: 15, jobHistory: 10,
+    customerRating: 15, reliability: 10, responsiveness: 5, safetyCompliance: 5, fairness: 5,
   });
-  const [policyVersion, setPolicyVersion] = useState(allocationWeights.policyVersion);
-  const [saved, setSaved] = useState(false);
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    if (activePolicy && !initialized) {
+      setWeights(activePolicy.weights_json);
+      setInitialized(true);
+    }
+  }, [activePolicy, initialized]);
 
   const total = Object.values(weights).reduce((a, b) => a + b, 0);
   const normalized = Object.fromEntries(
     Object.entries(weights).map(([k, v]) => [k, total > 0 ? Math.round((v / total) * 100) : 0])
-  ) as unknown as WeightConfig;
+  ) as unknown as AllocationWeights;
 
-  const updateWeight = (key: keyof WeightConfig, value: number[]) => {
+  const updateWeight = (key: keyof AllocationWeights, value: number[]) => {
     setWeights({ ...weights, [key]: value[0] });
   };
+
+  const handleSave = () => {
+    const currentVersion = activePolicy?.version_name ?? "Policy v1.0";
+    const vNum = parseFloat(currentVersion.replace("Policy v", "")) || 1.0;
+    const newVersion = `Policy v${(vNum + 0.1).toFixed(1)}`;
+
+    savePolicy.mutate({
+      versionName: newVersion,
+      weights,
+      fairness: activePolicy?.fairness_json ?? {
+        rollingWindow: 30, maxSharePercent: 15, cooldownHours: 4,
+        minDistributionBoost: 5, newSpBoostDays: 30,
+      },
+    });
+  };
+
+  const previousPolicy = allPolicies.find((p) => !p.active);
 
   return (
     <div className="space-y-8 animate-fade-in max-w-3xl">
@@ -63,13 +73,15 @@ export default function AllocationControl() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="section-title">Current Policy</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">{policyVersion}</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {activePolicy?.version_name ?? "No policy"} • {allPolicies.length} version(s)
+            </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setPolicyVersion("Policy v0.9")}>
-              Revert to Previous
+          {previousPolicy && (
+            <Button variant="outline" size="sm" onClick={() => activatePolicy.mutate(previousPolicy.id)}>
+              Revert to {previousPolicy.version_name}
             </Button>
-          </div>
+          )}
         </div>
       </div>
 
@@ -82,7 +94,7 @@ export default function AllocationControl() {
           </div>
         </div>
 
-        {(Object.keys(labels) as (keyof WeightConfig)[]).map((key) => (
+        {(Object.keys(labels) as (keyof AllocationWeights)[]).map((key) => (
           <div key={key} className="space-y-2">
             <div className="flex items-center justify-between">
               <Label className="text-sm">{labels[key]}</Label>
@@ -102,15 +114,8 @@ export default function AllocationControl() {
         ))}
       </div>
 
-      <Button
-        className="w-full sm:w-auto"
-        onClick={() => {
-          setPolicyVersion(`Policy v${(parseFloat(policyVersion.replace("Policy v", "")) + 0.1).toFixed(1)}`);
-          setSaved(true);
-          setTimeout(() => setSaved(false), 2000);
-        }}
-      >
-        {saved ? "✓ Policy Saved" : "Save New Policy Version"}
+      <Button className="w-full sm:w-auto" onClick={handleSave} disabled={savePolicy.isPending}>
+        {savePolicy.isPending ? "Saving…" : "Save New Policy Version"}
       </Button>
     </div>
   );
