@@ -713,12 +713,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_offer: { Args: { _offer_id: string }; Returns: Json }
+      decline_offer: {
+        Args: { _offer_id: string; _reason?: string }
+        Returns: Json
+      }
       get_user_sp_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      haversine_km: {
+        Args: { lat1: number; lat2: number; lng1: number; lng2: number }
+        Returns: number
+      }
+      sp_eligible_for_broadcast_job: {
+        Args: { _job_id: string; _sp_id: string }
         Returns: boolean
       }
     }

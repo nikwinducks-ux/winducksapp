@@ -8,7 +8,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { useSeedData } from "@/hooks/useSupabaseData";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
-import Signup from "./pages/Signup";
+// Signup removed — accounts are admin-created only
 
 // SP Pages
 import SPDashboard from "./pages/sp/SPDashboard";
@@ -58,7 +58,6 @@ function AppRoutes() {
   if (!user) {
     return (
       <Routes>
-        <Route path="/signup" element={<Signup />} />
         <Route path="*" element={<Login />} />
       </Routes>
     );
@@ -69,39 +68,39 @@ function AppRoutes() {
   return (
     <DashboardLayout>
       <Routes>
-        {/* SP Routes */}
+        {/* SP Routes — only accessible to SP role */}
         <Route path="/" element={role === "sp" ? <SPDashboard /> : <Navigate to="/admin" replace />} />
-        <Route path="/jobs" element={<JobOffers />} />
-        <Route path="/jobs/:id" element={<JobOfferDetail />} />
-        <Route path="/availability" element={<AvailabilitySettings />} />
-        <Route path="/auto-accept" element={<AutoAcceptSettings />} />
-        <Route path="/performance" element={<PerformancePage />} />
-        <Route path="/my-jobs" element={<MyJobs />} />
-        <Route path="/sp/jobs/:id" element={<SPJobDetail />} />
-        <Route path="/account" element={<AccountPage />} />
+        <Route path="/jobs" element={role === "sp" ? <JobOffers /> : <Navigate to="/admin" replace />} />
+        <Route path="/jobs/:id" element={role === "sp" ? <JobOfferDetail /> : <Navigate to="/admin" replace />} />
+        <Route path="/availability" element={role === "sp" ? <AvailabilitySettings /> : <Navigate to="/admin" replace />} />
+        <Route path="/auto-accept" element={role === "sp" ? <AutoAcceptSettings /> : <Navigate to="/admin" replace />} />
+        <Route path="/performance" element={role === "sp" ? <PerformancePage /> : <Navigate to="/admin" replace />} />
+        <Route path="/my-jobs" element={role === "sp" ? <MyJobs /> : <Navigate to="/admin" replace />} />
+        <Route path="/sp/jobs/:id" element={role === "sp" ? <SPJobDetail /> : <Navigate to="/admin" replace />} />
+        <Route path="/account" element={role === "sp" ? <AccountPage /> : <Navigate to="/admin" replace />} />
 
-        {/* Admin Routes */}
+        {/* Admin Routes — only accessible to admin role */}
         <Route path="/admin" element={role === "admin" ? <AdminDashboard /> : <Navigate to="/" replace />} />
-        <Route path="/admin/allocation" element={<AllocationControl />} />
-        <Route path="/admin/fairness" element={<FairnessControls />} />
-        <Route path="/admin/providers" element={<SPManagement />} />
-        <Route path="/admin/providers/new" element={<SPForm />} />
-        <Route path="/admin/providers/:id" element={<SPDetail />} />
-        <Route path="/admin/providers/:id/edit" element={<SPForm />} />
-        <Route path="/admin/customers" element={<CustomerManagement />} />
-        <Route path="/admin/customers/new" element={<CustomerForm />} />
-        <Route path="/admin/customers/:id" element={<CustomerDetail />} />
-        <Route path="/admin/customers/:id/edit" element={<CustomerForm />} />
-        <Route path="/admin/jobs" element={<JobManagement />} />
-        <Route path="/admin/jobs/new" element={<JobForm />} />
-        <Route path="/admin/jobs/:id" element={<JobDetail />} />
-        <Route path="/admin/jobs/:id/edit" element={<JobForm />} />
-        <Route path="/admin/simulation" element={<SimulationTool />} />
-        <Route path="/admin/qa" element={<AllocationQA />} />
-        <Route path="/admin/workflow" element={<OfferWorkflow />} />
-        <Route path="/admin/integrations" element={<Integrations />} />
-        <Route path="/admin/users" element={<UserManagement />} />
-        <Route path="/admin/categories" element={<ServiceCategories />} />
+        <Route path="/admin/allocation" element={role === "admin" ? <AllocationControl /> : <Navigate to="/" replace />} />
+        <Route path="/admin/fairness" element={role === "admin" ? <FairnessControls /> : <Navigate to="/" replace />} />
+        <Route path="/admin/providers" element={role === "admin" ? <SPManagement /> : <Navigate to="/" replace />} />
+        <Route path="/admin/providers/new" element={role === "admin" ? <SPForm /> : <Navigate to="/" replace />} />
+        <Route path="/admin/providers/:id" element={role === "admin" ? <SPDetail /> : <Navigate to="/" replace />} />
+        <Route path="/admin/providers/:id/edit" element={role === "admin" ? <SPForm /> : <Navigate to="/" replace />} />
+        <Route path="/admin/customers" element={role === "admin" ? <CustomerManagement /> : <Navigate to="/" replace />} />
+        <Route path="/admin/customers/new" element={role === "admin" ? <CustomerForm /> : <Navigate to="/" replace />} />
+        <Route path="/admin/customers/:id" element={role === "admin" ? <CustomerDetail /> : <Navigate to="/" replace />} />
+        <Route path="/admin/customers/:id/edit" element={role === "admin" ? <CustomerForm /> : <Navigate to="/" replace />} />
+        <Route path="/admin/jobs" element={role === "admin" ? <JobManagement /> : <Navigate to="/" replace />} />
+        <Route path="/admin/jobs/new" element={role === "admin" ? <JobForm /> : <Navigate to="/" replace />} />
+        <Route path="/admin/jobs/:id" element={role === "admin" ? <JobDetail /> : <Navigate to="/" replace />} />
+        <Route path="/admin/jobs/:id/edit" element={role === "admin" ? <JobForm /> : <Navigate to="/" replace />} />
+        <Route path="/admin/simulation" element={role === "admin" ? <SimulationTool /> : <Navigate to="/" replace />} />
+        <Route path="/admin/qa" element={role === "admin" ? <AllocationQA /> : <Navigate to="/" replace />} />
+        <Route path="/admin/workflow" element={role === "admin" ? <OfferWorkflow /> : <Navigate to="/" replace />} />
+        <Route path="/admin/integrations" element={role === "admin" ? <Integrations /> : <Navigate to="/" replace />} />
+        <Route path="/admin/users" element={role === "admin" ? <UserManagement /> : <Navigate to="/" replace />} />
+        <Route path="/admin/categories" element={role === "admin" ? <ServiceCategories /> : <Navigate to="/" replace />} />
 
         <Route path="*" element={<NotFound />} />
       </Routes>

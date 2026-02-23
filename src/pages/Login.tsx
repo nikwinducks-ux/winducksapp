@@ -145,19 +145,9 @@ export default function Login() {
             </button>
           </div>
 
-          <div className="text-center">
-            <button onClick={() => navigate("/signup")} className="text-sm text-primary hover:underline">
-              Create an account →
-            </button>
-          </div>
-
-          <div className="metric-card p-4">
-            <p className="text-xs text-muted-foreground text-center">
-              <strong>Prototype credentials:</strong><br />
-              Admin: admin@winducks.ca / admin123<br />
-              SP: mike@example.com / sp123 (or any seeded SP email)
-            </p>
-          </div>
+          <p className="text-xs text-muted-foreground text-center mt-4">
+            Contact your administrator to create an account.
+          </p>
         </div>
       </div>
     );
