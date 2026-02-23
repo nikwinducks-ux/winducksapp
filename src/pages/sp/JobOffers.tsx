@@ -23,8 +23,8 @@ export default function JobOffers() {
   const activeCategories = useActiveServiceCategories();
   const sp = serviceProviders[0];
 
-  const pendingJobs = jobs.filter((j) => j.status === "pending" || j.status === "created");
-  const otherJobs = jobs.filter((j) => j.status !== "pending" && j.status !== "created");
+  const pendingJobs = jobs.filter((j) => ["pending", "created", "offered"].includes(j.status) && !j.assignedSpId);
+  const otherJobs = jobs.filter((j) => !["pending", "created", "offered"].includes(j.status) || j.assignedSpId);
 
   function getDistanceDisplay(job: typeof jobs[0]) {
     if (sp?.baseAddress.lat && sp?.baseAddress.lng && job.jobAddress.lat && job.jobAddress.lng) {

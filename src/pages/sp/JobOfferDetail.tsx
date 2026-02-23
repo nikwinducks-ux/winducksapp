@@ -1,5 +1,6 @@
-import { useParams, Link } from "react-router-dom";
-import { useServiceProviders, useJobs, useActiveServiceCategories } from "@/hooks/useSupabaseData";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { useServiceProviders, useJobs, useActiveServiceCategories, useAcceptJobOffer } from "@/hooks/useSupabaseData";
+import { useAuth } from "@/contexts/AuthContext";
 import { declineReasons } from "@/data/mockData";
 import { ScoreBar } from "@/components/ScoreBar";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -25,16 +26,18 @@ function ScheduleDisplay({ job }: { job: any }) {
 
 export default function JobOfferDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: serviceProviders = [] } = useServiceProviders();
   const { data: jobs = [] } = useJobs();
   const activeCategories = useActiveServiceCategories();
+  const acceptMutation = useAcceptJobOffer();
   const job = jobs.find((j) => j.id === id);
   const [showDecline, setShowDecline] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
-  const [accepted, setAccepted] = useState(false);
   const [declined, setDeclined] = useState(false);
 
-  const currentSp = serviceProviders[0];
+  const currentSp = serviceProviders.find((sp) => sp.id === user?.spId);
   const isLegacy = job && activeCategories.length > 0 && !activeCategories.some((c) => c.name === job.serviceCategory);
 
   const distanceInfo = useMemo(() => {
@@ -48,6 +51,17 @@ export default function JobOfferDetail() {
     return { distance: null, needsGeocoding: true, score: job.scores?.proximity ?? 0 };
   }, [job, currentSp]);
 
+  // SP linkage check
+  if (!user?.spId) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 metric-card max-w-lg mx-auto text-center space-y-2">
+        <AlertCircle className="h-8 w-8 text-destructive" />
+        <p className="font-semibold text-destructive">Account Not Linked</p>
+        <p className="text-sm text-muted-foreground">Your account is not linked to a Service Provider profile. Contact admin.</p>
+      </div>
+    );
+  }
+
   if (!job) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -56,6 +70,21 @@ export default function JobOfferDetail() {
       </div>
     );
   }
+
+  const isAvailable = (job.status === "pending" || job.status === "created" || job.status === "offered") && !job.assignedSpId;
+  const isAccepted = job.status === "assigned" && job.assignedSpId === user.spId;
+
+  const handleAccept = () => {
+    acceptMutation.mutate(
+      { jobDbId: job.dbId, spId: user.spId! },
+      {
+        onSuccess: () => {
+          // Navigate to my-jobs after short delay for toast visibility
+          setTimeout(() => navigate("/my-jobs"), 800);
+        },
+      }
+    );
+  };
 
   return (
     <div className="space-y-8 animate-fade-in max-w-3xl">
@@ -66,14 +95,15 @@ export default function JobOfferDetail() {
       <div>
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="page-header">{job.id}</h1>
-          <span className={`status-badge ${job.status === "pending" || job.status === "created" ? "bg-warning/10 text-warning" : "bg-primary/10 text-primary"}`}>
-            {accepted ? "Accepted" : declined ? "Declined" : job.status}
+          <span className={`status-badge ${isAccepted ? "bg-primary/10 text-primary" : isAvailable ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground"}`}>
+            {isAccepted ? "Accepted" : declined ? "Declined" : job.status}
           </span>
           <UrgencyBadge urgency={job.urgency} />
         </div>
-        <p className="mt-1 text-sm text-muted-foreground">Offer expires in 45:00 minutes</p>
+        {isAvailable && !declined && <p className="mt-1 text-sm text-muted-foreground">Offer expires in 45:00 minutes</p>}
       </div>
 
+      {/* Job Details card */}
       <div className="metric-card space-y-4">
         <h2 className="section-title">Job Details</h2>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -114,6 +144,7 @@ export default function JobOfferDetail() {
         </div>
       )}
 
+      {/* Allocation Transparency */}
       {job.scores && (
         <div className="metric-card space-y-4">
           <h2 className="section-title">Allocation Transparency</h2>
@@ -152,13 +183,20 @@ export default function JobOfferDetail() {
         </div>
       )}
 
-      {(job.status === "pending" || job.status === "created") && !accepted && !declined && (
+      {/* Actions */}
+      {isAvailable && !declined && (
         <div className="metric-card space-y-4">
           <h2 className="section-title">Actions</h2>
           {!showDecline ? (
             <div className="flex gap-3">
-              <Button className="flex-1" onClick={() => setAccepted(true)}>Accept Job</Button>
-              <Button variant="outline" className="flex-1" onClick={() => setShowDecline(true)}>Decline Job</Button>
+              <Button
+                className="flex-1"
+                onClick={handleAccept}
+                disabled={acceptMutation.isPending}
+              >
+                {acceptMutation.isPending ? "Accepting…" : "Accept Job"}
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => setShowDecline(true)} disabled={acceptMutation.isPending}>Decline Job</Button>
             </div>
           ) : (
             <div className="space-y-4">
@@ -181,10 +219,10 @@ export default function JobOfferDetail() {
         </div>
       )}
 
-      {accepted && (
+      {isAccepted && (
         <div className="metric-card border-success/30 bg-success/5 text-center py-6">
           <p className="text-lg font-semibold text-success">✓ Job Accepted Successfully</p>
-          <p className="text-sm text-muted-foreground mt-1">You'll receive confirmation details shortly.</p>
+          <p className="text-sm text-muted-foreground mt-1">This job is now in your My Jobs list.</p>
         </div>
       )}
 

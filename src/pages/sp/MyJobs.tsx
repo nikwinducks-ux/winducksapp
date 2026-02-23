@@ -21,8 +21,8 @@ export default function MyJobs() {
   const { data: jobs = [], isLoading } = useJobs();
 
   const myJobs = jobs.filter((j) => j.assignedSpId === user?.spId);
-  const activeJobs = myJobs.filter((j) => j.status !== "completed" && j.status !== "cancelled");
-  const pastJobs = myJobs.filter((j) => j.status === "completed" || j.status === "cancelled");
+  const activeJobs = myJobs.filter((j) => !["completed", "cancelled"].includes(j.status));
+  const pastJobs = myJobs.filter((j) => ["completed", "cancelled"].includes(j.status));
 
   if (isLoading) return <div className="py-20 text-center text-muted-foreground">Loading jobs...</div>;
 
