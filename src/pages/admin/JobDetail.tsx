@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
-import { ArrowLeft, MapPin, Calendar, Clock, DollarSign, User, Pencil, UserPlus, AlertCircle, FileText, Send, Radio } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, Clock, DollarSign, User, Pencil, UserPlus, AlertCircle, FileText, Send, Radio, Bug, ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { useJobServices } from "@/hooks/useSupabaseData";
 
 function ScheduleDisplay({ job }: { job: any }) {
   const urgency = job.urgency || "Scheduled";
@@ -29,6 +31,7 @@ export default function JobDetail() {
   const activeCategories = useActiveServiceCategories();
   const { data: allCategories = [] } = useServiceCategories();
   const { data: jobOffers = [], refetch: refetchOffers } = useOffers(id);
+  const { data: directJobServices = [] } = useJobServices(id);
   const createManualOffer = useCreateManualOffer();
   const generateBroadcast = useGenerateBroadcastOffers();
 
@@ -158,21 +161,46 @@ export default function JobDetail() {
           </div>
         </div>
 
-        {/* Services */}
-        {job.services && job.services.length > 0 && (
+        {/* Services — use direct query as source of truth */}
+        {directJobServices.length > 0 && (
           <div className="metric-card space-y-3">
-            <h2 className="section-title">Services ({job.services.length})</h2>
-            <JobServicesDisplay services={job.services} categories={allCategories} />
+            <h2 className="section-title">Services ({directJobServices.length})</h2>
+            <JobServicesDisplay services={directJobServices} categories={allCategories} />
           </div>
         )}
 
         {/* Legacy single service display */}
-        {(!job.services || job.services.length === 0) && job.serviceCategory && (
+        {directJobServices.length === 0 && job.serviceCategory && (
           <div className="metric-card space-y-3">
             <h2 className="section-title">Service</h2>
             <p className="font-medium">{isLegacyCategory ? `(Legacy) ${job.serviceCategory}` : job.serviceCategory}</p>
           </div>
         )}
+
+        {/* Debug panel (admin-only, temporary) */}
+        <Collapsible>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+              <Bug className="h-4 w-4" /> Debug: job_services
+              <ChevronDown className="h-3 w-3" />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="metric-card mt-2 space-y-2 text-xs font-mono">
+              <p><strong>job_id:</strong> {job.dbId}</p>
+              <p><strong>job_services count:</strong> {directJobServices.length}</p>
+              <p><strong>bulk job.services count:</strong> {job.services?.length ?? 0}</p>
+              <p><strong>categories:</strong> {directJobServices.map(s => s.service_category).join(", ") || "—"}</p>
+              <p><strong>codes:</strong> {directJobServices.map(s => {
+                const cat = allCategories.find(c => c.name === s.service_category);
+                return cat?.code || s.service_category;
+              }).join(", ") || "—"}</p>
+              <p><strong>legacy service_category:</strong> {job.serviceCategory || "—"}</p>
+              <p><strong>payout:</strong> ${job.payout}</p>
+              <p><strong>line_totals sum:</strong> ${directJobServices.reduce((s, svc) => s + svc.line_total, 0).toFixed(2)}</p>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
 
       {/* Notes */}
       {job.notes && (

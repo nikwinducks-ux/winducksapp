@@ -217,11 +217,20 @@ export default function JobForm() {
         notes: s.notes,
       }));
 
+    console.log("[JobForm] serviceItems count:", serviceItems.length, "filtered payload count:", servicesPayload.length, servicesPayload);
+
     if (isEdit && id) {
       updateJob.mutate({ id, ...payload }, {
         onSuccess: async () => {
-          await saveJobServices.mutateAsync({ jobId: id, services: servicesPayload });
-          navigate("/admin/jobs");
+          try {
+            await saveJobServices.mutateAsync({ jobId: id, services: servicesPayload });
+            navigate("/admin/jobs");
+          } catch (err: any) {
+            toast({ title: "Error saving services", description: err.message, variant: "destructive" });
+          }
+        },
+        onError: (err: any) => {
+          toast({ title: "Error updating job", description: err.message, variant: "destructive" });
         },
       });
     } else {
@@ -250,9 +259,10 @@ export default function JobForm() {
         }).select("id").single();
         if (error) throw error;
         if (newJob && servicesPayload.length > 0) {
+          console.log("[JobForm] Saving", servicesPayload.length, "services for new job", newJob.id);
           await saveJobServices.mutateAsync({ jobId: newJob.id, services: servicesPayload });
         }
-        toast({ title: "Job created", description: "Job has been saved." });
+        toast({ title: "Job created", description: `Job saved with ${servicesPayload.length} service(s).` });
         navigate("/admin/jobs");
       } catch (err: any) {
         toast({ title: "Error", description: err.message, variant: "destructive" });
