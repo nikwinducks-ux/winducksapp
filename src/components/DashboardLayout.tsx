@@ -30,7 +30,7 @@ const adminLinks = [
   { to: "/admin/qa", icon: TestTube, label: "Allocation QA" },
   { to: "/admin/workflow", icon: GitBranch, label: "Offer Workflow" },
   { to: "/admin/integrations", icon: Plug, label: "Integrations" },
-  
+  { to: "/admin/users", icon: Users, label: "Users" },
 ];
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
