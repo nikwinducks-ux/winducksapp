@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useServiceProviders, useToggleSPStatus, useArchiveSP } from "@/hooks/useSupabaseData";
+import { useServiceProviders, useToggleSPStatus, useArchiveSP, useJobs } from "@/hooks/useSupabaseData";
 import { supabase } from "@/integrations/supabase/client";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,19 @@ export default function SPManagement() {
   const { data: providers = [], isLoading } = useServiceProviders();
   const toggleStatus = useToggleSPStatus();
   const archiveMutation = useArchiveSP();
+  const { data: jobs = [] } = useJobs();
+
+  const jobCountMap = useMemo(() => {
+    const map = new Map<string, { active: number; completed: number }>();
+    for (const j of jobs) {
+      if (!j.assignedSpId) continue;
+      const entry = map.get(j.assignedSpId) || { active: 0, completed: 0 };
+      if (["Assigned", "Accepted", "InProgress"].includes(j.status)) entry.active++;
+      if (j.status === "Completed") entry.completed++;
+      map.set(j.assignedSpId, entry);
+    }
+    return map;
+  }, [jobs]);
 
   // Load login linkage data
   const { data: loginMap = new Map() } = useQuery({
@@ -94,6 +107,7 @@ export default function SPManagement() {
               <th className="pb-3 font-medium text-muted-foreground">Categories</th>
               <th className="pb-3 font-medium text-muted-foreground">Availability</th>
               <th className="pb-3 font-medium text-muted-foreground">Rating</th>
+              <th className="pb-3 font-medium text-muted-foreground">Active Jobs</th>
               <th className="pb-3 font-medium text-muted-foreground">Compliance</th>
               <th className="pb-3 font-medium text-muted-foreground">Actions</th>
             </tr>
@@ -137,6 +151,10 @@ export default function SPManagement() {
                     {availSummary || `${sp.maxJobsPerDay}/day, ${sp.travelRadius}km`}
                   </td>
                   <td className="py-3">⭐ {sp.rating}</td>
+                  <td className="py-3">
+                    <span className="font-medium">{jobCountMap.get(sp.id)?.active ?? 0}</span>
+                    <span className="text-muted-foreground text-xs ml-1">/ {jobCountMap.get(sp.id)?.completed ?? 0} done</span>
+                  </td>
                   <td className="py-3">
                     <StatusBadge
                       label={sp.complianceStatus}

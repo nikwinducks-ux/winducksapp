@@ -242,7 +242,7 @@ export default function JobOffers() {
             <p className="text-sm text-muted-foreground">No past jobs yet.</p>
           ) : (
             myAssignedJobs.map((job) => {
-              const variant = job.status === "assigned" ? "info" : job.status === "completed" ? "valid" : job.status === "expired" || job.status === "cancelled" ? "warning" : job.status === "in-progress" ? "info" : "error";
+              const variant = job.status === "Assigned" ? "info" : job.status === "Completed" ? "valid" : job.status === "Expired" || job.status === "Cancelled" ? "warning" : job.status === "InProgress" ? "info" : "error";
               return (
                 <div key={job.dbId} className="metric-card flex items-center gap-4 opacity-80">
                   <div className="flex-1 min-w-0">

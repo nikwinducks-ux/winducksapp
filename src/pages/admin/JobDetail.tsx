@@ -73,12 +73,15 @@ export default function JobDetail() {
 
   const statusVariant = (s: string) => {
     switch (s) {
-      case "assigned": return "info";
-      case "completed": return "valid";
-      case "cancelled": return "warning";
+      case "Assigned": case "Accepted": return "info";
+      case "InProgress": return "warning";
+      case "Completed": return "valid";
+      case "Cancelled": return "warning";
       default: return "neutral";
     }
   };
+
+  const statusLabel = (s: string) => s === "InProgress" ? "In Progress" : s;
 
   const offerVariant = (s: string) => {
     switch (s) {
@@ -100,7 +103,7 @@ export default function JobDetail() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="page-header">{job.id}</h1>
-          <StatusBadge label={job.status} variant={statusVariant(job.status) as any} />
+          <StatusBadge label={statusLabel(job.status)} variant={statusVariant(job.status) as any} />
           <UrgencyBadge urgency={job.urgency} />
           {job.isBroadcast && <StatusBadge label="Broadcast" variant="warning" />}
         </div>

@@ -20,7 +20,7 @@ export default function JobManagement() {
 
   let filtered = jobs.filter(
     (j) =>
-      j.status !== "cancelled" &&
+      j.status !== "Cancelled" &&
       (j.id.toLowerCase().includes(search.toLowerCase()) ||
         j.customerName.toLowerCase().includes(search.toLowerCase()) ||
         j.serviceCategory.toLowerCase().includes(search.toLowerCase()) ||
@@ -31,7 +31,7 @@ export default function JobManagement() {
     filtered = filtered.filter((j) => (j.urgency || "Scheduled") === urgencyFilter);
   }
   if (statusFilter !== "all") {
-    filtered = filtered.filter((j) => j.status.toLowerCase() === statusFilter.toLowerCase());
+    filtered = filtered.filter((j) => j.status === statusFilter);
   }
 
   if (sortBy === "urgency") {
@@ -42,11 +42,19 @@ export default function JobManagement() {
 
   const statusVariant = (s: string) => {
     switch (s) {
-      case "assigned": return "info";
-      case "completed": return "valid";
-      case "cancelled": case "expired": return "warning";
-      case "created": case "pending": return "neutral";
+      case "Assigned": case "Accepted": return "info";
+      case "InProgress": return "warning";
+      case "Completed": return "valid";
+      case "Cancelled": case "Expired": return "warning";
+      case "Created": case "Offered": return "neutral";
       default: return "neutral";
+    }
+  };
+
+  const statusLabel = (s: string) => {
+    switch (s) {
+      case "InProgress": return "In Progress";
+      default: return s;
     }
   };
 
@@ -82,11 +90,12 @@ export default function JobManagement() {
           <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="created">Created</SelectItem>
-            <SelectItem value="offers">Offered</SelectItem>
-            <SelectItem value="assigned">Assigned</SelectItem>
-            <SelectItem value="in-progress">In Progress</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="Created">Created</SelectItem>
+            <SelectItem value="Offered">Offered</SelectItem>
+            <SelectItem value="Assigned">Assigned</SelectItem>
+            <SelectItem value="InProgress">In Progress</SelectItem>
+            <SelectItem value="Completed">Completed</SelectItem>
+            <SelectItem value="Cancelled">Cancelled</SelectItem>
           </SelectContent>
         </Select>
         <Select value={sortBy} onValueChange={setSortBy}>
@@ -127,7 +136,7 @@ export default function JobManagement() {
                   <UrgencyBadge urgency={job.urgency} />
                 </td>
                 <td className="py-3">
-                  <StatusBadge label={job.status} variant={statusVariant(job.status) as any} />
+                  <StatusBadge label={statusLabel(job.status)} variant={statusVariant(job.status) as any} />
                 </td>
                 <td className="py-3 text-muted-foreground">
                   {job.assignedSpId ? spMap.get(job.assignedSpId) ?? "—" : "—"}

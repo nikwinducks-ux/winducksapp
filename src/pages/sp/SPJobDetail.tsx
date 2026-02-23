@@ -18,18 +18,18 @@ function ScheduleDisplay({ job }: { job: any }) {
 
 const statusVariant = (s: string) => {
   switch (s) {
-    case "assigned": case "accepted": return "info";
-    case "inprogress": case "in-progress": return "warning";
-    case "completed": return "valid";
-    case "cancelled": return "error";
+    case "Assigned": case "Accepted": return "info";
+    case "InProgress": return "warning";
+    case "Completed": return "valid";
+    case "Cancelled": return "error";
     default: return "neutral";
   }
 };
 
 const statusLabel = (s: string) => {
   switch (s) {
-    case "inprogress": case "in-progress": return "In Progress";
-    default: return s.charAt(0).toUpperCase() + s.slice(1);
+    case "InProgress": return "In Progress";
+    default: return s;
   }
 };
 
@@ -72,15 +72,13 @@ export default function SPJobDetail() {
   }
 
   const isMyJob = job.assignedSpId === user.spId;
-  const canMarkInProgress = isMyJob && ["assigned", "accepted"].includes(job.status);
-  const canMarkCompleted = isMyJob && ["assigned", "accepted", "inprogress", "in-progress"].includes(job.status);
+  const canMarkInProgress = isMyJob && ["Assigned", "Accepted"].includes(job.status);
+  const canMarkCompleted = isMyJob && ["Assigned", "Accepted", "InProgress"].includes(job.status);
 
   const handleStatusUpdate = (newStatus: string) => {
-    // Map display status back to DB status string
-    const dbOldStatus = job.status.charAt(0).toUpperCase() + job.status.slice(1);
     updateStatus.mutate({
       jobDbId: job.dbId,
-      oldStatus: dbOldStatus,
+      oldStatus: job.status,
       newStatus,
       spId: user.spId!,
     });
@@ -176,7 +174,7 @@ export default function SPJobDetail() {
         </div>
       )}
 
-      {job.status === "completed" && (
+      {job.status === "Completed" && (
         <div className="metric-card border-success/30 bg-success/5 text-center py-6">
           <p className="text-lg font-semibold text-success">✓ Job Completed</p>
         </div>

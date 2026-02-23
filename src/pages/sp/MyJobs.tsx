@@ -18,14 +18,14 @@ export default function MyJobs() {
 
   const myJobs = jobs.filter((j) => j.assignedSpId === user?.spId);
   const activeJobs = myJobs
-    .filter((j) => !["completed", "cancelled"].includes(j.status))
+    .filter((j) => !["Completed", "Cancelled"].includes(j.status))
     .sort((a, b) => {
       if (a.scheduledDate && b.scheduledDate) return a.scheduledDate.localeCompare(b.scheduledDate);
       if (a.scheduledDate) return -1;
       if (b.scheduledDate) return 1;
       return 0;
     });
-  const pastJobs = myJobs.filter((j) => ["completed", "cancelled"].includes(j.status));
+  const pastJobs = myJobs.filter((j) => ["Completed", "Cancelled"].includes(j.status));
 
   if (isLoading) return <div className="py-20 text-center text-muted-foreground">Loading jobs...</div>;
 
@@ -52,7 +52,7 @@ export default function MyJobs() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold">{job.id}</p>
-                      <StatusBadge label={job.status === "in-progress" ? "In Progress" : job.status} variant={job.status === "in-progress" ? "warning" : "info"} />
+                      <StatusBadge label={job.status === "InProgress" ? "In Progress" : job.status} variant={job.status === "InProgress" ? "warning" : "info"} />
                       <UrgencyBadge urgency={job.urgency} />
                     </div>
                     <p className="text-xl font-bold text-primary flex items-center gap-1"><DollarSign className="h-4 w-4" />{job.payout}</p>
@@ -86,7 +86,7 @@ export default function MyJobs() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold truncate">{job.id}</p>
-                      <StatusBadge label={job.status} variant={job.status === "completed" ? "valid" : "warning"} />
+                      <StatusBadge label={job.status} variant={job.status === "Completed" ? "valid" : "warning"} />
                       <UrgencyBadge urgency={job.urgency} />
                     </div>
                     <p className="text-sm text-muted-foreground truncate mt-0.5">{job.customerName} · {job.serviceCategory} · {job.scheduledDate}</p>

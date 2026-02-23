@@ -103,7 +103,7 @@ export default function CustomerDetail() {
                   <span className="font-medium">{j.id}</span>
                   <span className="text-muted-foreground ml-2">{j.serviceCategory} · {j.scheduledDate}</span>
                 </div>
-                <StatusBadge label={j.status} variant={j.status === "completed" ? "valid" : j.status === "pending" ? "warning" : "info"} />
+                <StatusBadge label={j.status === "InProgress" ? "In Progress" : j.status} variant={j.status === "Completed" ? "valid" : j.status === "Created" ? "neutral" : "info"} />
               </div>
             ))}
           </div>

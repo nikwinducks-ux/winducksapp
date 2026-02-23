@@ -2,13 +2,87 @@ import { useParams, Link } from "react-router-dom";
 import { useServiceProvider, useJobs, useToggleSPStatus } from "@/hooks/useSupabaseData";
 import { formatAddress } from "@/data/mockData";
 import { StatusBadge } from "@/components/StatusBadge";
+import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { ScoreBar } from "@/components/ScoreBar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ArrowLeft, MapPin, Pencil } from "lucide-react";
+import { ArrowLeft, MapPin, Pencil, Eye } from "lucide-react";
 import SPLoginAccess from "@/components/admin/SPLoginAccess";
 import SPAvailabilityEditor from "@/components/admin/SPAvailabilityEditor";
+import { useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const jobStatusVariant = (s: string) => {
+  switch (s) {
+    case "Assigned": case "Accepted": return "info";
+    case "InProgress": return "warning";
+    case "Completed": return "valid";
+    case "Cancelled": case "Expired": return "warning";
+    default: return "neutral";
+  }
+};
+
+const jobStatusLabel = (s: string) => s === "InProgress" ? "In Progress" : s;
+
+function SPJobsTab({ jobs }: { jobs: any[] }) {
+  const [statusFilter, setStatusFilter] = useState("all");
+  const filtered = statusFilter === "all" ? jobs : jobs.filter((j: any) => j.status === statusFilter);
+
+  return (
+    <div className="metric-card space-y-4 mt-4">
+      <div className="flex items-center justify-between">
+        <h2 className="section-title">Assigned Jobs</h2>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="Assigned">Assigned</SelectItem>
+            <SelectItem value="InProgress">In Progress</SelectItem>
+            <SelectItem value="Completed">Completed</SelectItem>
+            <SelectItem value="Cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {filtered.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-4 text-center">No jobs found.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="pb-3 font-medium text-muted-foreground">Job #</th>
+                <th className="pb-3 font-medium text-muted-foreground">Customer</th>
+                <th className="pb-3 font-medium text-muted-foreground">Urgency</th>
+                <th className="pb-3 font-medium text-muted-foreground">Status</th>
+                <th className="pb-3 font-medium text-muted-foreground">Scheduled</th>
+                <th className="pb-3 font-medium text-muted-foreground">Amount</th>
+                <th className="pb-3 font-medium text-muted-foreground">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((job: any) => (
+                <tr key={job.dbId} className="border-b last:border-0">
+                  <td className="py-3 font-medium">{job.id}</td>
+                  <td className="py-3">{job.customerName}</td>
+                  <td className="py-3"><UrgencyBadge urgency={job.urgency} /></td>
+                  <td className="py-3"><StatusBadge label={jobStatusLabel(job.status)} variant={jobStatusVariant(job.status) as any} /></td>
+                  <td className="py-3 text-muted-foreground">{job.scheduledDate || "—"}</td>
+                  <td className="py-3 font-medium">${job.payout}</td>
+                  <td className="py-3">
+                    <Link to={`/admin/jobs/${job.dbId}`}>
+                      <Button size="sm" variant="ghost" title="View"><Eye className="h-4 w-4" /></Button>
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function SPDetail() {
   const { id } = useParams();
@@ -67,6 +141,7 @@ export default function SPDetail() {
       <Tabs defaultValue="profile">
         <TabsList className="flex-wrap">
           <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="jobs">Jobs ({spJobs.length})</TabsTrigger>
           <TabsTrigger value="competency">Competency</TabsTrigger>
           <TabsTrigger value="availability">Availability</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
@@ -92,6 +167,10 @@ export default function SPDetail() {
               <div><p className="text-xs text-muted-foreground mb-1">Notes</p><p className="text-sm font-medium">{sp.notes || "—"}</p></div>
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="jobs">
+          <SPJobsTab jobs={spJobs} />
         </TabsContent>
 
         <TabsContent value="competency">
