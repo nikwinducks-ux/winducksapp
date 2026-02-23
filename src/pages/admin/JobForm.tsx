@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Info } from "lucide-react";
+import { ArrowLeft, Info, MapPin } from "lucide-react";
+import { autofillCoords, SUPPORTED_CITIES } from "@/lib/coord-autofill";
+import { useToast } from "@/hooks/use-toast";
 
 // Generate time options in 15-min increments
 const TIME_OPTIONS: string[] = [];
@@ -55,6 +57,7 @@ const URGENCY_OPTIONS = [
 export default function JobForm() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const isEdit = !!id;
   const { data: customers = [] } = useCustomers();
   const activeCategories = useActiveServiceCategories();
@@ -130,6 +133,15 @@ export default function JobForm() {
 
   const update = (field: string, value: string) => setForm({ ...form, [field]: value });
   const isSaving = createJob.isPending || updateJob.isPending;
+  const handleAutofillCoords = () => {
+    const result = autofillCoords(form.city);
+    if (result) {
+      setForm((f) => ({ ...f, lat: String(result.lat), lng: String(result.lng) }));
+      toast({ title: "Coordinates filled", description: `Approximate coords for ${form.city}` });
+    } else {
+      toast({ title: "City not supported", description: `Supported: ${SUPPORTED_CITIES.join(", ")}. Enter coordinates manually.`, variant: "destructive" });
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,6 +242,9 @@ export default function JobForm() {
             <div className="space-y-1.5"><Label>Postal Code</Label><Input value={form.postalCode} onChange={(e) => update("postalCode", e.target.value)} /></div>
             <div className="space-y-1.5"><Label>Country</Label><Input value={form.country} onChange={(e) => update("country", e.target.value)} /></div>
           </div>
+          <Button type="button" variant="outline" size="sm" onClick={handleAutofillCoords} className="gap-1.5">
+            <MapPin className="h-3.5 w-3.5" /> Auto-fill coordinates (approx)
+          </Button>
         </div>
 
         <div className="metric-card space-y-4">
