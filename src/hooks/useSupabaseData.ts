@@ -72,6 +72,7 @@ function dbToJob(row: any, customers: Customer[]): Job {
   const cust = customers.find((c) => c.id === row.customer_id);
   return {
     id: row.job_number || row.id,
+    dbId: row.id,
     customerId: row.customer_id ?? "",
     customerName: cust?.name ?? "Unknown",
     address: `${row.job_address_street}, ${row.job_address_city}`,
@@ -511,6 +512,49 @@ export function useAssignJob() {
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+}
+
+export function useAcceptJobOffer() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ jobDbId, spId }: { jobDbId: string; spId: string }) => {
+      // 1. Check job is still available
+      const { data: jobRow, error: fetchErr } = await supabase
+        .from("jobs")
+        .select("id, status, assigned_sp_id")
+        .eq("id", jobDbId)
+        .single();
+      if (fetchErr) throw new Error("Could not verify job availability.");
+      if (jobRow.assigned_sp_id) throw new Error("Job already assigned to another provider.");
+      const st = (jobRow.status || "").toLowerCase().replace(/\s/g, "-");
+      if (!["created", "pending", "offered"].includes(st)) {
+        throw new Error(`Job is no longer available (status: ${jobRow.status}).`);
+      }
+
+      // 2. Update job
+      const { error: jobErr } = await supabase.from("jobs").update({
+        assigned_sp_id: spId,
+        status: "Assigned",
+      }).eq("id", jobDbId).is("assigned_sp_id", null);
+      if (jobErr) throw new Error("Failed to accept job. It may have been taken.");
+
+      // 3. Insert assignment audit
+      const { error: assignErr } = await supabase.from("job_assignments").insert({
+        job_id: jobDbId,
+        sp_id: spId,
+        assignment_type: "Offer",
+      });
+      if (assignErr) console.error("Assignment audit error:", assignErr);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      toast({ title: "Job accepted", description: "Job accepted and added to My Jobs." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not accept job", description: err.message, variant: "destructive" });
     },
   });
 }
