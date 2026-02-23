@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import type { ServiceProvider, Job } from "@/data/mockData";
 import { computeProximityResult } from "@/lib/proximity";
+import { haversineDistance } from "@/lib/proximity";
 
 // ===== Types =====
 
@@ -412,7 +413,6 @@ export function useExpireStaleOffers() {
         .lt("expires_at", now)
         .select("job_id");
 
-      // For each affected job, check if all offers are now non-pending
       const jobIds = [...new Set((data ?? []).map((d: any) => d.job_id))];
       for (const jobId of jobIds) {
         const { count } = await supabase
@@ -427,6 +427,77 @@ export function useExpireStaleOffers() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["offers"] });
+    },
+  });
+}
+
+// ===== Generate Broadcast Offers =====
+
+export function useGenerateBroadcastOffers() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({
+      job,
+      serviceProviders,
+      expiryMinutes = 30,
+      createdBy = "system",
+    }: {
+      job: Job;
+      serviceProviders: ServiceProvider[];
+      expiryMinutes?: number;
+      createdBy?: string;
+    }) => {
+      const broadcastRadius = job.broadcastRadiusKm ?? 100;
+      
+      // Filter eligible SPs by hard gates only
+      const eligibleSps = serviceProviders.filter(sp => {
+        if (sp.status !== "Active") return false;
+        if (sp.complianceStatus !== "Valid") return false;
+        if (!sp.serviceCategories.some(c => c.toLowerCase() === job.serviceCategory.toLowerCase())) return false;
+        
+        // Distance check: within SP travel radius AND broadcast radius
+        if (sp.baseAddress.lat && sp.baseAddress.lng && job.jobAddress.lat && job.jobAddress.lng) {
+          const dist = haversineDistance(sp.baseAddress.lat, sp.baseAddress.lng, job.jobAddress.lat, job.jobAddress.lng);
+          if (dist > broadcastRadius) return false;
+        }
+        
+        return true;
+      });
+
+      if (eligibleSps.length === 0) {
+        throw new Error("No eligible SPs found within broadcast radius.");
+      }
+
+      const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000).toISOString();
+      const offerRows = eligibleSps.map(sp => ({
+        job_id: job.dbId,
+        sp_id: sp.id,
+        status: "Pending",
+        expires_at: expiresAt,
+        acceptance_source: "Broadcast",
+        created_by: createdBy,
+      }));
+
+      const { data: inserted, error } = await supabase
+        .from("offers")
+        .insert(offerRows as any)
+        .select("*");
+      if (error) throw error;
+
+      // Update job status
+      await supabase.from("jobs").update({ status: "Offered" }).eq("id", job.dbId);
+
+      return { offersCreated: inserted?.length ?? 0, eligibleCount: eligibleSps.length };
+    },
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ["offers"] });
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      toast({ title: "Broadcast offers sent", description: `${result.offersCreated} offers created for ${result.eligibleCount} eligible SPs.` });
+    },
+    onError: (err: any) => {
+      toast({ title: "Broadcast failed", description: err.message, variant: "destructive" });
     },
   });
 }

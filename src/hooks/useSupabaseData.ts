@@ -95,6 +95,9 @@ function dbToJob(row: any, customers: Customer[]): Job {
     scores: row.scores as AllocationScores | undefined,
     notes: row.notes ?? "",
     urgency: row.urgency ?? "Scheduled",
+    isBroadcast: row.is_broadcast ?? false,
+    broadcastRadiusKm: row.broadcast_radius_km ?? 100,
+    broadcastNote: row.broadcast_note ?? "",
   };
 }
 
@@ -433,6 +436,9 @@ export function useCreateJob() {
         estimated_duration: form.estimatedDuration,
         notes: form.notes ?? "",
         urgency: form.urgency ?? "Scheduled",
+        is_broadcast: (form as any).isBroadcast ?? false,
+        broadcast_radius_km: (form as any).broadcastRadiusKm ?? 100,
+        broadcast_note: (form as any).broadcastNote ?? "",
         status: "Created",
       });
       if (error) throw error;
@@ -473,6 +479,9 @@ export function useUpdateJob() {
         estimated_duration: form.estimatedDuration,
         notes: form.notes ?? "",
         urgency: form.urgency ?? "Scheduled",
+        is_broadcast: (form as any).isBroadcast ?? false,
+        broadcast_radius_km: (form as any).broadcastRadiusKm ?? 100,
+        broadcast_note: (form as any).broadcastNote ?? "",
       }).eq("id", id);
       if (error) throw error;
     },
