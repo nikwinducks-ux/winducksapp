@@ -132,7 +132,11 @@ function evaluateAutoAccept(
   if (sp.fairnessStatus === "Above Target Share") return false;
 
   // Category check
-  if (!sp.serviceCategories.some(c => c.toLowerCase() === job.serviceCategory.toLowerCase())) return false;
+  // Category check — must match ALL service categories
+  const categories = job.services && job.services.length > 0
+    ? job.services.map(s => s.service_category)
+    : [job.serviceCategory];
+  if (!categories.every(cat => sp.serviceCategories.some(c => c.toLowerCase() === cat.toLowerCase()))) return false;
 
   // Distance check
   const proxResult = computeProximityResult(sp.baseAddress, job.jobAddress);
@@ -409,7 +413,11 @@ export function useGenerateBroadcastOffers() {
       const eligibleSps = serviceProviders.filter(sp => {
         if (sp.status !== "Active") return false;
         if (sp.complianceStatus !== "Valid") return false;
-        if (!sp.serviceCategories.some(c => c.toLowerCase() === job.serviceCategory.toLowerCase())) return false;
+        // Category check — must match ALL service categories
+        const categories = job.services && job.services.length > 0
+          ? job.services.map(s => s.service_category)
+          : [job.serviceCategory];
+        if (!categories.every(cat => sp.serviceCategories.some(c => c.toLowerCase() === cat.toLowerCase()))) return false;
         
         // Distance check: within broadcast radius
         if (sp.baseAddress.lat && sp.baseAddress.lng && job.jobAddress.lat && job.jobAddress.lng) {

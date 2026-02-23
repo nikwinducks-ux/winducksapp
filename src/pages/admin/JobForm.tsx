@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useCustomers, useCreateJob, useUpdateJob, useActiveServiceCategories } from "@/hooks/useSupabaseData";
+import { useCustomers, useCreateJob, useUpdateJob, useActiveServiceCategories, useJobServices, useSaveJobServices } from "@/hooks/useSupabaseData";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { ArrowLeft, Info, MapPin, Radio } from "lucide-react";
 import { autofillCoords, SUPPORTED_CITIES } from "@/lib/coord-autofill";
 import { useToast } from "@/hooks/use-toast";
 import { normalizeUrgency } from "@/components/UrgencyBadge";
+import { JobServiceLineItems, type ServiceLineItem } from "@/components/JobServiceLineItems";
 
 // Generate time options in 15-min increments
 const TIME_OPTIONS: string[] = [];
@@ -65,11 +66,11 @@ export default function JobForm() {
   const activeCategories = useActiveServiceCategories();
   const createJob = useCreateJob();
   const updateJob = useUpdateJob();
+  const saveJobServices = useSaveJobServices();
+  const { data: existingServices = [] } = useJobServices(id);
 
   const [form, setForm] = useState({
     customerId: "",
-    serviceCategory: "",
-    customService: "",
     payout: "",
     street: "",
     city: "",
@@ -87,6 +88,11 @@ export default function JobForm() {
     broadcastRadiusKm: "100",
     broadcastNote: "",
   });
+
+  const [serviceItems, setServiceItems] = useState<ServiceLineItem[]>([
+    { service_category: "", quantity: 1, unit_price: "", notes: "" },
+  ]);
+
   const [loadingExisting, setLoadingExisting] = useState(isEdit);
 
   useEffect(() => {
@@ -94,11 +100,8 @@ export default function JobForm() {
     (async () => {
       const { data } = await supabase.from("jobs").select("*").eq("id", id).single();
       if (data) {
-        const catNames = activeCategories.map((c) => c.name);
         setForm({
           customerId: data.customer_id ?? "",
-          serviceCategory: catNames.includes(data.service_category) ? data.service_category : "custom",
-          customService: catNames.includes(data.service_category) ? "" : data.service_category,
           payout: String(data.payout),
           street: data.job_address_street,
           city: data.job_address_city,
@@ -119,7 +122,19 @@ export default function JobForm() {
       }
       setLoadingExisting(false);
     })();
-  }, [id, isEdit, activeCategories.length]);
+  }, [id, isEdit]);
+
+  // Initialize service items from existing services when editing
+  useEffect(() => {
+    if (isEdit && existingServices.length > 0) {
+      setServiceItems(existingServices.map(s => ({
+        service_category: s.service_category,
+        quantity: s.quantity,
+        unit_price: s.unit_price != null ? String(s.unit_price) : "",
+        notes: s.notes,
+      })));
+    }
+  }, [isEdit, existingServices.length]);
 
   // Auto-fill address from customer
   useEffect(() => {
@@ -141,6 +156,7 @@ export default function JobForm() {
 
   const update = (field: string, value: string) => setForm({ ...form, [field]: value });
   const isSaving = createJob.isPending || updateJob.isPending;
+
   const handleAutofillCoords = () => {
     const result = autofillCoords(form.city);
     if (result) {
@@ -151,18 +167,29 @@ export default function JobForm() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Compute total from line items
+  const computedTotal = serviceItems.reduce((sum, item) => {
+    const price = parseFloat(item.unit_price);
+    return sum + (isNaN(price) ? 0 : item.quantity * price);
+  }, 0);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const serviceCategory = form.serviceCategory === "custom" ? form.customService : form.serviceCategory;
+
+    // Derive primary service category from first service item
+    const primaryCategory = serviceItems[0]?.service_category || "";
     const mins = parseInt(form.estimatedDurationMinutes);
     const estimatedDuration = !isNaN(mins) && mins > 0
       ? (mins >= 60 ? `${Math.floor(mins / 60)}${mins % 60 > 0 ? `.${Math.round((mins % 60) / 60 * 10) / 10 * 10}` : ""} hours` : `${mins} minutes`)
       : form.estimatedDurationMinutes;
 
+    // Use computed total if payout is empty, otherwise use manual payout
+    const finalPayout = form.payout ? form.payout : String(computedTotal);
+
     const payload: any = {
       customerId: form.customerId,
-      serviceCategory,
-      payout: form.payout,
+      serviceCategory: primaryCategory,
+      payout: finalPayout,
       street: form.street,
       city: form.city,
       province: form.province,
@@ -179,10 +206,57 @@ export default function JobForm() {
       broadcastRadiusKm: parseInt(form.broadcastRadiusKm) || 100,
       broadcastNote: form.broadcastNote,
     };
+
+    const servicesPayload = serviceItems
+      .filter(s => s.service_category)
+      .map(s => ({
+        service_category: s.service_category,
+        quantity: s.quantity,
+        unit_price: s.unit_price ? parseFloat(s.unit_price) : null,
+        line_total: s.unit_price ? s.quantity * parseFloat(s.unit_price) : 0,
+        notes: s.notes,
+      }));
+
     if (isEdit && id) {
-      updateJob.mutate({ id, ...payload }, { onSuccess: () => navigate("/admin/jobs") });
+      updateJob.mutate({ id, ...payload }, {
+        onSuccess: async () => {
+          await saveJobServices.mutateAsync({ jobId: id, services: servicesPayload });
+          navigate("/admin/jobs");
+        },
+      });
     } else {
-      createJob.mutate(payload, { onSuccess: () => navigate("/admin/jobs") });
+      // For create, we need the job ID from the insert
+      try {
+        const { data: newJob, error } = await supabase.from("jobs").insert({
+          customer_id: payload.customerId || null,
+          service_category: payload.serviceCategory,
+          payout: parseFloat(payload.payout) || 0,
+          job_address_street: payload.street,
+          job_address_city: payload.city,
+          job_address_region: payload.province,
+          job_address_postal: payload.postalCode,
+          job_address_country: payload.country,
+          job_lat: payload.lat ? parseFloat(payload.lat) : null,
+          job_lng: payload.lng ? parseFloat(payload.lng) : null,
+          scheduled_date: payload.scheduledDate || null,
+          scheduled_time: payload.scheduledTime,
+          estimated_duration: payload.estimatedDuration,
+          notes: payload.notes ?? "",
+          urgency: payload.urgency ?? "Scheduled",
+          is_broadcast: payload.isBroadcast ?? false,
+          broadcast_radius_km: payload.broadcastRadiusKm ?? 100,
+          broadcast_note: payload.broadcastNote ?? "",
+          status: "Created",
+        }).select("id").single();
+        if (error) throw error;
+        if (newJob && servicesPayload.length > 0) {
+          await saveJobServices.mutateAsync({ jobId: newJob.id, services: servicesPayload });
+        }
+        toast({ title: "Job created", description: "Job has been saved." });
+        navigate("/admin/jobs");
+      } catch (err: any) {
+        toast({ title: "Error", description: err.message, variant: "destructive" });
+      }
     }
   };
 
@@ -206,6 +280,7 @@ export default function JobForm() {
       <h1 className="page-header">{isEdit ? "Edit" : "Create"} Job</h1>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Customer & Payout */}
         <div className="metric-card space-y-4">
           <h2 className="section-title">Job Info</h2>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -221,28 +296,22 @@ export default function JobForm() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Service Type</Label>
-              <Select value={form.serviceCategory} onValueChange={(v) => update("serviceCategory", v)}>
-                <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                <SelectContent>
-                  {activeCategories.map((t) => (<SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>))}
-                  <SelectItem value="custom">Custom...</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {form.serviceCategory === "custom" && (
-              <div className="space-y-1.5">
-                <Label>Custom Service</Label>
-                <Input value={form.customService} onChange={(e) => update("customService", e.target.value)} required />
-              </div>
-            )}
-            <div className="space-y-1.5">
-              <Label>Amount ($)</Label>
-              <Input type="number" min="0" step="0.01" value={form.payout} onChange={(e) => update("payout", e.target.value)} required />
+              <Label>Amount ($) <span className="text-xs text-muted-foreground">(auto-calculated from services if empty)</span></Label>
+              <Input type="number" min="0" step="0.01" value={form.payout} onChange={(e) => update("payout", e.target.value)} placeholder={computedTotal > 0 ? `Auto: $${computedTotal.toFixed(2)}` : "0.00"} />
             </div>
           </div>
         </div>
 
+        {/* Services Line Items */}
+        <div className="metric-card">
+          <JobServiceLineItems
+            items={serviceItems}
+            onChange={setServiceItems}
+            activeCategories={activeCategories}
+          />
+        </div>
+
+        {/* Location */}
         <div className="metric-card space-y-4">
           <h2 className="section-title">Job Location</h2>
           <p className="text-xs text-muted-foreground">Defaults to customer address. Override below if different.</p>
@@ -258,6 +327,7 @@ export default function JobForm() {
           </Button>
         </div>
 
+        {/* Urgency & Scheduling */}
         <div className="metric-card space-y-4">
           <h2 className="section-title">Urgency & Scheduling</h2>
           <div className="space-y-3">

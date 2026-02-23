@@ -2,6 +2,7 @@ import { useJobs } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
+import { JobServicesSummary } from "@/components/JobServicesDisplay";
 import { MapPin, Clock, DollarSign, Calendar, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -57,7 +58,7 @@ export default function MyJobs() {
                     </div>
                     <p className="text-xl font-bold text-primary flex items-center gap-1"><DollarSign className="h-4 w-4" />{job.payout}</p>
                   </div>
-                  <p className="text-sm font-medium">{job.customerName} — {job.serviceCategory}</p>
+                  <p className="text-sm font-medium">{job.customerName} — {job.services && job.services.length > 0 ? <JobServicesSummary services={job.services} /> : job.serviceCategory}</p>
                   <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
                     <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{job.address}</span>
                     <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /><ScheduleText job={job} /></span>
@@ -89,7 +90,7 @@ export default function MyJobs() {
                       <StatusBadge label={job.status} variant={job.status === "Completed" ? "valid" : "warning"} />
                       <UrgencyBadge urgency={job.urgency} />
                     </div>
-                    <p className="text-sm text-muted-foreground truncate mt-0.5">{job.customerName} · {job.serviceCategory} · {job.scheduledDate}</p>
+                    <p className="text-sm text-muted-foreground truncate mt-0.5">{job.customerName} · {job.services && job.services.length > 0 ? job.services.map(s => s.service_category).join(", ") : job.serviceCategory} · {job.scheduledDate}</p>
                   </div>
                   <p className="text-lg font-bold">${job.payout}</p>
                 </div>

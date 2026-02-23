@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useJobs, useServiceProviders } from "@/hooks/useSupabaseData";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge, URGENCY_PRIORITY } from "@/components/UrgencyBadge";
+import { JobServicesSummary } from "@/components/JobServicesDisplay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -114,7 +115,7 @@ export default function JobManagement() {
             <tr className="border-b text-left">
               <th className="pb-3 font-medium text-muted-foreground">Job #</th>
               <th className="pb-3 font-medium text-muted-foreground">Customer</th>
-              <th className="pb-3 font-medium text-muted-foreground">Service</th>
+              <th className="pb-3 font-medium text-muted-foreground">Service(s)</th>
               <th className="pb-3 font-medium text-muted-foreground">Amount</th>
               <th className="pb-3 font-medium text-muted-foreground">City</th>
               <th className="pb-3 font-medium text-muted-foreground">Urgency</th>
@@ -129,7 +130,11 @@ export default function JobManagement() {
               <tr key={job.id} className="border-b last:border-0">
                 <td className="py-3 font-medium">{job.id}</td>
                 <td className="py-3">{job.customerName}</td>
-                <td className="py-3">{job.serviceCategory}</td>
+                <td className="py-3">
+                  {job.services && job.services.length > 0
+                    ? <JobServicesSummary services={job.services} />
+                    : job.serviceCategory}
+                </td>
                 <td className="py-3 font-medium">${job.payout}</td>
                 <td className="py-3 text-muted-foreground">{job.jobAddress.city}</td>
                 <td className="py-3">

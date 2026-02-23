@@ -54,6 +54,16 @@ export interface ServiceProvider {
 }
 
 // ===== JOBS =====
+export interface JobService {
+  id: string;
+  job_id: string;
+  service_category: string;
+  quantity: number;
+  unit_price: number | null;
+  line_total: number;
+  notes: string;
+}
+
 export interface Job {
   id: string;
   dbId: string;
@@ -75,6 +85,7 @@ export interface Job {
   isBroadcast?: boolean;
   broadcastRadiusKm?: number;
   broadcastNote?: string;
+  services?: JobService[];
 }
 
 export interface AllocationScores {

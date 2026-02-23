@@ -1,4 +1,5 @@
 import { useParams, Link } from "react-router-dom";
+import { JobServicesDisplay } from "@/components/JobServicesDisplay";
 import { useJobs, useServiceProviders, useActiveServiceCategories, useUpdateJobStatus } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -130,15 +131,24 @@ export default function SPJobDetail() {
               </div>
             </div>
           )}
-          <div className="flex items-center gap-3">
-            <Briefcase className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Service Category</p>
-              <p className="font-medium">{isLegacy ? `(Legacy) ${job.serviceCategory}` : job.serviceCategory}</p>
-            </div>
-          </div>
         </div>
       </div>
+
+      {/* Services */}
+      {job.services && job.services.length > 0 && (
+        <div className="metric-card space-y-3">
+          <h2 className="section-title">Services ({job.services.length})</h2>
+          <JobServicesDisplay services={job.services} />
+        </div>
+      )}
+
+      {/* Legacy single service */}
+      {(!job.services || job.services.length === 0) && job.serviceCategory && (
+        <div className="metric-card space-y-3">
+          <h2 className="section-title">Service</h2>
+          <p className="font-medium">{isLegacy ? `(Legacy) ${job.serviceCategory}` : job.serviceCategory}</p>
+        </div>
+      )}
 
       {/* Notes */}
       {job.notes && (

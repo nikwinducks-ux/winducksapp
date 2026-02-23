@@ -77,11 +77,16 @@ function computeProximityFactor(sp: ServiceProvider, job: Job): { score: number;
 }
 
 function computeCompetency(sp: ServiceProvider, job: Job): number {
-  const hasCategory = sp.serviceCategories.some(
-    (c) => c.toLowerCase() === job.serviceCategory.toLowerCase()
-  );
+  // Multi-service: SP must match ALL service categories
+  const categories = job.services && job.services.length > 0
+    ? job.services.map(s => s.service_category)
+    : [job.serviceCategory];
+  const matchCount = categories.filter(cat =>
+    sp.serviceCategories.some(c => c.toLowerCase() === cat.toLowerCase())
+  ).length;
+  const allMatch = matchCount === categories.length;
   const certBonus = Math.min(sp.certifications.length * 10, 20);
-  return hasCategory ? Math.min(80 + certBonus, 100) : Math.max(30 + certBonus, 0);
+  return allMatch ? Math.min(80 + certBonus, 100) : Math.max(30 + certBonus, 0);
 }
 
 function computeJobHistory(sp: ServiceProvider): number {
@@ -173,8 +178,14 @@ function checkEligibility(
     return { eligible: false, reason: "Suspended/Archived" };
   }
 
-  // Category mismatch
-  if (!sp.serviceCategories.some((c) => c.toLowerCase() === job.serviceCategory.toLowerCase())) {
+  // Category mismatch — must match ALL service categories
+  const categories = job.services && job.services.length > 0
+    ? job.services.map(s => s.service_category)
+    : [job.serviceCategory];
+  const allMatch = categories.every(cat =>
+    sp.serviceCategories.some(c => c.toLowerCase() === cat.toLowerCase())
+  );
+  if (!allMatch) {
     return { eligible: false, reason: "Category mismatch" };
   }
 

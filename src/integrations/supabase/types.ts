@@ -296,6 +296,47 @@ export type Database = {
           },
         ]
       }
+      job_services: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string
+          line_total: number
+          notes: string | null
+          quantity: number
+          service_category: string
+          unit_price: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id: string
+          line_total?: number
+          notes?: string | null
+          quantity?: number
+          service_category?: string
+          unit_price?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string
+          line_total?: number
+          notes?: string | null
+          quantity?: number
+          service_category?: string
+          unit_price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_services_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_status_events: {
         Row: {
           changed_at: string
