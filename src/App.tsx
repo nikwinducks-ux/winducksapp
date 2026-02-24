@@ -40,6 +40,7 @@ import JobForm from "./pages/admin/JobForm";
 import JobDetail from "./pages/admin/JobDetail";
 import UserManagement from "./pages/admin/UserManagement";
 import ServiceCategories from "./pages/admin/ServiceCategories";
+import LaunchReadiness from "./pages/admin/LaunchReadiness";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 
@@ -101,6 +102,7 @@ function AppRoutes() {
         <Route path="/admin/integrations" element={role === "admin" ? <Integrations /> : <Navigate to="/" replace />} />
         <Route path="/admin/users" element={role === "admin" ? <UserManagement /> : <Navigate to="/" replace />} />
         <Route path="/admin/categories" element={role === "admin" ? <ServiceCategories /> : <Navigate to="/" replace />} />
+        <Route path="/admin/readiness" element={role === "admin" ? <LaunchReadiness /> : <Navigate to="/" replace />} />
 
         <Route path="*" element={<NotFound />} />
       </Routes>
