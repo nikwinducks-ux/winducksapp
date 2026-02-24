@@ -19,14 +19,17 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard label="Active Providers" value={activeSPs} icon={<Users className="h-5 w-5" />} />
-        <MetricCard label="Pending Jobs" value={pendingJobs} icon={<Briefcase className="h-5 w-5" />} />
-        <MetricCard label="Completed (Total)" value={completedJobs} icon={<TrendingUp className="h-5 w-5" />} />
-        <MetricCard label="Expiring Compliance" value={expiring} icon={<AlertTriangle className="h-5 w-5" />} subtitle={expiring > 0 ? "Needs attention" : "All clear"} trend={expiring > 0 ? "down" : "up"} />
+        <MetricCard label="Active Providers" value={activeSPs} icon={<Users className="h-5 w-5" />} to="/admin/providers?status=Active" />
+        <MetricCard label="Pending Jobs" value={pendingJobs} icon={<Briefcase className="h-5 w-5" />} to="/admin/jobs?status=Created,Offered" />
+        <MetricCard label="Completed (Total)" value={completedJobs} icon={<TrendingUp className="h-5 w-5" />} to="/admin/jobs?status=Completed" />
+        <MetricCard label="Expiring Compliance" value={expiring} icon={<AlertTriangle className="h-5 w-5" />} subtitle={expiring > 0 ? "Needs attention" : "All clear"} trend={expiring > 0 ? "down" : "up"} to="/admin/providers?compliance=Expiring" />
       </div>
 
       <div className="metric-card">
-        <h2 className="section-title mb-4">Provider Overview</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="section-title">Provider Overview</h2>
+          <a href="/admin/providers" className="text-sm font-medium text-primary hover:underline">View All Providers</a>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

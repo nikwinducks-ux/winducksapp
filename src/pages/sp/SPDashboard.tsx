@@ -4,10 +4,11 @@ import { useServiceProviders, useJobs } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { haversineDistance } from "@/lib/proximity";
 import { Briefcase, Clock, Star, TrendingUp, Shield, Scale } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function SPDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { data: serviceProviders = [] } = useServiceProviders();
   const { data: jobs = [] } = useJobs();
 
@@ -29,21 +30,21 @@ export default function SPDashboard() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard label="Today's Assigned Jobs" value={assignedJobs.length} icon={<Briefcase className="h-5 w-5" />} />
-        <MetricCard label="Pending Offers" value={pendingOffers.length} icon={<Clock className="h-5 w-5" />} />
-        <MetricCard label="Acceptance Rate" value={`${sp.acceptanceRate}%`} icon={<TrendingUp className="h-5 w-5" />} subtitle="Last 30 days" />
-        <MetricCard label="Avg Rating" value={sp.rating.toFixed(1)} icon={<Star className="h-5 w-5" />} subtitle={`${sp.totalJobsCompleted} jobs completed`} />
+        <MetricCard label="Today's Assigned Jobs" value={assignedJobs.length} icon={<Briefcase className="h-5 w-5" />} to="/my-jobs" />
+        <MetricCard label="Pending Offers" value={pendingOffers.length} icon={<Clock className="h-5 w-5" />} to="/jobs" />
+        <MetricCard label="Acceptance Rate" value={`${sp.acceptanceRate}%`} icon={<TrendingUp className="h-5 w-5" />} subtitle="Last 30 days" to="/performance" />
+        <MetricCard label="Avg Rating" value={sp.rating.toFixed(1)} icon={<Star className="h-5 w-5" />} subtitle={`${sp.totalJobsCompleted} jobs completed`} to="/performance" />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="metric-card">
+        <div className="metric-card cursor-pointer hover:shadow-md hover:border-primary/30 transition-all" role="button" tabIndex={0} onClick={() => navigate("/performance")} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && navigate("/performance")}>
           <p className="text-sm text-muted-foreground mb-2">Reliability Score</p>
           <div className="flex items-center gap-3">
             <span className="text-2xl font-bold">{sp.reliabilityScore}</span>
             <div className="flex-1 score-bar-track"><div className="score-bar" style={{ width: `${sp.reliabilityScore}%` }} /></div>
           </div>
         </div>
-        <div className="metric-card">
+        <div className="metric-card cursor-pointer hover:shadow-md hover:border-primary/30 transition-all" role="button" tabIndex={0} onClick={() => navigate("/performance")} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && navigate("/performance")}>
           <p className="text-sm text-muted-foreground mb-2">Fairness Status</p>
           <div className="flex items-center gap-3">
             <Scale className="h-5 w-5 text-muted-foreground" />
@@ -51,7 +52,7 @@ export default function SPDashboard() {
           </div>
           <p className="mt-2 text-xs text-muted-foreground">Share: {sp.fairnessShare}% (last 30 days)</p>
         </div>
-        <div className="metric-card">
+        <div className="metric-card cursor-pointer hover:shadow-md hover:border-primary/30 transition-all" role="button" tabIndex={0} onClick={() => navigate("/account")} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && navigate("/account")}>
           <p className="text-sm text-muted-foreground mb-2">Compliance Status</p>
           <div className="flex items-center gap-3">
             <Shield className="h-5 w-5 text-muted-foreground" />
@@ -68,7 +69,7 @@ export default function SPDashboard() {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
             {assignedJobs.map((job) => (
-              <div key={job.id} className="metric-card">
+              <Link key={job.id} to={`/my-jobs/${job.id}`} className="metric-card hover:border-primary/30 transition-colors cursor-pointer">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="font-semibold">{job.customerName}</p>
@@ -80,7 +81,7 @@ export default function SPDashboard() {
                     <p className="text-xs text-muted-foreground">{job.scheduledTime}</p>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}
