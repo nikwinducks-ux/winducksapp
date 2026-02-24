@@ -39,7 +39,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const role = user?.role ?? "sp";
-  const links = role === "sp" ? spLinks : adminLinks;
+  const isAdmin = role === "admin" || role === "owner";
+  const links = isAdmin ? adminLinks : spLinks;
 
   return (
     <div className="flex min-h-screen w-full">
@@ -65,7 +66,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         <div className="border-b border-sidebar-border p-3">
           <div className="flex items-center gap-2">
             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-sidebar-primary-foreground text-xs font-bold">
-              {role === "admin" ? <Shield className="h-3.5 w-3.5" /> : <UserCircle className="h-3.5 w-3.5" />}
+              {isAdmin ? <Shield className="h-3.5 w-3.5" /> : <UserCircle className="h-3.5 w-3.5" />}
             </div>
             {!collapsed && (
               <div className="min-w-0 flex-1">

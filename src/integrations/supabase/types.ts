@@ -731,19 +731,28 @@ export type Database = {
       }
       user_roles: {
         Row: {
+          disabled_at: string | null
+          disabled_reason: string | null
           id: string
+          is_active: boolean
           role: Database["public"]["Enums"]["app_role"]
           sp_id: string | null
           user_id: string
         }
         Insert: {
+          disabled_at?: string | null
+          disabled_reason?: string | null
           id?: string
+          is_active?: boolean
           role: Database["public"]["Enums"]["app_role"]
           sp_id?: string | null
           user_id: string
         }
         Update: {
+          disabled_at?: string | null
+          disabled_reason?: string | null
           id?: string
+          is_active?: boolean
           role?: Database["public"]["Enums"]["app_role"]
           sp_id?: string | null
           user_id?: string
@@ -780,13 +789,15 @@ export type Database = {
         Args: { lat1: number; lat2: number; lng1: number; lng2: number }
         Returns: number
       }
+      is_admin_or_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_owner: { Args: { _user_id: string }; Returns: boolean }
       sp_eligible_for_broadcast_job: {
         Args: { _job_id: string; _sp_id: string }
         Returns: boolean
       }
     }
     Enums: {
-      app_role: "admin" | "sp"
+      app_role: "admin" | "sp" | "owner"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -914,7 +925,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "sp"],
+      app_role: ["admin", "sp", "owner"],
     },
   },
 } as const

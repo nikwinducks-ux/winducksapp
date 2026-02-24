@@ -5,8 +5,9 @@ import type { User, Session } from "@supabase/supabase-js";
 interface AuthUser {
   id: string;
   email: string;
-  role: "admin" | "sp";
+  role: "admin" | "sp" | "owner";
   spId: string | null;
+  isActive: boolean;
 }
 
 interface AuthContextType {
@@ -29,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log("[Auth] Fetching role for", authUser.email);
       const { data, error } = await supabase
         .from("user_roles")
-        .select("role, sp_id")
+        .select("role, sp_id, is_active")
         .eq("user_id", authUser.id)
         .limit(1)
         .maybeSingle();
@@ -37,12 +38,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log("[Auth] Role fetch result: none", error?.message);
         return null;
       }
-      console.log("[Auth] Role resolved:", data.role);
+      console.log("[Auth] Role resolved:", data.role, "active:", data.is_active);
       return {
         id: authUser.id,
         email: authUser.email ?? "",
-        role: data.role as "admin" | "sp",
+        role: data.role as "admin" | "sp" | "owner",
         spId: data.sp_id,
+        isActive: data.is_active ?? true,
       };
     } catch {
       return null;

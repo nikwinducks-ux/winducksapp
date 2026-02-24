@@ -1,23 +1,28 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, RotateCcw, Copy, Pencil, Link } from "lucide-react";
+import { UserPlus, RotateCcw, Copy, Pencil, Link, ShieldOff, ShieldCheck, Crown } from "lucide-react";
 
 interface UserRow {
   userId: string;
   email: string;
-  role: "admin" | "sp";
+  role: "admin" | "sp" | "owner";
   spId: string | null;
   spName: string | null;
   createdAt: string;
+  isActive: boolean;
+  disabledAt: string | null;
+  disabledReason: string | null;
 }
 
 interface SpOption {
@@ -33,9 +38,20 @@ function generatePassword() {
   return pw;
 }
 
+function roleBadge(role: string, isActive: boolean) {
+  if (!isActive) {
+    return <Badge variant="destructive">Disabled</Badge>;
+  }
+  if (role === "owner") return <Badge className="bg-amber-600 hover:bg-amber-700 text-white"><Crown className="h-3 w-3 mr-1" />Owner</Badge>;
+  if (role === "admin") return <Badge variant="default">Admin</Badge>;
+  return <Badge variant="secondary">SP</Badge>;
+}
+
 export default function UserManagement() {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { user: currentUser } = useAuth();
+  const isOwner = currentUser?.role === "owner";
 
   // Load SPs for dropdowns
   const { data: spOptions } = useQuery<SpOption[]>({
@@ -49,11 +65,10 @@ export default function UserManagement() {
     },
   });
 
-  // Load users with emails from edge function + roles + SP names
+  // Load users
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin_users"],
     queryFn: async () => {
-      // Fetch auth users (emails) and roles in parallel
       const [authRes, rolesRes, spRes] = await Promise.all([
         supabase.functions.invoke("create-user", { body: { action: "list-users" } }),
         supabase.from("user_roles").select("*"),
@@ -65,15 +80,18 @@ export default function UserManagement() {
       const spMap = new Map((spRes.data ?? []).map((s) => [s.id, s.name]));
       const roles = rolesRes.data ?? [];
 
-      const results: UserRow[] = roles.map((r) => {
+      const results: UserRow[] = roles.map((r: any) => {
         const auth = emailMap.get(r.user_id);
         return {
           userId: r.user_id,
           email: auth?.email ?? "",
-          role: r.role as "admin" | "sp",
+          role: r.role as "admin" | "sp" | "owner",
           spId: r.sp_id,
           spName: r.sp_id ? spMap.get(r.sp_id) ?? "Unknown" : null,
           createdAt: auth?.created_at ?? "",
+          isActive: r.is_active ?? true,
+          disabledAt: r.disabled_at,
+          disabledReason: r.disabled_reason,
         };
       });
 
@@ -111,7 +129,7 @@ export default function UserManagement() {
   // --- Edit User ---
   const [editOpen, setEditOpen] = useState(false);
   const [editUser, setEditUser] = useState<UserRow | null>(null);
-  const [editRole, setEditRole] = useState<"admin" | "sp">("sp");
+  const [editRole, setEditRole] = useState<"admin" | "sp" | "owner">("sp");
   const [editSpId, setEditSpId] = useState("");
   const [editError, setEditError] = useState("");
 
@@ -163,6 +181,48 @@ export default function UserManagement() {
     },
   });
 
+  // --- Disable/Enable ---
+  const [disableTarget, setDisableTarget] = useState<UserRow | null>(null);
+  const [disableReason, setDisableReason] = useState("");
+
+  const disableUser = useMutation({
+    mutationFn: async () => {
+      if (!disableTarget) throw new Error("No user");
+      const response = await supabase.functions.invoke("create-user", {
+        body: { action: "disable-user", userId: disableTarget.userId, reason: disableReason },
+      });
+      if (response.error) throw response.error;
+      if (response.data?.error) throw new Error(response.data.error);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin_users"] });
+      toast({ title: "Access disabled", description: `${disableTarget?.email} has been disabled.` });
+      setDisableTarget(null);
+      setDisableReason("");
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      setDisableTarget(null);
+    },
+  });
+
+  const enableUser = useMutation({
+    mutationFn: async (targetUserId: string) => {
+      const response = await supabase.functions.invoke("create-user", {
+        body: { action: "enable-user", userId: targetUserId },
+      });
+      if (response.error) throw response.error;
+      if (response.data?.error) throw new Error(response.data.error);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin_users"] });
+      toast({ title: "Access enabled" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({ title: "Copied to clipboard" });
@@ -178,6 +238,30 @@ export default function UserManagement() {
       </SelectContent>
     </Select>
   );
+
+  // Permission helpers
+  const canEditUser = (target: UserRow) => {
+    if (target.role === "owner") return isOwner; // only owners edit owners
+    if (target.role === "admin") return isOwner; // only owners edit admins
+    return true; // admins can edit SP users
+  };
+
+  const canDisable = (target: UserRow) => {
+    if (target.userId === currentUser?.id) return false; // can't disable self
+    if (target.role === "owner") return false; // can never disable owner
+    if (target.role === "admin") return isOwner; // only owner disables admin
+    return true;
+  };
+
+  const canEnable = (target: UserRow) => {
+    if (target.role === "admin" || target.role === "owner") return isOwner;
+    return true;
+  };
+
+  // Available roles for edit dropdown
+  const availableRoles = isOwner
+    ? [{ value: "owner", label: "Owner" }, { value: "admin", label: "Admin" }, { value: "sp", label: "Service Provider" }]
+    : [{ value: "sp", label: "Service Provider" }]; // non-owners can only set SP
 
   return (
     <div className="space-y-6">
@@ -253,24 +337,31 @@ export default function UserManagement() {
               <TableHead>User ID</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Linked SP</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
             ) : (users ?? []).map((u) => (
-              <TableRow key={u.userId}>
+              <TableRow key={u.userId} className={!u.isActive ? "opacity-60" : ""}>
                 <TableCell className="font-mono text-xs">{u.userId.slice(0, 8)}…</TableCell>
                 <TableCell className="text-sm">{u.email || <span className="text-muted-foreground italic">unknown</span>}</TableCell>
+                <TableCell>{roleBadge(u.role, u.isActive)}</TableCell>
                 <TableCell>
-                  <Badge variant={u.role === "admin" ? "default" : "secondary"}>
-                    {u.role === "admin" ? "Admin" : "SP"}
-                  </Badge>
+                  {u.isActive ? (
+                    <Badge variant="outline" className="text-green-600 border-green-300">Active</Badge>
+                  ) : (
+                    <div>
+                      <Badge variant="destructive">Disabled</Badge>
+                      {u.disabledReason && <p className="text-xs text-muted-foreground mt-1">{u.disabledReason}</p>}
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell>
-                  {u.role === "admin" ? "—" : u.spName ? (
+                  {u.role === "sp" ? (u.spName ? (
                     <span>{u.spName}</span>
                   ) : (
                     <span className="text-destructive text-sm flex items-center gap-1">
@@ -279,13 +370,15 @@ export default function UserManagement() {
                         <Link className="h-3 w-3" />
                       </Button>
                     </span>
-                  )}
+                  )) : "—"}
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => openEdit(u)}>
-                      <Pencil className="h-3 w-3 mr-1" />Edit
-                    </Button>
+                    {canEditUser(u) && (
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(u)}>
+                        <Pencil className="h-3 w-3 mr-1" />Edit
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -293,6 +386,27 @@ export default function UserManagement() {
                     >
                       <RotateCcw className="h-3 w-3 mr-1" />Reset
                     </Button>
+                    {u.isActive && canDisable(u) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => { setDisableTarget(u); setDisableReason(""); }}
+                      >
+                        <ShieldOff className="h-3 w-3 mr-1" />Disable
+                      </Button>
+                    )}
+                    {!u.isActive && canEnable(u) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-green-600 hover:text-green-700"
+                        onClick={() => enableUser.mutate(u.userId)}
+                        disabled={enableUser.isPending}
+                      >
+                        <ShieldCheck className="h-3 w-3 mr-1" />Enable
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
@@ -313,13 +427,17 @@ export default function UserManagement() {
               </div>
               <div className="space-y-1.5">
                 <Label>Role</Label>
-                <Select value={editRole} onValueChange={(v) => { setEditRole(v as "admin" | "sp"); if (v === "admin") setEditSpId(""); }}>
+                <Select value={editRole} onValueChange={(v) => { setEditRole(v as any); if (v !== "sp") setEditSpId(""); }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="sp">Service Provider</SelectItem>
+                    {availableRoles.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                {!isOwner && (editUser.role === "admin" || editUser.role === "owner") && (
+                  <p className="text-xs text-muted-foreground">Only Owners can change admin roles.</p>
+                )}
               </div>
               {editRole === "sp" && (
                 <div className="space-y-1.5">
@@ -354,6 +472,32 @@ export default function UserManagement() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Disable Confirmation Dialog */}
+      <AlertDialog open={!!disableTarget} onOpenChange={(o) => { if (!o) setDisableTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disable Access</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will immediately revoke access for <strong>{disableTarget?.email}</strong>. They will not be able to log in or access any data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-1.5">
+            <Label>Reason (optional)</Label>
+            <Input value={disableReason} onChange={(e) => setDisableReason(e.target.value)} placeholder="e.g. Contract ended" />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => disableUser.mutate()}
+              disabled={disableUser.isPending}
+            >
+              {disableUser.isPending ? "Disabling..." : "Disable Access"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
