@@ -1,6 +1,11 @@
 import { haversineDistance, proximityScore, computeProximityResult } from "./proximity";
 import type { ServiceProvider, Job } from "@/data/mockData";
 
+// ===== Constants =====
+
+/** Hard system cap: no SP beyond this distance is ever eligible */
+export const MAX_SYSTEM_DISTANCE_KM = 100;
+
 // ===== Types =====
 
 export interface AllocationWeights {
@@ -189,9 +194,15 @@ function checkEligibility(
     return { eligible: false, reason: "Category mismatch" };
   }
 
-  // Outside radius
-  if (distKm !== null && distKm > sp.travelRadius) {
-    return { eligible: false, reason: `Outside radius (${distKm}km > ${sp.travelRadius}km)` };
+  // Hard system distance cap — always enforced
+  if (distKm !== null && distKm > MAX_SYSTEM_DISTANCE_KM) {
+    return { eligible: false, reason: `Distance > ${MAX_SYSTEM_DISTANCE_KM}km (${distKm}km)` };
+  }
+
+  // SP travel radius — must be within MIN(sp.travelRadius, MAX_SYSTEM_DISTANCE_KM)
+  const effectiveRadius = Math.min(sp.travelRadius, MAX_SYSTEM_DISTANCE_KM);
+  if (distKm !== null && distKm > effectiveRadius) {
+    return { eligible: false, reason: `Outside radius (${distKm}km > ${effectiveRadius}km)` };
   }
 
   // Cooldown

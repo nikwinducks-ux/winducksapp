@@ -408,6 +408,11 @@ function CandidateCard({ item }: { item: CandidateResult }) {
           <div className="flex items-center gap-3 mb-3">
             <p className="font-semibold">{item.sp.name}</p>
             <span className="text-xs text-muted-foreground">{item.sp.baseAddress.city}</span>
+            {item.distKm !== null && (
+              <span className={`text-xs ${item.distKm > 100 ? "text-destructive font-semibold" : "text-muted-foreground"}`}>
+                {item.distKm} km
+              </span>
+            )}
             {item.sp.autoAccept && <StatusBadge label="Auto-Accept" variant="info" />}
             {!isExcluded && <span className="text-xl font-bold text-primary">{item.finalScore}</span>}
             {isExcluded && (

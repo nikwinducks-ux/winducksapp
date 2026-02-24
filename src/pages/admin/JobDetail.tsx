@@ -2,17 +2,20 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import { JobServicesDisplay } from "@/components/JobServicesDisplay";
 import { useJobs, useServiceProviders, useAssignJob, useActiveServiceCategories, useServiceCategories } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
-import { useOffers, useCreateManualOffer, useGenerateBroadcastOffers } from "@/hooks/useOfferData";
+import { useOffers, useCreateManualOffer, useGenerateBroadcastOffers, useGenerateOffers } from "@/hooks/useOfferData";
+import { useActivePolicy, useFairnessContext, useSaveAllocationRun } from "@/hooks/useAllocationData";
+import { runAllocation } from "@/lib/allocation-engine";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
-import { ArrowLeft, MapPin, Calendar, Clock, DollarSign, User, Pencil, UserPlus, AlertCircle, FileText, Send, Radio, Bug, ChevronDown } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, Clock, DollarSign, User, Pencil, UserPlus, AlertCircle, FileText, Send, Radio, Bug, ChevronDown, FlaskConical } from "lucide-react";
 import { useState } from "react";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { useJobServices } from "@/hooks/useSupabaseData";
+import { useToast } from "@/hooks/use-toast";
 
 function ScheduleDisplay({ job }: { job: any }) {
   const urgency = job.urgency || "Scheduled";
@@ -34,6 +37,11 @@ export default function JobDetail() {
   const { data: directJobServices = [] } = useJobServices(id);
   const createManualOffer = useCreateManualOffer();
   const generateBroadcast = useGenerateBroadcastOffers();
+  const generateOffers = useGenerateOffers();
+  const activePolicy = useActivePolicy();
+  const { data: fairnessCtx } = useFairnessContext(activePolicy?.fairness_json?.rollingWindow ?? 30);
+  const saveRun = useSaveAllocationRun();
+  const { toast } = useToast();
 
   const job = jobs.find((j) => j.dbId === id);
   const [showAssign, setShowAssign] = useState(searchParams.get("assign") === "true");
@@ -42,6 +50,7 @@ export default function JobDetail() {
   const [offerSpId, setOfferSpId] = useState("");
   const [offerExpiry, setOfferExpiry] = useState(10);
   const [broadcastExpiry, setBroadcastExpiry] = useState(30);
+  const [generatingAllocation, setGeneratingAllocation] = useState(false);
 
   if (!job) {
     return (
@@ -74,6 +83,43 @@ export default function JobDetail() {
     setShowSendOffer(false);
     setOfferSpId("");
     refetchOffers();
+  };
+
+  const handleGenerateAllocationOffers = async () => {
+    if (!job || !activePolicy || !fairnessCtx || !id) return;
+    setGeneratingAllocation(true);
+    try {
+      const candidates = runAllocation(job, providers, activePolicy.weights_json, activePolicy.fairness_json, fairnessCtx);
+      const eligible = candidates.filter(c => c.eligibilityStatus === "Eligible");
+      if (eligible.length === 0) {
+        toast({ title: "No eligible SPs", description: "No service providers passed eligibility checks for this job.", variant: "destructive" });
+        setGeneratingAllocation(false);
+        return;
+      }
+      const runId = await saveRun.mutateAsync({
+        jobId: job.dbId,
+        policyId: activePolicy.id,
+        selectedSpId: eligible[0]?.sp.id ?? null,
+        candidates,
+        userId: user?.id,
+        label: `Job Detail — ${activePolicy.version_name}`,
+      });
+      const topSpIds = eligible.slice(0, 3).map(c => c.sp.id);
+      await generateOffers.mutateAsync({
+        jobId: job.dbId,
+        allocationRunId: runId,
+        topSpIds,
+        serviceProviders: providers,
+        job,
+        expiryMinutes: 10,
+        createdBy: user?.id ?? "system",
+      });
+      refetchOffers();
+      toast({ title: "Offers generated", description: `Sent to top ${topSpIds.length} eligible SPs.` });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+    setGeneratingAllocation(false);
   };
 
   const statusVariant = (s: string) => {
@@ -214,8 +260,13 @@ export default function JobDetail() {
       <div className="metric-card space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="section-title">Offers</h2>
-          <div className="flex gap-2">
-            {job.isBroadcast && (
+          <div className="flex gap-2 flex-wrap">
+            {!job.assignedSpId && (
+              <Button size="sm" onClick={handleGenerateAllocationOffers} disabled={generatingAllocation || !activePolicy}>
+                <FlaskConical className="h-4 w-4 mr-1" />{generatingAllocation ? "Generating..." : "Generate Offers (Allocation)"}
+              </Button>
+            )}
+            {job.isBroadcast && !job.assignedSpId && (
               <Button size="sm" variant="outline" onClick={async () => {
                 await generateBroadcast.mutateAsync({
                   job,
@@ -228,9 +279,11 @@ export default function JobDetail() {
                 <Radio className="h-4 w-4 mr-1" />{generateBroadcast.isPending ? "Broadcasting..." : "Broadcast Offers"}
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={() => setShowSendOffer(!showSendOffer)}>
-              <Send className="h-4 w-4 mr-1" />Send Offer to SP
-            </Button>
+            {!job.assignedSpId && (
+              <Button size="sm" variant="outline" onClick={() => setShowSendOffer(!showSendOffer)}>
+                <Send className="h-4 w-4 mr-1" />Send Offer to SP
+              </Button>
+            )}
           </div>
         </div>
 
