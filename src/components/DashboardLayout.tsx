@@ -31,6 +31,7 @@ const adminLinks = [
   { to: "/admin/workflow", icon: GitBranch, label: "Offer Workflow" },
   { to: "/admin/integrations", icon: Plug, label: "Integrations" },
   { to: "/admin/users", icon: Users, label: "Users" },
+  { to: "/admin/readiness", icon: Shield, label: "Launch Readiness" },
 ];
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
