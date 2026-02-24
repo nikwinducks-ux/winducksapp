@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
 
     const userId = claimsData.claims.sub as string;
 
-    // Check admin role
+    // Check admin/owner role
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -41,14 +41,16 @@ Deno.serve(async (req) => {
 
     const { data: roleRow } = await supabaseAdmin
       .from("user_roles")
-      .select("role")
+      .select("role, is_active")
       .eq("user_id", userId)
-      .eq("role", "admin")
+      .in("role", ["admin", "owner"])
       .maybeSingle();
 
-    if (!roleRow) {
-      return new Response(JSON.stringify({ error: "Forbidden: admin role required" }), { headers: jsonHeaders, status: 403 });
+    if (!roleRow || !roleRow.is_active) {
+      return new Response(JSON.stringify({ error: "Forbidden: active admin/owner role required" }), { headers: jsonHeaders, status: 403 });
     }
+
+    const callerRole = roleRow.role;
 
     // ── Proceed with admin operations ──
     const body = await req.json();
@@ -65,9 +67,52 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ users }), { headers: jsonHeaders });
     }
 
-    // Update role action
+    // Disable user action (owner-only for admin/owner targets)
+    if (body.action === "disable-user") {
+      const { userId: targetUserId, reason } = body;
+      // Check target's role
+      const { data: targetRole } = await supabaseAdmin
+        .from("user_roles").select("role").eq("user_id", targetUserId).maybeSingle();
+      if (targetRole?.role === "owner") {
+        return new Response(JSON.stringify({ error: "Cannot disable an Owner account" }), { headers: jsonHeaders, status: 403 });
+      }
+      if (targetRole?.role === "admin" && callerRole !== "owner") {
+        return new Response(JSON.stringify({ error: "Only Owners can disable Admin accounts" }), { headers: jsonHeaders, status: 403 });
+      }
+      const { error } = await supabaseAdmin
+        .from("user_roles")
+        .update({ is_active: false, disabled_at: new Date().toISOString(), disabled_reason: reason || "Disabled by admin" })
+        .eq("user_id", targetUserId);
+      if (error) return new Response(JSON.stringify({ error: error.message }), { headers: jsonHeaders, status: 400 });
+      return new Response(JSON.stringify({ success: true }), { headers: jsonHeaders });
+    }
+
+    // Enable user action (owner-only for admin targets)
+    if (body.action === "enable-user") {
+      const { userId: targetUserId } = body;
+      const { data: targetRole } = await supabaseAdmin
+        .from("user_roles").select("role").eq("user_id", targetUserId).maybeSingle();
+      if ((targetRole?.role === "admin" || targetRole?.role === "owner") && callerRole !== "owner") {
+        return new Response(JSON.stringify({ error: "Only Owners can enable Admin accounts" }), { headers: jsonHeaders, status: 403 });
+      }
+      const { error } = await supabaseAdmin
+        .from("user_roles")
+        .update({ is_active: true, disabled_at: null, disabled_reason: null })
+        .eq("user_id", targetUserId);
+      if (error) return new Response(JSON.stringify({ error: error.message }), { headers: jsonHeaders, status: 400 });
+      return new Response(JSON.stringify({ success: true }), { headers: jsonHeaders });
+    }
+
+    // Update role action (owner-only for changing admin/owner roles)
     if (body.action === "update-role") {
       const { userId: targetUserId, role, spId } = body;
+      // Check target's current role
+      const { data: targetRole } = await supabaseAdmin
+        .from("user_roles").select("role").eq("user_id", targetUserId).maybeSingle();
+      // Only owners can change admin/owner roles or promote to admin/owner
+      if ((targetRole?.role === "admin" || targetRole?.role === "owner" || role === "admin" || role === "owner") && callerRole !== "owner") {
+        return new Response(JSON.stringify({ error: "Only Owners can modify admin roles" }), { headers: jsonHeaders, status: 403 });
+      }
       const { data: existing } = await supabaseAdmin
         .from("user_roles")
         .select("id")

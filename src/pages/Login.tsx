@@ -29,7 +29,7 @@ export default function Login() {
     if (signedInWaiting && user) {
       console.log("Role loaded:", user.role);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      navigate(user.role === "admin" ? "/admin" : "/", { replace: true });
+      navigate((user.role === "admin" || user.role === "owner") ? "/admin" : "/", { replace: true });
     }
   }, [signedInWaiting, user, navigate]);
 
