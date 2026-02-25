@@ -134,6 +134,31 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true }), { headers: jsonHeaders });
     }
 
+    // Promote owner action (temporary, single-use)
+    if (body.action === "promote-owner") {
+      // Must be admin (not owner), active, and exact email
+      if (callerRole !== "admin") {
+        return new Response(JSON.stringify({ error: "Only admin can use this action" }), { headers: jsonHeaders, status: 403 });
+      }
+
+      // Get caller email from auth
+      const { data: callerUser } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (!callerUser?.user?.email || callerUser.user.email !== "quack@winducks.com") {
+        return new Response(JSON.stringify({ error: "Unauthorized: email mismatch" }), { headers: jsonHeaders, status: 403 });
+      }
+
+      // Update role to owner
+      const { error: promoteErr } = await supabaseAdmin
+        .from("user_roles")
+        .update({ role: "owner" })
+        .eq("user_id", userId);
+      if (promoteErr) {
+        return new Response(JSON.stringify({ error: promoteErr.message }), { headers: jsonHeaders, status: 400 });
+      }
+
+      return new Response(JSON.stringify({ success: true, message: "Promoted to owner. Remove this action from code now." }), { headers: jsonHeaders });
+    }
+
     // Reset password action
     if (body.action === "reset-password") {
       const { userId: targetUserId, password } = body;
