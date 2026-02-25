@@ -53,7 +53,7 @@ export function DashboardLayout({ children }: {children: React.ReactNode;}) {
         {/* Logo */}
         <div className="flex h-14 items-center gap-2 border-b border-sidebar-border px-4">
           <img
-            src="/assets/branding/winducks-icon.png"
+            src="/assets/branding/winducks-iconw.png"
             alt="Winducks logo"
             className="h-10 w-10 rounded-xl object-contain"
           />
