@@ -110,9 +110,11 @@ export default function Login() {
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="w-full max-w-md space-y-8 px-6">
           <div className="text-center space-y-2">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-xl">
-              W
-            </div>
+            <img
+              src="/assets/branding/winducks-logo-login.png"
+              alt="Winducks logo"
+              className="h-20 w-auto object-contain mx-auto"
+            />
             <h1 className="text-2xl font-bold tracking-tight text-foreground">Winducks</h1>
             <p className="text-sm text-muted-foreground">SP Allocation Platform</p>
           </div>
@@ -157,9 +159,11 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="w-full max-w-sm space-y-6 px-6">
         <div className="text-center space-y-2">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-lg">
-            W
-          </div>
+          <img
+            src="/assets/branding/winducks-logo-login.png"
+            alt="Winducks logo"
+            className="h-20 w-auto object-contain mx-auto"
+          />
           <h1 className="text-xl font-bold tracking-tight text-foreground">
             {mode === "admin" ? "Admin Login" : "Service Provider Login"}
           </h1>
