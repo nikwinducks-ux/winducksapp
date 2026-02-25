@@ -52,7 +52,7 @@ export function DashboardLayout({ children }: {children: React.ReactNode;}) {
 
         {/* Logo */}
         <div className="flex h-14 items-center gap-2 border-b border-sidebar-border px-4">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sidebar-primary-foreground font-bold text-sm bg-info">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary-foreground font-bold text-sm bg-primary">
             W
           </div>
           {!collapsed &&
@@ -65,7 +65,7 @@ export function DashboardLayout({ children }: {children: React.ReactNode;}) {
         {/* User info */}
         <div className="border-b border-sidebar-border p-3">
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sidebar-primary-foreground text-xs font-bold bg-warning">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-accent-foreground text-xs font-bold bg-accent">
               {isAdmin ? <Shield className="h-3.5 w-3.5" /> : <UserCircle className="h-3.5 w-3.5" />}
             </div>
             {!collapsed &&
