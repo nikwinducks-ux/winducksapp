@@ -136,18 +136,22 @@ Deno.serve(async (req) => {
 
     // Promote owner action (temporary, single-use)
     if (body.action === "promote-owner") {
-      // Must be admin (not owner), active, and exact email
       if (callerRole !== "admin") {
         return new Response(JSON.stringify({ error: "Only admin can use this action" }), { headers: jsonHeaders, status: 403 });
       }
 
-      // Get caller email from auth
       const { data: callerUser } = await supabaseAdmin.auth.admin.getUserById(userId);
       if (!callerUser?.user?.email || callerUser.user.email !== "quack@winducks.com") {
         return new Response(JSON.stringify({ error: "Unauthorized: email mismatch" }), { headers: jsonHeaders, status: 403 });
       }
 
-      // Update role to owner
+      // Check if already owner (single-use guard)
+      const { data: currentRole } = await supabaseAdmin
+        .from("user_roles").select("role").eq("user_id", userId).maybeSingle();
+      if (currentRole?.role === "owner") {
+        return new Response(JSON.stringify({ error: "Already an Owner. This action cannot be repeated." }), { headers: jsonHeaders, status: 400 });
+      }
+
       const { error: promoteErr } = await supabaseAdmin
         .from("user_roles")
         .update({ role: "owner" })
@@ -156,7 +160,15 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: promoteErr.message }), { headers: jsonHeaders, status: 400 });
       }
 
-      return new Response(JSON.stringify({ success: true, message: "Promoted to owner. Remove this action from code now." }), { headers: jsonHeaders });
+      // Audit log
+      await supabaseAdmin.from("admin_audit_logs").insert({
+        user_id: userId,
+        user_email: callerUser.user.email,
+        action: "promote-owner",
+        details: { message: "Promoted to owner via Owner Setup page" },
+      });
+
+      return new Response(JSON.stringify({ success: true, message: "Promoted to owner." }), { headers: jsonHeaders });
     }
 
     // Reset password action
