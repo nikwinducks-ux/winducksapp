@@ -448,8 +448,13 @@ export function useGenerateBroadcastOffers() {
         .select("*");
       if (error) throw error;
 
-      // Update job status
-      await supabase.from("jobs").update({ status: "Offered" }).eq("id", job.dbId);
+      // Update job status and persist broadcast flags
+      await supabase.from("jobs").update({
+        status: "Offered",
+        is_broadcast: true,
+        broadcast_radius_km: job.broadcastRadiusKm ?? 100,
+        broadcast_note: job.broadcastNote ?? "",
+      }).eq("id", job.dbId);
 
       return { offersCreated: inserted?.length ?? 0, eligibleCount: eligibleSps.length };
     },
