@@ -463,6 +463,10 @@ export default function JobForm() {
           />
         </div>
 
+        <div className="metric-card">
+          <JobPhotosUploader existing={existingPhotos} onChange={setPhotoState} />
+        </div>
+
         <div className="flex gap-3">
           <Button type="submit" disabled={isSaving}>{isSaving ? "Saving..." : isEdit ? "Update" : "Create"} Job</Button>
           <Link to="/admin/jobs"><Button type="button" variant="outline">Cancel</Button></Link>
