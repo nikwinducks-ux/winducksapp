@@ -14,9 +14,8 @@ import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { ArrowLeft, MapPin, Calendar, Clock, DollarSign, User, Pencil, UserPlus, AlertCircle, FileText, Send, Radio, Bug, ChevronDown, FlaskConical, Zap, Shield } from "lucide-react";
 import { useState } from "react";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
-import { useJobServices, useJobPhotos } from "@/hooks/useSupabaseData";
-import { JobPhotosGallery } from "@/components/JobPhotosGallery";
-import { Image as ImageIcon } from "lucide-react";
+import { useJobServices } from "@/hooks/useSupabaseData";
+import { JobPhotosCard } from "@/components/JobPhotosCard";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 

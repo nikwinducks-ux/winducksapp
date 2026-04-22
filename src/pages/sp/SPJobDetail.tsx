@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, FileText, Briefcase } from "lucide-react";
 import { useMemo } from "react";
 import { computeProximityResult, DISTANCE_SOURCE_LABELS } from "@/lib/proximity";
+import { JobPhotosCard } from "@/components/JobPhotosCard";
 
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 
