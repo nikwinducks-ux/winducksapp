@@ -368,6 +368,7 @@ export default function JobManagement() {
               <th className="pb-3 font-medium text-muted-foreground">City</th>
               <th className="pb-3 font-medium text-muted-foreground">Urgency</th>
               <th className="pb-3 font-medium text-muted-foreground">Status</th>
+              <th className="pb-3 font-medium text-muted-foreground">Broadcast</th>
               <th className="pb-3 font-medium text-muted-foreground">Assigned SP</th>
               <th className="pb-3 font-medium text-muted-foreground">Created</th>
               <th className="pb-3 font-medium text-muted-foreground">Actions</th>
