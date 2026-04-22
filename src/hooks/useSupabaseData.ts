@@ -309,6 +309,108 @@ export function useSaveJobServices() {
   });
 }
 
+// ===== Job Photos =====
+
+export interface JobPhoto {
+  id: string;
+  job_id: string;
+  storage_path: string;
+  caption: string;
+  uploaded_by_user_id: string | null;
+  created_at: string;
+}
+
+export function useJobPhotos(jobId: string | undefined) {
+  return useQuery({
+    queryKey: ["job_photos", jobId],
+    queryFn: async () => {
+      if (!jobId) return [];
+      const { data, error } = await supabase
+        .from("job_photos")
+        .select("*")
+        .eq("job_id", jobId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as JobPhoto[];
+    },
+    enabled: !!jobId,
+  });
+}
+
+export function useSaveJobPhotos() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({
+      jobId,
+      newFiles,
+      newCaptions,
+      keepIds,
+      existing,
+      updatedCaptions,
+    }: {
+      jobId: string;
+      newFiles: File[];
+      newCaptions: string[];
+      keepIds: string[];
+      existing: JobPhoto[];
+      updatedCaptions: Record<string, string>;
+    }) => {
+      // Delete photos that were removed
+      const toDelete = existing.filter((p) => !keepIds.includes(p.id));
+      if (toDelete.length > 0) {
+        const paths = toDelete.map((p) => p.storage_path);
+        await supabase.storage.from("job-photos").remove(paths);
+        const ids = toDelete.map((p) => p.id);
+        const { error: delErr } = await supabase.from("job_photos").delete().in("id", ids);
+        if (delErr) throw delErr;
+      }
+
+      // Update captions on kept photos
+      for (const p of existing) {
+        if (keepIds.includes(p.id) && updatedCaptions[p.id] !== undefined && updatedCaptions[p.id] !== p.caption) {
+          const { error } = await supabase
+            .from("job_photos")
+            .update({ caption: updatedCaptions[p.id] })
+            .eq("id", p.id);
+          if (error) throw error;
+        }
+      }
+
+      // Upload new files
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id ?? null;
+      for (let i = 0; i < newFiles.length; i++) {
+        const file = newFiles[i];
+        const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+        const path = `${jobId}/${crypto.randomUUID()}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("job-photos")
+          .upload(path, file, { contentType: file.type, upsert: false });
+        if (upErr) throw upErr;
+        const { error: insErr } = await supabase.from("job_photos").insert({
+          job_id: jobId,
+          storage_path: path,
+          caption: newCaptions[i] ?? "",
+          uploaded_by_user_id: uid,
+        });
+        if (insErr) throw insErr;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["job_photos"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error saving photos", description: err.message, variant: "destructive" });
+    },
+  });
+}
+
+export function getJobPhotoUrl(storage_path: string): string {
+  const { data } = supabase.storage.from("job-photos").getPublicUrl(storage_path);
+  return data.publicUrl;
+}
+
 // ===== Mutations =====
 
 export function useCreateCustomer() {

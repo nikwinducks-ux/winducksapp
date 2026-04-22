@@ -15,6 +15,7 @@ import { ArrowLeft, MapPin, Calendar, Clock, DollarSign, User, Pencil, UserPlus,
 import { useState } from "react";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { useJobServices } from "@/hooks/useSupabaseData";
+import { JobPhotosCard } from "@/components/JobPhotosCard";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -290,6 +291,10 @@ export default function JobDetail() {
           <p className="text-sm whitespace-pre-wrap">{job.notes}</p>
         </div>
       )}
+
+      {/* Photos */}
+      <JobPhotosCard jobId={id} />
+
 
       {/* ====== DISPATCH ACTIONS ====== */}
       <div className="metric-card space-y-4">

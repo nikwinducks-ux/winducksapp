@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, Info, FileText, Timer } from "lucide-react";
 import { useState, useMemo } from "react";
 import { computeProximityResult, PROXIMITY_TOOLTIP, DISTANCE_SOURCE_LABELS } from "@/lib/proximity";
+import { JobPhotosCard } from "@/components/JobPhotosCard";
 
 function ScheduleDisplay({ job }: { job: any }) {
   const urgency = job.urgency || "Scheduled";
@@ -168,6 +169,9 @@ export default function JobOfferDetail() {
           <p className="text-sm whitespace-pre-wrap">{job.notes}</p>
         </div>
       )}
+
+      {/* Photos */}
+      <JobPhotosCard jobId={id} />
 
       {/* Allocation Transparency */}
       {job.scores && (

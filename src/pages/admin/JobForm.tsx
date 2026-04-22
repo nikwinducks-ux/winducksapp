@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useCustomers, useCreateJob, useUpdateJob, useActiveServiceCategories, useJobServices, useSaveJobServices } from "@/hooks/useSupabaseData";
+import { useCustomers, useCreateJob, useUpdateJob, useActiveServiceCategories, useJobServices, useSaveJobServices, useJobPhotos, useSaveJobPhotos } from "@/hooks/useSupabaseData";
+import { JobPhotosUploader, type JobPhotosUploaderState } from "@/components/JobPhotosUploader";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +69,11 @@ export default function JobForm() {
   const updateJob = useUpdateJob();
   const saveJobServices = useSaveJobServices();
   const { data: existingServices = [] } = useJobServices(id);
+  const savePhotos = useSaveJobPhotos();
+  const { data: existingPhotos = [] } = useJobPhotos(id);
+  const [photoState, setPhotoState] = useState<JobPhotosUploaderState>({
+    newFiles: [], newCaptions: [], keepIds: [], updatedCaptions: {},
+  });
 
   const [form, setForm] = useState({
     customerId: "",
@@ -224,9 +230,17 @@ export default function JobForm() {
         onSuccess: async () => {
           try {
             await saveJobServices.mutateAsync({ jobId: id, services: servicesPayload });
+            await savePhotos.mutateAsync({
+              jobId: id,
+              newFiles: photoState.newFiles,
+              newCaptions: photoState.newCaptions,
+              keepIds: photoState.keepIds,
+              existing: existingPhotos,
+              updatedCaptions: photoState.updatedCaptions,
+            });
             navigate("/admin/jobs");
           } catch (err: any) {
-            toast({ title: "Error saving services", description: err.message, variant: "destructive" });
+            toast({ title: "Error saving job extras", description: err.message, variant: "destructive" });
           }
         },
         onError: (err: any) => {
@@ -262,7 +276,17 @@ export default function JobForm() {
           console.log("[JobForm] Saving", servicesPayload.length, "services for new job", newJob.id);
           await saveJobServices.mutateAsync({ jobId: newJob.id, services: servicesPayload });
         }
-        toast({ title: "Job created", description: `Job saved with ${servicesPayload.length} service(s).` });
+        if (newJob && photoState.newFiles.length > 0) {
+          await savePhotos.mutateAsync({
+            jobId: newJob.id,
+            newFiles: photoState.newFiles,
+            newCaptions: photoState.newCaptions,
+            keepIds: [],
+            existing: [],
+            updatedCaptions: {},
+          });
+        }
+        toast({ title: "Job created", description: `Job saved with ${servicesPayload.length} service(s) and ${photoState.newFiles.length} photo(s).` });
         navigate("/admin/jobs");
       } catch (err: any) {
         toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -437,6 +461,10 @@ export default function JobForm() {
             placeholder="Add any special instructions, access notes, or details for the SP..."
             rows={4}
           />
+        </div>
+
+        <div className="metric-card">
+          <JobPhotosUploader existing={existingPhotos} onChange={setPhotoState} />
         </div>
 
         <div className="flex gap-3">
