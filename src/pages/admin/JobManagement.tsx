@@ -486,11 +486,15 @@ export default function JobManagement() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Bulk broadcast dialog */}
-      <Dialog open={broadcastOpen} onOpenChange={(o) => { if (!busy) setBroadcastOpen(o); }}>
+      {/* Broadcast dialog (single or bulk) */}
+      <Dialog open={broadcastOpen} onOpenChange={(o) => { if (!busy) { setBroadcastOpen(o); if (!o) setStartBroadcastJobId(null); } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Broadcast {selectedIds.size} job{selectedIds.size === 1 ? "" : "s"}</DialogTitle>
+            <DialogTitle>
+              {startBroadcastJobId
+                ? "Start broadcast"
+                : `Broadcast ${selectedIds.size} job${selectedIds.size === 1 ? "" : "s"}`}
+            </DialogTitle>
             <DialogDescription>
               Sends offers to all eligible Service Providers. Jobs already Assigned, In Progress, Completed, or Cancelled are skipped.
             </DialogDescription>
@@ -519,14 +523,56 @@ export default function JobManagement() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setBroadcastOpen(false)} disabled={busy}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setBroadcastOpen(false); setStartBroadcastJobId(null); }} disabled={busy}>Cancel</Button>
             <Button onClick={runBroadcast} disabled={busy}>
               <Radio className="h-4 w-4 mr-2" />
-              {busy ? "Broadcasting…" : `Broadcast ${selectedIds.size}`}
+              {busy ? "Broadcasting…" : (startBroadcastJobId ? "Broadcast" : `Broadcast ${selectedIds.size}`)}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Stop broadcast (single) */}
+      <AlertDialog open={!!stopBroadcastJobId} onOpenChange={(o) => { if (!busy && !o) setStopBroadcastJobId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Stop broadcast?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This cancels all pending offers for this job. If the job was Offered (not yet accepted), it returns to Created.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); runStopBroadcastSingle(); }}
+              disabled={busy}
+            >
+              {busy ? "Stopping…" : "Stop broadcast"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Stop broadcast (bulk) */}
+      <AlertDialog open={bulkStopOpen} onOpenChange={(o) => { if (!busy) setBulkStopOpen(o); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Stop broadcast for selected jobs?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cancels all pending offers for selected jobs currently broadcasting. Jobs not currently broadcasting are skipped.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); runBulkStopBroadcast(); }}
+              disabled={busy}
+            >
+              {busy ? "Stopping…" : "Stop broadcast"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
