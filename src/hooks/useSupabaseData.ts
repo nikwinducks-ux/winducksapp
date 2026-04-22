@@ -98,6 +98,7 @@ function dbToJob(row: any, customers: Customer[]): Job {
     isBroadcast: row.is_broadcast ?? false,
     broadcastRadiusKm: row.broadcast_radius_km ?? 100,
     broadcastNote: row.broadcast_note ?? "",
+    completedAt: row.completed_at ?? undefined,
   };
 }
 
