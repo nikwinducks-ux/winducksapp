@@ -1,61 +1,62 @@
 
 
-# Fix Authentication End-to-End
+## Add Photo Attachments to Job Notes
 
-## Problem Summary
+Enable admins to attach photos when creating/editing a job, and display those photos to Service Providers on the job offer and job detail pages.
 
-The login flow has three issues causing it to appear broken:
-1. After a successful sign-in, there is no visual feedback or navigation -- the Login form just sits there while `AuthContext` asynchronously loads the user role in the background.
-2. No error messages are shown for failed logins.
-3. Multiple rapid sign-in attempts can occur because there's no loading state feedback during the role-resolution gap.
+### What gets built
 
-## Changes
+**Storage**
+- New public storage bucket `job-photos` for job-related images
+- RLS policies: admins can upload/delete; SPs can read photos for jobs assigned to them or for broadcast jobs they're eligible for; public read on the bucket for simplicity (since URLs are non-guessable UUIDs)
 
-### 1. Improve Login Page (`src/pages/Login.tsx`)
+**Database**
+- New table `job_photos`:
+  - `id` (uuid, pk)
+  - `job_id` (uuid, references jobs)
+  - `storage_path` (text — path inside `job-photos` bucket)
+  - `caption` (text, optional)
+  - `uploaded_by_user_id` (uuid)
+  - `created_at` (timestamptz)
+- RLS:
+  - Admin/owner: full access
+  - SP: select where `job_id` is one of their assigned jobs or eligible broadcast jobs (mirrors existing `job_services` policies)
 
-- Add a **post-login waiting state**: After `signIn` succeeds (no error), show a "Loading your dashboard..." spinner instead of the login form. This covers the gap while `AuthContext` resolves the role.
-- Add a **2-second safety fallback**: If the role doesn't load within 2 seconds after successful sign-in, display: "Signed in, but role not found. Please contact admin." with a "Retry" button.
-- Add **console.log** statements for debugging: "Submitting login", "Login result: success/error", "Role loaded".
-- Keep the existing error display (`{error && <p>...`}) -- it already works, just needs the flow to reach it properly.
+**Admin UI — Job Form (`src/pages/admin/JobForm.tsx`)**
+- New "Photos" section under the Notes field
+- Multi-file image picker (accepts jpg/png/webp, max ~5MB each)
+- Thumbnail grid of existing + newly added photos with delete (X) button per photo
+- Optional caption field per photo
+- On submit: upload new files to `job-photos/{jobId}/{uuid}.{ext}`, insert rows into `job_photos`, delete removed ones
 
-### 2. Add Post-Login Navigation (`src/pages/Login.tsx`)
+**Admin UI — Job Detail (`src/pages/admin/JobDetail.tsx`)**
+- New "Photos" card showing thumbnails; click to open lightbox (Dialog) at full size
 
-- Add a `useEffect` that watches `useAuth().user`:
-  - When `user` becomes non-null, navigate based on role:
-    - `admin` -> `/admin`
-    - `sp` -> `/`
-  - This handles the redirect after `AuthContext` resolves the role.
+**SP UI — Job Offer Detail (`src/pages/sp/JobOfferDetail.tsx`) & SP Job Detail (`src/pages/sp/SPJobDetail.tsx`)**
+- New "Photos" card (read-only) below the Notes section
+- Same thumbnail grid + click-to-enlarge lightbox
 
-### 3. Clean Up AuthContext (`src/contexts/AuthContext.tsx`)
+**Shared component**
+- `src/components/JobPhotosGallery.tsx` — read-only grid + lightbox, used by all three viewer pages
+- `src/components/JobPhotosUploader.tsx` — admin uploader (grid + add/remove + caption)
 
-- The current implementation is already correct (uses `setTimeout` to avoid deadlock, separates initial load from listener).
-- Add minimal debug logging: log when role is fetched and what it resolved to.
-- No structural changes needed -- the 5-second timeout hack is already removed.
+**Data hook**
+- `useJobPhotos(jobId)` and `useSaveJobPhotos()` in `src/hooks/useSupabaseData.ts` (mirrors `useJobServices`/`useSaveJobServices` pattern)
 
-### 4. Fix Signup Race Condition (`src/pages/Signup.tsx`)
+### Technical notes
 
-- Already fixed in previous iteration (role insert before sign-in). No changes needed.
+- Files stored at `job-photos/{job_id}/{uuid}.{ext}` so deleting a job's photos is a simple prefix operation
+- Public bucket → use `supabase.storage.from('job-photos').getPublicUrl(path)` for display (no signed URL overhead)
+- Client-side validation: file type must start with `image/`, size ≤ 5MB; show toast on rejection
+- Uploads happen after the job row is saved (need `jobId`); for new-job flow, save job first, then upload, then insert `job_photos` rows — same sequencing already used by `saveJobServices`
+- Reuse existing `Dialog` component for the lightbox
+- No changes to the canonical job status flow or allocation logic
 
-## Technical Details
+### Acceptance criteria
 
-### Login.tsx Changes
-
-```
-- After signIn returns success, set a `signedInWaiting` state = true
-- Render a "Loading dashboard..." view when signedInWaiting is true
-- useEffect: if signedInWaiting && user is loaded, navigate by role
-- useEffect: if signedInWaiting, start 2-second timer; if user still null, show error with retry button
-- Retry button: re-calls fetchRole or signs out and resets
-```
-
-### Files Modified
-
-| File | Change |
-|---|---|
-| `src/pages/Login.tsx` | Add post-login waiting state, role-based navigation, retry fallback, debug logs |
-| `src/contexts/AuthContext.tsx` | Add minimal debug console.logs around role fetching |
-
-### No Database or Edge Function Changes
-
-The auth tables, RLS policies, and edge functions are all working correctly. The fix is purely in the frontend login flow.
+- Admin can attach 1+ photos when creating or editing a job; thumbnails appear in the form
+- Photos persist across reloads and are visible on the admin Job Detail page
+- An SP viewing an offered or assigned job sees the same photos (read-only) with click-to-enlarge
+- Removing a photo in the admin form deletes it from storage and DB on save
+- SPs cannot see photos for jobs they aren't assigned to or eligible for
 
