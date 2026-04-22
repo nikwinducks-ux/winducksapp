@@ -7,7 +7,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserCircle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { UserCircle, Bell } from "lucide-react";
+import {
+  isPushSupported,
+  getCurrentSubscription,
+  subscribeToPush,
+  unsubscribeFromPush,
+} from "@/lib/push";
 
 export default function AccountPage() {
   const { user } = useAuth();
@@ -28,6 +35,41 @@ export default function AccountPage() {
   });
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const supported = isPushSupported();
+      if (cancelled) return;
+      setPushSupported(supported);
+      if (!supported) return;
+      const sub = await getCurrentSubscription();
+      if (!cancelled) setPushEnabled(!!sub && Notification.permission === "granted");
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleTogglePush = async (next: boolean) => {
+    setPushBusy(true);
+    try {
+      if (next) {
+        await subscribeToPush();
+        setPushEnabled(true);
+        toast({ title: "Notifications enabled" });
+      } else {
+        await unsubscribeFromPush();
+        setPushEnabled(false);
+        toast({ title: "Notifications disabled" });
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.message ?? "Could not update notifications", variant: "destructive" });
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (sp && !loaded) {
@@ -137,6 +179,27 @@ export default function AccountPage() {
               <Input value={sp.maxJobsPerDay} disabled className="bg-muted" />
               <p className="text-xs text-muted-foreground">Contact admin to change.</p>
             </div>
+          </div>
+        </div>
+
+        <div className="metric-card space-y-4">
+          <h2 className="section-title flex items-center gap-2">
+            <Bell className="h-4 w-4" /> Notifications
+          </h2>
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground">Push notifications</p>
+              <p className="text-xs text-muted-foreground">
+                {pushSupported
+                  ? "Get notified about new job offers and auto-accepts, even when the app is closed."
+                  : "Push notifications aren't supported here. On iOS, add this app to your Home Screen first; in the Lovable preview, open the published URL."}
+              </p>
+            </div>
+            <Switch
+              checked={pushEnabled}
+              disabled={!pushSupported || pushBusy}
+              onCheckedChange={handleTogglePush}
+            />
           </div>
         </div>
 

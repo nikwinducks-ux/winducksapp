@@ -1,5 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOfferRealtime } from "@/hooks/useOfferRealtime";
+import { NotificationsBanner } from "@/components/NotificationsBanner";
 import {
   LayoutDashboard, Briefcase, Calendar, Zap, TrendingUp,
   Sliders, Scale, Users, FlaskConical, GitBranch, Plug, Tag,
@@ -43,6 +45,9 @@ export function DashboardLayout({ children }: {children: React.ReactNode;}) {
   const role = user?.role ?? "sp";
   const isAdmin = role === "admin" || role === "owner";
   const links = isAdmin ? adminLinks : spLinks;
+
+  // Realtime offer notifications for SPs
+  useOfferRealtime(!isAdmin ? user?.spId ?? null : null);
 
   return (
     <div className="flex min-h-screen w-full">
@@ -123,7 +128,10 @@ export function DashboardLayout({ children }: {children: React.ReactNode;}) {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-7xl p-6 lg:p-8">{children}</div>
+        <div className="mx-auto max-w-7xl p-6 lg:p-8">
+          {!isAdmin && user?.spId && <NotificationsBanner />}
+          {children}
+        </div>
       </main>
     </div>);
 
