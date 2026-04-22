@@ -43,6 +43,8 @@ import UserManagement from "./pages/admin/UserManagement";
 import ServiceCategories from "./pages/admin/ServiceCategories";
 import LaunchReadiness from "./pages/admin/LaunchReadiness";
 import OwnerSetup from "./pages/admin/OwnerSetup";
+import AdminCalendar from "./pages/admin/AdminCalendar";
+import SPCalendar from "./pages/sp/SPCalendar";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 
@@ -93,6 +95,7 @@ function AppRoutes() {
         <Route path="/my-jobs" element={!isAdmin ? <MyJobs /> : <Navigate to="/admin" replace />} />
         <Route path="/sp/jobs/:id" element={!isAdmin ? <SPJobDetail /> : <Navigate to="/admin" replace />} />
         <Route path="/account" element={!isAdmin ? <AccountPage /> : <Navigate to="/admin" replace />} />
+        <Route path="/calendar" element={!isAdmin ? <SPCalendar /> : <Navigate to="/admin" replace />} />
 
         {/* Admin Routes — accessible to admin and owner roles */}
         <Route path="/admin" element={isAdmin ? <AdminDashboard /> : <Navigate to="/" replace />} />
@@ -118,6 +121,7 @@ function AppRoutes() {
         <Route path="/admin/categories" element={isAdmin ? <ServiceCategories /> : <Navigate to="/" replace />} />
         <Route path="/admin/readiness" element={isAdmin ? <LaunchReadiness /> : <Navigate to="/" replace />} />
         <Route path="/admin/owner-setup" element={isAdmin ? <OwnerSetup /> : <Navigate to="/" replace />} />
+        <Route path="/admin/calendar" element={isAdmin ? <AdminCalendar /> : <Navigate to="/" replace />} />
 
         <Route path="*" element={<NotFound />} />
       </Routes>

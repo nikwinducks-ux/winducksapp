@@ -4,13 +4,14 @@ import {
   LayoutDashboard, Briefcase, Calendar, Zap, TrendingUp,
   Sliders, Scale, Users, FlaskConical, GitBranch, Plug, Tag,
   ChevronLeft, ChevronRight, Shield, UserCircle, Contact,
-  LogOut, ClipboardList, Settings, TestTube } from
+  LogOut, ClipboardList, Settings, TestTube, CalendarDays } from
 "lucide-react";
 import { useState } from "react";
 
 const spLinks = [
 { to: "/", icon: LayoutDashboard, label: "Dashboard" },
 { to: "/my-jobs", icon: ClipboardList, label: "My Jobs" },
+{ to: "/calendar", icon: CalendarDays, label: "Calendar" },
 { to: "/jobs", icon: Briefcase, label: "Job Offers" },
 { to: "/availability", icon: Calendar, label: "Availability" },
 { to: "/auto-accept", icon: Zap, label: "Auto-Accept" },
@@ -21,6 +22,7 @@ const spLinks = [
 const adminLinks = [
 { to: "/admin", icon: LayoutDashboard, label: "Dashboard" },
 { to: "/admin/jobs", icon: Briefcase, label: "Jobs" },
+{ to: "/admin/calendar", icon: CalendarDays, label: "Calendar" },
 { to: "/admin/categories", icon: Tag, label: "Service Categories" },
 { to: "/admin/allocation", icon: Sliders, label: "Allocation Control" },
 { to: "/admin/fairness", icon: Scale, label: "Fairness Controls" },
