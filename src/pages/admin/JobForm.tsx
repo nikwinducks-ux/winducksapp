@@ -69,6 +69,11 @@ export default function JobForm() {
   const updateJob = useUpdateJob();
   const saveJobServices = useSaveJobServices();
   const { data: existingServices = [] } = useJobServices(id);
+  const savePhotos = useSaveJobPhotos();
+  const { data: existingPhotos = [] } = useJobPhotos(id);
+  const [photoState, setPhotoState] = useState<JobPhotosUploaderState>({
+    newFiles: [], newCaptions: [], keepIds: [], updatedCaptions: {},
+  });
 
   const [form, setForm] = useState({
     customerId: "",
