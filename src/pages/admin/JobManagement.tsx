@@ -163,8 +163,10 @@ export default function JobManagement() {
   };
 
   const runBroadcast = async () => {
-    const targets = jobs.filter((j) => selectedIds.has(j.dbId) && !NON_BROADCASTABLE.has(j.status));
-    const skipped = selectedIds.size - targets.length;
+    // If single-job mode, only that job; else use selection
+    const sourceIds = startBroadcastJobId ? [startBroadcastJobId] : Array.from(selectedIds);
+    const targets = jobs.filter((j) => sourceIds.includes(j.dbId) && !NON_BROADCASTABLE.has(j.status));
+    const skipped = sourceIds.length - targets.length;
     if (targets.length === 0) {
       toast({ title: "Nothing to broadcast", description: "Selected jobs are all in non-broadcastable statuses.", variant: "destructive" });
       return;
@@ -185,7 +187,7 @@ export default function JobManagement() {
       await supabase.from("admin_audit_logs").insert({
         user_id: (await supabase.auth.getUser()).data.user?.id,
         user_email: (await supabase.auth.getUser()).data.user?.email ?? "",
-        action: "bulk_broadcast_jobs",
+        action: startBroadcastJobId ? "start_broadcast" : "bulk_broadcast_jobs",
         details: {
           job_ids: targets.map((t) => t.dbId),
           count: targets.length,
@@ -200,10 +202,75 @@ export default function JobManagement() {
     setBusy(false);
     setBroadcastOpen(false);
     setBroadcastNote("");
-    clearSelection();
+    setStartBroadcastJobId(null);
+    if (!startBroadcastJobId) clearSelection();
     toast({
       title: "Broadcast complete",
       description: `${ok} broadcast${fail ? `, ${fail} failed` : ""}${skipped ? `, ${skipped} skipped` : ""}.`,
+    });
+  };
+
+  const openStartBroadcast = (job: any) => {
+    setStartBroadcastJobId(job.dbId);
+    setBroadcastRadius(job.broadcastRadiusKm || 100);
+    setBroadcastNote(job.broadcastNote || "");
+    setBroadcastOpen(true);
+  };
+
+  const runStopBroadcastSingle = async () => {
+    if (!stopBroadcastJobId) return;
+    setBusy(true);
+    try {
+      const result = await stopBroadcast.mutateAsync(stopBroadcastJobId);
+      try {
+        await supabase.from("admin_audit_logs").insert({
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          user_email: (await supabase.auth.getUser()).data.user?.email ?? "",
+          action: "stop_broadcast",
+          details: { job_id: stopBroadcastJobId, cancelled_offer_count: (result as any)?.cancelled_offer_count ?? 0 },
+        } as any);
+      } catch { /* best-effort */ }
+      toast({ title: "Broadcast stopped", description: `${(result as any)?.cancelled_offer_count ?? 0} pending offer(s) cancelled.` });
+    } catch (e: any) {
+      toast({ title: "Failed", description: e.message, variant: "destructive" });
+    }
+    setBusy(false);
+    setStopBroadcastJobId(null);
+  };
+
+  const runBulkStopBroadcast = async () => {
+    const targets = jobs.filter((j) => selectedIds.has(j.dbId) && j.isBroadcast);
+    const skipped = selectedIds.size - targets.length;
+    if (targets.length === 0) {
+      toast({ title: "Nothing to stop", description: "No selected jobs are currently broadcasting.", variant: "destructive" });
+      setBulkStopOpen(false);
+      return;
+    }
+    setBusy(true);
+    let ok = 0;
+    let fail = 0;
+    for (const job of targets) {
+      try {
+        await stopBroadcast.mutateAsync(job.dbId);
+        ok++;
+      } catch {
+        fail++;
+      }
+    }
+    try {
+      await supabase.from("admin_audit_logs").insert({
+        user_id: (await supabase.auth.getUser()).data.user?.id,
+        user_email: (await supabase.auth.getUser()).data.user?.email ?? "",
+        action: "bulk_stop_broadcast",
+        details: { job_ids: targets.map((t) => t.dbId), count: targets.length, ok, fail, skipped },
+      } as any);
+    } catch { /* best-effort */ }
+    setBusy(false);
+    setBulkStopOpen(false);
+    clearSelection();
+    toast({
+      title: "Bulk stop complete",
+      description: `${ok} stopped${fail ? `, ${fail} failed` : ""}${skipped ? `, ${skipped} skipped` : ""}.`,
     });
   };
 
