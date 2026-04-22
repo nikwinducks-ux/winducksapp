@@ -839,6 +839,7 @@ export type Database = {
         Args: { _offer_id: string; _reason?: string }
         Returns: Json
       }
+      delete_job: { Args: { _job_id: string }; Returns: Json }
       get_user_sp_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {

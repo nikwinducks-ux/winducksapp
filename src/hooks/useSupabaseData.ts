@@ -759,6 +759,30 @@ export function useAcceptJobOffer() {
   });
 }
 
+export function useDeleteJob() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (jobDbId: string) => {
+      const { data, error } = await supabase.rpc("delete_job" as any, { _job_id: jobDbId });
+      if (error) throw error;
+      const result = data as any;
+      if (result?.error) throw new Error(result.error);
+      return result;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["offers"] });
+      qc.invalidateQueries({ queryKey: ["job-photos"] });
+      qc.invalidateQueries({ queryKey: ["job-services"] });
+      qc.invalidateQueries({ queryKey: ["allocation-runs"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+    },
+  });
+}
+
 export function useUpdateJobStatus() {
   const qc = useQueryClient();
   const { toast } = useToast();
