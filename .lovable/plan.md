@@ -1,53 +1,90 @@
 
 
-## Fix: Broadcast toggle doesn't persist
+## Fix the Jobs-page broadcast toggle so it only succeeds when the job row is actually updated
 
-### Root cause
+### Root issue
 
-When admin flips the **Broadcast** switch from Off → On in `JobManagement.tsx`, the dialog calls `useGenerateBroadcastOffers` which inserts offer rows and sets `jobs.status = 'Offered'` — but it **never sets `jobs.is_broadcast = true`**, nor persists the new `broadcast_radius_km` / `broadcast_note`. So:
+The current broadcast flow is creating `offers` rows, but the matching `jobs` row is still coming back from the database as:
 
-- The optimistic UI looks like it flipped (briefly), then the next `["jobs"]` invalidation refetches `is_broadcast = false` from the DB and the switch snaps back to Off.
-- Stop Broadcast already works correctly because the `stop_broadcast` RPC explicitly sets `is_broadcast = false`.
+- `status = 'Created'`
+- `is_broadcast = false`
 
-A second contributing issue: the broadcast dialog sends a job clone with `broadcastRadiusKm`/`broadcastNote` overrides only into the offer-eligibility math — these admin-entered overrides are never written back to the `jobs` row either.
+That is why the Jobs-page switch snaps back to Off even though providers received broadcast offers.
 
-### Fix
+The code in `useGenerateBroadcastOffers()` already attempts to update the job row, but it does not verify that the update actually succeeded. In this stack, a write can silently affect zero rows without throwing, so the UI can report success while the broadcast flags were never persisted.
 
-**Edit `src/hooks/useOfferData.ts` — `useGenerateBroadcastOffers`**
+### What to change
 
-In the `mutationFn`, replace the single line:
-```
-await supabase.from("jobs").update({ status: "Offered" }).eq("id", job.dbId);
-```
-with an update that also persists the broadcast flags:
-```
-await supabase.from("jobs").update({
-  status: "Offered",
-  is_broadcast: true,
-  broadcast_radius_km: job.broadcastRadiusKm ?? 100,
-  broadcast_note: job.broadcastNote ?? "",
-}).eq("id", job.dbId);
-```
+#### 1) Harden `useGenerateBroadcastOffers()` in `src/hooks/useOfferData.ts`
 
-That single change makes the toggle persist — on next refetch the row comes back with `is_broadcast = true` and the switch stays On with the correct "On · Nkm" label. It also persists the radius/note the admin entered in the dialog so future Stop/Restart flows show the right values.
+Replace the current unchecked job update with a verified update:
 
-### Why no other changes are needed
+- update `jobs`
+- request the updated row back with `.select(...)`
+- use `.single()`
+- throw if:
+  - `error` exists
+  - no row is returned
+  - `is_broadcast` is not `true`
+  - `status` is not `Offered`
 
-- `dbToJob` already maps `is_broadcast → isBroadcast`, `broadcast_radius_km → broadcastRadiusKm`, `broadcast_note → broadcastNote`.
-- `useGenerateBroadcastOffers.onSuccess` already invalidates `["jobs"]` and `["offers"]`.
-- `useStopBroadcast` (Off path) is correct — the `stop_broadcast` RPC sets `is_broadcast = false` server-side.
-- The Switch component, `openStartBroadcast`, `runBroadcast`, and audit logging all work — they just relied on a backend write that wasn't happening.
+Use the verified fields:
+- `status: "Offered"`
+- `is_broadcast: true`
+- `broadcast_radius_km: job.broadcastRadiusKm ?? 100`
+- `broadcast_note: job.broadcastNote ?? ""`
 
-### Acceptance
+This makes the mutation fail loudly instead of falsely reporting success.
 
-- Flip Off → On, confirm radius dialog → switch stays On with "On · Nkm" label after the table refetches.
-- Refresh the page → switch is still On.
-- Flip On → Off, confirm → switch goes Off and stays Off.
-- SP portal still receives broadcast offers as before (no behavior change there).
+#### 2) Make the broadcast mutation transactional in behavior
 
-### Files
+Inside the same hook, if the job-row verification fails after offers were inserted:
 
-- **Edit** `src/hooks/useOfferData.ts` — extend the `jobs` update inside `useGenerateBroadcastOffers` (one statement).
+- throw a descriptive error like:
+  - “Broadcast offers were created, but the job broadcast status could not be saved.”
+- do not show the success toast
+- let the caller surface a destructive toast instead
 
-No DB migration, no other UI edits.
+This prevents the admin from thinking the toggle worked when it did not.
+
+#### 3) Tighten the Jobs-page success path in `src/pages/admin/JobManagement.tsx`
+
+Keep the current dialog/toggle UX, but adjust the success handling so the page only shows broadcast success after the mutation fully succeeds.
+
+Also improve the failure toast to clarify the mismatch:
+- offers may have been created
+- but the job was not marked as broadcast
+- the toggle will remain Off until the job row is successfully updated
+
+#### 4) Add a defensive refresh after start/stop
+
+After successful start or stop broadcast:
+- keep invalidating `["jobs"]` and `["offers"]`
+- optionally also close the dialog only after the mutation resolves successfully
+
+This ensures the switch state always reflects fresh backend data.
+
+### Why this is the right fix
+
+- The current code already maps `is_broadcast`, `broadcast_radius_km`, and `broadcast_note` correctly in `dbToJob()`.
+- The Jobs page already renders the switch from `job.isBroadcast`.
+- The network/data evidence shows the real gap is persistence verification, not display mapping.
+- No schema change is required.
+
+### Files to update
+
+- `src/hooks/useOfferData.ts`
+  - verify the `jobs` update result inside `useGenerateBroadcastOffers()`
+  - throw when the row was not actually updated
+- `src/pages/admin/JobManagement.tsx`
+  - improve error handling/message around `runBroadcast()`
+  - keep dialog/toggle flow tied to actual mutation success
+
+### Acceptance criteria
+
+- Turning Broadcast on from `/admin/jobs` keeps the switch On after refetch.
+- The row label changes to `On · Nkm`.
+- Refreshing the page still shows the job as broadcast.
+- If the job row cannot be updated, the admin sees a failure message and the UI does not pretend the toggle succeeded.
+- Stop Broadcast continues to turn the switch Off and persist correctly.
 
