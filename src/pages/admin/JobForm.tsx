@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useCustomers, useCreateJob, useUpdateJob, useActiveServiceCategories, useJobServices, useSaveJobServices } from "@/hooks/useSupabaseData";
+import { useCustomers, useCreateJob, useUpdateJob, useActiveServiceCategories, useJobServices, useSaveJobServices, useJobPhotos, useSaveJobPhotos } from "@/hooks/useSupabaseData";
+import { JobPhotosUploader, type JobPhotosUploaderState } from "@/components/JobPhotosUploader";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
