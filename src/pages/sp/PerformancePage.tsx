@@ -1,13 +1,53 @@
+import { useMemo, useState } from "react";
+import { format, subDays, subMonths, startOfDay, endOfDay } from "date-fns";
 import { MetricCard } from "@/components/MetricCard";
-import { useServiceProviders } from "@/hooks/useSupabaseData";
+import { useServiceProviders, useJobs } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
-import { CheckCircle, Clock, XCircle, Star, Zap, Shield, Scale } from "lucide-react";
+import { CheckCircle, Clock, XCircle, Star, Zap, Shield, Scale, CheckCircle2, DollarSign, CalendarIcon } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+type Timeframe = "7d" | "30d" | "12mo" | "custom";
 
 export default function PerformancePage() {
   const { user } = useAuth();
   const { data: providers = [] } = useServiceProviders();
+  const { data: jobs = [] } = useJobs();
   const sp = providers.find((s) => s.id === user?.spId) ?? providers[0];
+
+  const [timeframe, setTimeframe] = useState<Timeframe>("30d");
+  const [customStart, setCustomStart] = useState<Date | undefined>();
+  const [customEnd, setCustomEnd] = useState<Date | undefined>();
+
+  const { startDate, endDate } = useMemo(() => {
+    const now = new Date();
+    if (timeframe === "custom" && customStart && customEnd) {
+      return { startDate: startOfDay(customStart), endDate: endOfDay(customEnd) };
+    }
+    if (timeframe === "7d") return { startDate: startOfDay(subDays(now, 7)), endDate: now };
+    if (timeframe === "12mo") return { startDate: startOfDay(subMonths(now, 12)), endDate: now };
+    return { startDate: startOfDay(subDays(now, 30)), endDate: now };
+  }, [timeframe, customStart, customEnd]);
+
+  const { totalCompleted, totalRevenue } = useMemo(() => {
+    if (!sp) return { totalCompleted: 0, totalRevenue: 0 };
+    const filtered = jobs.filter((j) => {
+      if (j.assignedSpId !== sp.id) return false;
+      if (j.status !== "Completed") return false;
+      if (!j.completedAt) return false;
+      const c = new Date(j.completedAt);
+      return c >= startDate && c <= endDate;
+    });
+    return {
+      totalCompleted: filtered.length,
+      totalRevenue: filtered.reduce((sum, j) => sum + (j.payout || 0), 0),
+    };
+  }, [jobs, sp, startDate, endDate]);
+
   if (!sp) return <div className="py-20 text-center text-muted-foreground">Loading...</div>;
 
   const weeklyData = [
@@ -25,11 +65,59 @@ export default function PerformancePage() {
     { month: "Feb", rating: 4.8 },
   ];
 
+  const formattedRevenue = `$${totalRevenue.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+
   return (
     <div className="space-y-8 animate-fade-in">
-      <div>
-        <h1 className="page-header">Performance</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Your performance metrics over the last 30 days</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="page-header">Performance</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Your performance metrics and totals</p>
+        </div>
+        <div className="flex flex-col gap-2 sm:items-end">
+          <Select value={timeframe} onValueChange={(v) => setTimeframe(v as Timeframe)}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="30d">Last 30 days</SelectItem>
+              <SelectItem value="12mo">Last 12 months</SelectItem>
+              <SelectItem value="custom">Custom</SelectItem>
+            </SelectContent>
+          </Select>
+          {timeframe === "custom" && (
+            <div className="flex gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-[150px] justify-start text-left font-normal", !customStart && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {customStart ? format(customStart, "MMM d, yyyy") : "Start"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={customStart} onSelect={setCustomStart} initialFocus className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-[150px] justify-start text-left font-normal", !customEnd && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {customEnd ? format(customEnd, "MMM d, yyyy") : "End"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={customEnd} onSelect={setCustomEnd} initialFocus className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <MetricCard label="Total Jobs Completed" value={totalCompleted} icon={<CheckCircle2 className="h-5 w-5" />} />
+        <MetricCard label="Total Revenue Produced" value={formattedRevenue} icon={<DollarSign className="h-5 w-5" />} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
