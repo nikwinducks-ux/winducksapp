@@ -38,10 +38,16 @@ export default function JobManagement() {
   const [broadcastNote, setBroadcastNote] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Single-job broadcast toggle state
+  const [startBroadcastJobId, setStartBroadcastJobId] = useState<string | null>(null);
+  const [stopBroadcastJobId, setStopBroadcastJobId] = useState<string | null>(null);
+  const [bulkStopOpen, setBulkStopOpen] = useState(false);
+
   const { data: jobs = [], isLoading } = useJobs();
   const { data: providers = [] } = useServiceProviders();
   const { data: categories = [] } = useServiceCategories();
   const deleteJob = useDeleteJob();
+  const stopBroadcast = useStopBroadcast();
   const broadcast = useGenerateBroadcastOffers();
   const { toast } = useToast();
 
