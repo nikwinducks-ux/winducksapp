@@ -1,62 +1,58 @@
 
 
-## Add Photo Attachments to Job Notes
+## Bulk Job Actions: Delete & Broadcast
 
-Enable admins to attach photos when creating/editing a job, and display those photos to Service Providers on the job offer and job detail pages.
+Add admin controls on the Jobs list to select multiple jobs and either delete them or broadcast them in one action. Deletions cascade to all related records so SP views update immediately.
 
-### What gets built
+### Admin UI — `src/pages/admin/JobManagement.tsx`
 
-**Storage**
-- New public storage bucket `job-photos` for job-related images
-- RLS policies: admins can upload/delete; SPs can read photos for jobs assigned to them or for broadcast jobs they're eligible for; public read on the bucket for simplicity (since URLs are non-guessable UUIDs)
+- Add a checkbox column (header + per-row) to the jobs table.
+- Header checkbox = select-all-visible (respects current filters/search).
+- When ≥1 row is selected, show a sticky **bulk action bar** above the table:
+  - "N selected" + Clear button
+  - **Broadcast Selected** (with radius input, default 100km, optional broadcast note)
+  - **Delete Selected** (destructive, requires confirmation)
+- Per-row **Delete** button (trash icon) added to the existing actions column for single-job delete.
 
-**Database**
-- New table `job_photos`:
-  - `id` (uuid, pk)
-  - `job_id` (uuid, references jobs)
-  - `storage_path` (text — path inside `job-photos` bucket)
-  - `caption` (text, optional)
-  - `uploaded_by_user_id` (uuid)
-  - `created_at` (timestamptz)
-- RLS:
-  - Admin/owner: full access
-  - SP: select where `job_id` is one of their assigned jobs or eligible broadcast jobs (mirrors existing `job_services` policies)
+### Confirmation dialogs
 
-**Admin UI — Job Form (`src/pages/admin/JobForm.tsx`)**
-- New "Photos" section under the Notes field
-- Multi-file image picker (accepts jpg/png/webp, max ~5MB each)
-- Thumbnail grid of existing + newly added photos with delete (X) button per photo
-- Optional caption field per photo
-- On submit: upload new files to `job-photos/{jobId}/{uuid}.{ext}`, insert rows into `job_photos`, delete removed ones
+- **Delete confirmation** (`AlertDialog`): "Delete N job(s)? This permanently removes the job, its services, photos, offers, assignments, and history. This cannot be undone." Requires typing `DELETE` to confirm when N > 1.
+- **Bulk broadcast dialog** (`Dialog`): radius slider/input + note textarea + "Broadcast N jobs" button. Skips jobs already in `Assigned`, `InProgress`, `Completed`, or `Cancelled` status (shows a count of skipped jobs in the result toast).
 
-**Admin UI — Job Detail (`src/pages/admin/JobDetail.tsx`)**
-- New "Photos" card showing thumbnails; click to open lightbox (Dialog) at full size
+### Backend — cascade delete
 
-**SP UI — Job Offer Detail (`src/pages/sp/JobOfferDetail.tsx`) & SP Job Detail (`src/pages/sp/SPJobDetail.tsx`)**
-- New "Photos" card (read-only) below the Notes section
-- Same thumbnail grid + click-to-enlarge lightbox
+A single `delete_job(_job_id uuid)` SECURITY DEFINER RPC that:
+1. Verifies caller is admin/owner via `is_admin_or_owner(auth.uid())`.
+2. Deletes all storage objects under `job-photos/{job_id}/` (loops `storage.objects` rows in the `job-photos` bucket).
+3. Deletes from: `job_photos`, `job_services`, `job_status_events`, `job_assignments`, `offers`, `allocation_run_candidates` (via `allocation_runs.job_id`), `allocation_runs`, then `jobs`.
+4. Returns `{ success: true }` or `{ error: "..." }`.
 
-**Shared component**
-- `src/components/JobPhotosGallery.tsx` — read-only grid + lightbox, used by all three viewer pages
-- `src/components/JobPhotosUploader.tsx` — admin uploader (grid + add/remove + caption)
+Bulk delete = client loops the RPC per job (keeps logic simple, atomic per-job, easy error reporting).
 
-**Data hook**
-- `useJobPhotos(jobId)` and `useSaveJobPhotos()` in `src/hooks/useSupabaseData.ts` (mirrors `useJobServices`/`useSaveJobServices` pattern)
+### Backend — bulk broadcast
 
-### Technical notes
+Reuse existing `useGenerateBroadcastOffers()` hook from `src/hooks/useOfferData.ts` in a loop over selected eligible jobs. Each job's status flips to `Offered` and broadcast offers fan out to eligible SPs — already RLS-correct, so SP portals (`JobOffers`, `SPDashboard`) refresh on next query.
 
-- Files stored at `job-photos/{job_id}/{uuid}.{ext}` so deleting a job's photos is a simple prefix operation
-- Public bucket → use `supabase.storage.from('job-photos').getPublicUrl(path)` for display (no signed URL overhead)
-- Client-side validation: file type must start with `image/`, size ≤ 5MB; show toast on rejection
-- Uploads happen after the job row is saved (need `jobId`); for new-job flow, save job first, then upload, then insert `job_photos` rows — same sequencing already used by `saveJobServices`
-- Reuse existing `Dialog` component for the lightbox
-- No changes to the canonical job status flow or allocation logic
+### Cache invalidation
 
-### Acceptance criteria
+After bulk actions, invalidate React Query keys: `["jobs"]`, `["offers"]`, `["job-photos"]`, `["job-services"]`, `["allocation-runs"]`. SP-side queries (`useJobs`, `useSpOffers`) re-run automatically and stale offers/jobs disappear from the SP UI.
 
-- Admin can attach 1+ photos when creating or editing a job; thumbnails appear in the form
-- Photos persist across reloads and are visible on the admin Job Detail page
-- An SP viewing an offered or assigned job sees the same photos (read-only) with click-to-enlarge
-- Removing a photo in the admin form deletes it from storage and DB on save
-- SPs cannot see photos for jobs they aren't assigned to or eligible for
+### Audit
+
+Insert one `admin_audit_logs` row per bulk action with `action = "bulk_delete_jobs"` or `"bulk_broadcast_jobs"` and `details = { job_ids, count, ... }`.
+
+### Files
+
+- **New migration**: `delete_job` RPC.
+- **Edit** `src/pages/admin/JobManagement.tsx`: checkboxes, bulk bar, dialogs, delete handler, broadcast handler.
+- **Edit** `src/hooks/useSupabaseData.ts`: add `useDeleteJob()` mutation calling the RPC + invalidating caches.
+- No edits needed to SP pages — they already react to `jobs`/`offers` query invalidation.
+
+### Acceptance
+
+- Admin can check multiple jobs, click Delete, confirm, and all selected jobs vanish from the list.
+- Deleted jobs no longer appear in any SP's My Jobs, Job Offers, or Dashboard (next refresh / 10s poll).
+- Admin can check multiple `Created` jobs, click Broadcast, and they all appear as broadcast offers to eligible SPs.
+- Single-row delete works via the trash icon in the Actions column.
+- Non-admin users cannot call `delete_job` (RPC enforces).
 
