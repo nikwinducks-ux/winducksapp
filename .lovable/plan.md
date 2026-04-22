@@ -1,58 +1,60 @@
 
 
-## Bulk Job Actions: Delete & Broadcast
+## Toggle Broadcast Status from the Jobs Page
 
-Add admin controls on the Jobs list to select multiple jobs and either delete them or broadcast them in one action. Deletions cascade to all related records so SP views update immediately.
+Add inline broadcast on/off control on the Admin Jobs list, plus a bulk "Stop Broadcast" action — without leaving the page.
 
-### Admin UI — `src/pages/admin/JobManagement.tsx`
+### What changes in the UI — `src/pages/admin/JobManagement.tsx`
 
-- Add a checkbox column (header + per-row) to the jobs table.
-- Header checkbox = select-all-visible (respects current filters/search).
-- When ≥1 row is selected, show a sticky **bulk action bar** above the table:
-  - "N selected" + Clear button
-  - **Broadcast Selected** (with radius input, default 100km, optional broadcast note)
-  - **Delete Selected** (destructive, requires confirmation)
-- Per-row **Delete** button (trash icon) added to the existing actions column for single-job delete.
+**New "Broadcast" column** (between Status and Assigned SP):
+- Shows a small switch + label:
+  - `On` (with radius badge, e.g. "On · 80km") when `is_broadcast = true`
+  - `Off` when `is_broadcast = false`
+- Toggle is disabled (read-only badge) for jobs in `Assigned`, `InProgress`, `Completed`, `Cancelled`, `Archived` — those can't be re-broadcast.
 
-### Confirmation dialogs
+**Toggle behavior:**
+- **Off → On**: opens a small popover/dialog asking for radius (default current value or 100km) + optional note → on confirm, runs the existing broadcast generation (same as the bulk Broadcast dialog) so offers fan out to eligible SPs. Job status moves to `Offered`.
+- **On → Off** ("Stop Broadcast"): confirmation `AlertDialog` → sets `is_broadcast = false`, cancels all `Pending` offers for the job (`status = 'Cancelled'`), and if the job's status is `Offered` (no acceptance yet) reverts it to `Created`. Audit row written.
 
-- **Delete confirmation** (`AlertDialog`): "Delete N job(s)? This permanently removes the job, its services, photos, offers, assignments, and history. This cannot be undone." Requires typing `DELETE` to confirm when N > 1.
-- **Bulk broadcast dialog** (`Dialog`): radius slider/input + note textarea + "Broadcast N jobs" button. Skips jobs already in `Assigned`, `InProgress`, `Completed`, or `Cancelled` status (shows a count of skipped jobs in the result toast).
+**Bulk action bar** (already present when rows are selected) gains a third button:
+- **Stop Broadcast** — runs the same Off action for every selected job currently `is_broadcast = true`. Skips ineligible jobs and reports counts in toast.
 
-### Backend — cascade delete
+### Backend
 
-A single `delete_job(_job_id uuid)` SECURITY DEFINER RPC that:
-1. Verifies caller is admin/owner via `is_admin_or_owner(auth.uid())`.
-2. Deletes all storage objects under `job-photos/{job_id}/` (loops `storage.objects` rows in the `job-photos` bucket).
-3. Deletes from: `job_photos`, `job_services`, `job_status_events`, `job_assignments`, `offers`, `allocation_run_candidates` (via `allocation_runs.job_id`), `allocation_runs`, then `jobs`.
-4. Returns `{ success: true }` or `{ error: "..." }`.
+New SECURITY DEFINER RPC `stop_broadcast(_job_id uuid)`:
+1. Check `is_admin_or_owner(auth.uid())`.
+2. `UPDATE offers SET status = 'Cancelled', responded_at = now() WHERE job_id = _job_id AND status = 'Pending'`.
+3. `UPDATE jobs SET is_broadcast = false, status = CASE WHEN status = 'Offered' AND assigned_sp_id IS NULL THEN 'Created' ELSE status END WHERE id = _job_id`.
+4. Insert a `job_status_events` row if status changed.
+5. Returns `{ success: true, cancelled_offer_count }`.
 
-Bulk delete = client loops the RPC per job (keeps logic simple, atomic per-job, easy error reporting).
+The "turn On" path reuses the existing `useGenerateBroadcastOffers` hook + a direct `is_broadcast = true` update (same code path already used in `JobDetail.tsx`).
 
-### Backend — bulk broadcast
+### New hooks — `src/hooks/useSupabaseData.ts`
 
-Reuse existing `useGenerateBroadcastOffers()` hook from `src/hooks/useOfferData.ts` in a loop over selected eligible jobs. Each job's status flips to `Offered` and broadcast offers fan out to eligible SPs — already RLS-correct, so SP portals (`JobOffers`, `SPDashboard`) refresh on next query.
-
-### Cache invalidation
-
-After bulk actions, invalidate React Query keys: `["jobs"]`, `["offers"]`, `["job-photos"]`, `["job-services"]`, `["allocation-runs"]`. SP-side queries (`useJobs`, `useSpOffers`) re-run automatically and stale offers/jobs disappear from the SP UI.
+- `useStopBroadcast()` → calls the RPC, invalidates `["jobs"]`, `["offers"]`.
+- `useStartBroadcast()` (thin wrapper) → flips `is_broadcast = true`, sets new `broadcast_radius_km` / `broadcast_note`, then calls `useGenerateBroadcastOffers`. Invalidates the same caches.
 
 ### Audit
 
-Insert one `admin_audit_logs` row per bulk action with `action = "bulk_delete_jobs"` or `"bulk_broadcast_jobs"` and `details = { job_ids, count, ... }`.
+- Single-row toggle: insert `admin_audit_logs` with `action = 'start_broadcast'` or `'stop_broadcast'`, `details = { job_id, radius_km?, note?, cancelled_offer_count? }`.
+- Bulk stop: one row with `action = 'bulk_stop_broadcast'`, `details = { job_ids, count, ok, fail }`.
+
+### SP-side propagation
+
+No SP-side code changes required. RLS already hides non-broadcast / non-eligible jobs, and the SP `JobOffers` page polls every 10s and respects offer status — cancelled offers vanish automatically.
 
 ### Files
 
-- **New migration**: `delete_job` RPC.
-- **Edit** `src/pages/admin/JobManagement.tsx`: checkboxes, bulk bar, dialogs, delete handler, broadcast handler.
-- **Edit** `src/hooks/useSupabaseData.ts`: add `useDeleteJob()` mutation calling the RPC + invalidating caches.
-- No edits needed to SP pages — they already react to `jobs`/`offers` query invalidation.
+- **New migration**: `stop_broadcast` RPC.
+- **Edit** `src/pages/admin/JobManagement.tsx`: Broadcast column, start/stop dialogs, bulk Stop Broadcast button.
+- **Edit** `src/hooks/useSupabaseData.ts`: `useStopBroadcast`, `useStartBroadcast`.
 
 ### Acceptance
 
-- Admin can check multiple jobs, click Delete, confirm, and all selected jobs vanish from the list.
-- Deleted jobs no longer appear in any SP's My Jobs, Job Offers, or Dashboard (next refresh / 10s poll).
-- Admin can check multiple `Created` jobs, click Broadcast, and they all appear as broadcast offers to eligible SPs.
-- Single-row delete works via the trash icon in the Actions column.
-- Non-admin users cannot call `delete_job` (RPC enforces).
+- A `Created` job shows "Off" switch in the Broadcast column; flipping it on opens a radius prompt and immediately broadcasts.
+- A broadcast `Offered` job shows "On · Nkm"; flipping it off cancels all pending offers and returns the job to `Created`.
+- Selecting multiple broadcast jobs and clicking "Stop Broadcast" stops all of them in one action.
+- Jobs in `Assigned`/`InProgress`/`Completed` show a static badge and cannot be toggled.
+- SP portals stop seeing the job/offer on next refresh.
 
