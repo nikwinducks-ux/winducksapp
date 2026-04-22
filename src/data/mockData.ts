@@ -86,6 +86,7 @@ export interface Job {
   broadcastRadiusKm?: number;
   broadcastNote?: string;
   services?: JobService[];
+  completedAt?: string;
 }
 
 export interface AllocationScores {
