@@ -783,6 +783,27 @@ export function useDeleteJob() {
   });
 }
 
+export function useStopBroadcast() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (jobDbId: string) => {
+      const { data, error } = await supabase.rpc("stop_broadcast" as any, { _job_id: jobDbId });
+      if (error) throw error;
+      const result = data as any;
+      if (result?.error) throw new Error(result.error);
+      return result as { success: true; cancelled_offer_count: number };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["offers"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Stop broadcast failed", description: err.message, variant: "destructive" });
+    },
+  });
+}
+
 export function useUpdateJobStatus() {
   const qc = useQueryClient();
   const { toast } = useToast();

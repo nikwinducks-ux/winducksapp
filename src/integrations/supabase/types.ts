@@ -858,6 +858,7 @@ export type Database = {
         Args: { _job_id: string; _sp_id: string }
         Returns: boolean
       }
+      stop_broadcast: { Args: { _job_id: string }; Returns: Json }
     }
     Enums: {
       app_role: "admin" | "sp" | "owner"

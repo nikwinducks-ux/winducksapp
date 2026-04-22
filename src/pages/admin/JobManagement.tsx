@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useJobs, useServiceProviders, useServiceCategories, useDeleteJob } from "@/hooks/useSupabaseData";
+import { useJobs, useServiceProviders, useServiceCategories, useDeleteJob, useStopBroadcast } from "@/hooks/useSupabaseData";
 import { useGenerateBroadcastOffers } from "@/hooks/useOfferData";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge, URGENCY_PRIORITY } from "@/components/UrgencyBadge";
@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -15,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Plus, Eye, Pencil, UserPlus, Trash2, Radio, X } from "lucide-react";
+import { Search, Plus, Eye, Pencil, UserPlus, Trash2, Radio, X, RadioTower } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,10 +38,16 @@ export default function JobManagement() {
   const [broadcastNote, setBroadcastNote] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Single-job broadcast toggle state
+  const [startBroadcastJobId, setStartBroadcastJobId] = useState<string | null>(null);
+  const [stopBroadcastJobId, setStopBroadcastJobId] = useState<string | null>(null);
+  const [bulkStopOpen, setBulkStopOpen] = useState(false);
+
   const { data: jobs = [], isLoading } = useJobs();
   const { data: providers = [] } = useServiceProviders();
   const { data: categories = [] } = useServiceCategories();
   const deleteJob = useDeleteJob();
+  const stopBroadcast = useStopBroadcast();
   const broadcast = useGenerateBroadcastOffers();
   const { toast } = useToast();
 
@@ -155,8 +163,10 @@ export default function JobManagement() {
   };
 
   const runBroadcast = async () => {
-    const targets = jobs.filter((j) => selectedIds.has(j.dbId) && !NON_BROADCASTABLE.has(j.status));
-    const skipped = selectedIds.size - targets.length;
+    // If single-job mode, only that job; else use selection
+    const sourceIds = startBroadcastJobId ? [startBroadcastJobId] : Array.from(selectedIds);
+    const targets = jobs.filter((j) => sourceIds.includes(j.dbId) && !NON_BROADCASTABLE.has(j.status));
+    const skipped = sourceIds.length - targets.length;
     if (targets.length === 0) {
       toast({ title: "Nothing to broadcast", description: "Selected jobs are all in non-broadcastable statuses.", variant: "destructive" });
       return;
@@ -177,7 +187,7 @@ export default function JobManagement() {
       await supabase.from("admin_audit_logs").insert({
         user_id: (await supabase.auth.getUser()).data.user?.id,
         user_email: (await supabase.auth.getUser()).data.user?.email ?? "",
-        action: "bulk_broadcast_jobs",
+        action: startBroadcastJobId ? "start_broadcast" : "bulk_broadcast_jobs",
         details: {
           job_ids: targets.map((t) => t.dbId),
           count: targets.length,
@@ -192,10 +202,75 @@ export default function JobManagement() {
     setBusy(false);
     setBroadcastOpen(false);
     setBroadcastNote("");
-    clearSelection();
+    setStartBroadcastJobId(null);
+    if (!startBroadcastJobId) clearSelection();
     toast({
       title: "Broadcast complete",
       description: `${ok} broadcast${fail ? `, ${fail} failed` : ""}${skipped ? `, ${skipped} skipped` : ""}.`,
+    });
+  };
+
+  const openStartBroadcast = (job: any) => {
+    setStartBroadcastJobId(job.dbId);
+    setBroadcastRadius(job.broadcastRadiusKm || 100);
+    setBroadcastNote(job.broadcastNote || "");
+    setBroadcastOpen(true);
+  };
+
+  const runStopBroadcastSingle = async () => {
+    if (!stopBroadcastJobId) return;
+    setBusy(true);
+    try {
+      const result = await stopBroadcast.mutateAsync(stopBroadcastJobId);
+      try {
+        await supabase.from("admin_audit_logs").insert({
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          user_email: (await supabase.auth.getUser()).data.user?.email ?? "",
+          action: "stop_broadcast",
+          details: { job_id: stopBroadcastJobId, cancelled_offer_count: (result as any)?.cancelled_offer_count ?? 0 },
+        } as any);
+      } catch { /* best-effort */ }
+      toast({ title: "Broadcast stopped", description: `${(result as any)?.cancelled_offer_count ?? 0} pending offer(s) cancelled.` });
+    } catch (e: any) {
+      toast({ title: "Failed", description: e.message, variant: "destructive" });
+    }
+    setBusy(false);
+    setStopBroadcastJobId(null);
+  };
+
+  const runBulkStopBroadcast = async () => {
+    const targets = jobs.filter((j) => selectedIds.has(j.dbId) && j.isBroadcast);
+    const skipped = selectedIds.size - targets.length;
+    if (targets.length === 0) {
+      toast({ title: "Nothing to stop", description: "No selected jobs are currently broadcasting.", variant: "destructive" });
+      setBulkStopOpen(false);
+      return;
+    }
+    setBusy(true);
+    let ok = 0;
+    let fail = 0;
+    for (const job of targets) {
+      try {
+        await stopBroadcast.mutateAsync(job.dbId);
+        ok++;
+      } catch {
+        fail++;
+      }
+    }
+    try {
+      await supabase.from("admin_audit_logs").insert({
+        user_id: (await supabase.auth.getUser()).data.user?.id,
+        user_email: (await supabase.auth.getUser()).data.user?.email ?? "",
+        action: "bulk_stop_broadcast",
+        details: { job_ids: targets.map((t) => t.dbId), count: targets.length, ok, fail, skipped },
+      } as any);
+    } catch { /* best-effort */ }
+    setBusy(false);
+    setBulkStopOpen(false);
+    clearSelection();
+    toast({
+      title: "Bulk stop complete",
+      description: `${ok} stopped${fail ? `, ${fail} failed` : ""}${skipped ? `, ${skipped} skipped` : ""}.`,
     });
   };
 
@@ -262,8 +337,11 @@ export default function JobManagement() {
             </Button>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => setBroadcastOpen(true)}>
+            <Button size="sm" variant="outline" onClick={() => { setStartBroadcastJobId(null); setBroadcastOpen(true); }}>
               <Radio className="h-4 w-4 mr-2" />Broadcast Selected
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setBulkStopOpen(true)}>
+              <RadioTower className="h-4 w-4 mr-2" />Stop Broadcast
             </Button>
             <Button size="sm" variant="destructive" onClick={openDeleteBulk}>
               <Trash2 className="h-4 w-4 mr-2" />Delete Selected
@@ -290,6 +368,7 @@ export default function JobManagement() {
               <th className="pb-3 font-medium text-muted-foreground">City</th>
               <th className="pb-3 font-medium text-muted-foreground">Urgency</th>
               <th className="pb-3 font-medium text-muted-foreground">Status</th>
+              <th className="pb-3 font-medium text-muted-foreground">Broadcast</th>
               <th className="pb-3 font-medium text-muted-foreground">Assigned SP</th>
               <th className="pb-3 font-medium text-muted-foreground">Created</th>
               <th className="pb-3 font-medium text-muted-foreground">Actions</th>
@@ -317,6 +396,27 @@ export default function JobManagement() {
                   <td className="py-3"><UrgencyBadge urgency={job.urgency} /></td>
                   <td className="py-3">
                     <StatusBadge label={statusLabel(job.status)} variant={statusVariant(job.status) as any} />
+                  </td>
+                  <td className="py-3">
+                    {NON_BROADCASTABLE.has(job.status) ? (
+                      <Badge variant="outline" className="text-muted-foreground">N/A</Badge>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={!!job.isBroadcast}
+                          onCheckedChange={(v) => {
+                            if (v) openStartBroadcast(job);
+                            else setStopBroadcastJobId(job.dbId);
+                          }}
+                          aria-label="Toggle broadcast"
+                        />
+                        {job.isBroadcast ? (
+                          <span className="text-xs text-muted-foreground">On · {job.broadcastRadiusKm || 100}km</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Off</span>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="py-3 text-muted-foreground">
                     {job.assignedSpId ? spMap.get(job.assignedSpId) ?? "—" : "—"}
@@ -386,11 +486,15 @@ export default function JobManagement() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Bulk broadcast dialog */}
-      <Dialog open={broadcastOpen} onOpenChange={(o) => { if (!busy) setBroadcastOpen(o); }}>
+      {/* Broadcast dialog (single or bulk) */}
+      <Dialog open={broadcastOpen} onOpenChange={(o) => { if (!busy) { setBroadcastOpen(o); if (!o) setStartBroadcastJobId(null); } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Broadcast {selectedIds.size} job{selectedIds.size === 1 ? "" : "s"}</DialogTitle>
+            <DialogTitle>
+              {startBroadcastJobId
+                ? "Start broadcast"
+                : `Broadcast ${selectedIds.size} job${selectedIds.size === 1 ? "" : "s"}`}
+            </DialogTitle>
             <DialogDescription>
               Sends offers to all eligible Service Providers. Jobs already Assigned, In Progress, Completed, or Cancelled are skipped.
             </DialogDescription>
@@ -419,14 +523,56 @@ export default function JobManagement() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setBroadcastOpen(false)} disabled={busy}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setBroadcastOpen(false); setStartBroadcastJobId(null); }} disabled={busy}>Cancel</Button>
             <Button onClick={runBroadcast} disabled={busy}>
               <Radio className="h-4 w-4 mr-2" />
-              {busy ? "Broadcasting…" : `Broadcast ${selectedIds.size}`}
+              {busy ? "Broadcasting…" : (startBroadcastJobId ? "Broadcast" : `Broadcast ${selectedIds.size}`)}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Stop broadcast (single) */}
+      <AlertDialog open={!!stopBroadcastJobId} onOpenChange={(o) => { if (!busy && !o) setStopBroadcastJobId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Stop broadcast?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This cancels all pending offers for this job. If the job was Offered (not yet accepted), it returns to Created.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); runStopBroadcastSingle(); }}
+              disabled={busy}
+            >
+              {busy ? "Stopping…" : "Stop broadcast"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Stop broadcast (bulk) */}
+      <AlertDialog open={bulkStopOpen} onOpenChange={(o) => { if (!busy) setBulkStopOpen(o); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Stop broadcast for selected jobs?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cancels all pending offers for selected jobs currently broadcasting. Jobs not currently broadcasting are skipped.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); runBulkStopBroadcast(); }}
+              disabled={busy}
+            >
+              {busy ? "Stopping…" : "Stop broadcast"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
