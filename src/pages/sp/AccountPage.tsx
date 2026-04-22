@@ -7,7 +7,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserCircle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { UserCircle, Bell } from "lucide-react";
+import {
+  isPushSupported,
+  getCurrentSubscription,
+  subscribeToPush,
+  unsubscribeFromPush,
+} from "@/lib/push";
 
 export default function AccountPage() {
   const { user } = useAuth();
