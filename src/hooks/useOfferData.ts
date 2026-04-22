@@ -448,13 +448,34 @@ export function useGenerateBroadcastOffers() {
         .select("*");
       if (error) throw error;
 
-      // Update job status and persist broadcast flags
-      await supabase.from("jobs").update({
-        status: "Offered",
-        is_broadcast: true,
-        broadcast_radius_km: job.broadcastRadiusKm ?? 100,
-        broadcast_note: job.broadcastNote ?? "",
-      }).eq("id", job.dbId);
+      // Update job status and persist broadcast flags — verify the write actually happened
+      const { data: updatedJob, error: jobUpdateErr } = await supabase
+        .from("jobs")
+        .update({
+          status: "Offered",
+          is_broadcast: true,
+          broadcast_radius_km: job.broadcastRadiusKm ?? 100,
+          broadcast_note: job.broadcastNote ?? "",
+        })
+        .eq("id", job.dbId)
+        .select("id, status, is_broadcast, broadcast_radius_km")
+        .maybeSingle();
+
+      if (jobUpdateErr) {
+        throw new Error(
+          `Broadcast offers were created, but the job broadcast status could not be saved: ${jobUpdateErr.message}`
+        );
+      }
+      if (!updatedJob) {
+        throw new Error(
+          "Broadcast offers were created, but the job row could not be updated (no row returned). The toggle will remain Off until the job row is successfully updated."
+        );
+      }
+      if (updatedJob.is_broadcast !== true || updatedJob.status !== "Offered") {
+        throw new Error(
+          `Broadcast offers were created, but the job broadcast flags did not persist (status=${updatedJob.status}, is_broadcast=${updatedJob.is_broadcast}). The toggle will remain Off.`
+        );
+      }
 
       return { offersCreated: inserted?.length ?? 0, eligibleCount: eligibleSps.length };
     },

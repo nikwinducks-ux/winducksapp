@@ -174,13 +174,15 @@ export default function JobManagement() {
     setBusy(true);
     let ok = 0;
     let fail = 0;
+    let lastError = "";
     for (const job of targets) {
       try {
         const jobWithRadius = { ...job, broadcastRadiusKm: broadcastRadius, broadcastNote } as any;
         await broadcast.mutateAsync({ job: jobWithRadius, serviceProviders: providers });
         ok++;
-      } catch {
+      } catch (e: any) {
         fail++;
+        lastError = e?.message ?? String(e);
       }
     }
     try {
@@ -196,6 +198,7 @@ export default function JobManagement() {
           skipped,
           ok,
           fail,
+          last_error: lastError,
         },
       } as any);
     } catch { /* best-effort */ }
@@ -204,10 +207,24 @@ export default function JobManagement() {
     setBroadcastNote("");
     setStartBroadcastJobId(null);
     if (!startBroadcastJobId) clearSelection();
-    toast({
-      title: "Broadcast complete",
-      description: `${ok} broadcast${fail ? `, ${fail} failed` : ""}${skipped ? `, ${skipped} skipped` : ""}.`,
-    });
+    if (fail > 0 && ok === 0) {
+      toast({
+        title: "Broadcast failed",
+        description: lastError || "The job broadcast status could not be saved. The toggle will remain Off.",
+        variant: "destructive",
+      });
+    } else if (fail > 0) {
+      toast({
+        title: "Broadcast partially complete",
+        description: `${ok} ok, ${fail} failed${skipped ? `, ${skipped} skipped` : ""}. ${lastError}`,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Broadcast complete",
+        description: `${ok} broadcast${skipped ? `, ${skipped} skipped` : ""}.`,
+      });
+    }
   };
 
   const openStartBroadcast = (job: any) => {
