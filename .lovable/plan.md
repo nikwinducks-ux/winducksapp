@@ -1,90 +1,137 @@
 
 
-## Fix the Jobs-page broadcast toggle so it only succeeds when the job row is actually updated
+## Calendar Pages for Admin & SP
 
-### Root issue
+Two new calendar pages — one for admins, one for SPs — to schedule, view, and manage **Scheduled** jobs (urgency = "Scheduled" with a `scheduled_date`). Day / Week / Month views, drag-friendly job blocks, and inline accept/reject/progress actions for SPs.
 
-The current broadcast flow is creating `offers` rows, but the matching `jobs` row is still coming back from the database as:
+### Scope
 
-- `status = 'Created'`
-- `is_broadcast = false`
+- Only jobs where `urgency = 'Scheduled'` AND `scheduled_date IS NOT NULL` appear.
+- ASAP / Anytime soon jobs are excluded (they have no calendar slot by design).
+- Admin sees all scheduled jobs across all SPs (and unassigned).
+- SP sees only their own offered + assigned scheduled jobs.
 
-That is why the Jobs-page switch snaps back to Off even though providers received broadcast offers.
+---
 
-The code in `useGenerateBroadcastOffers()` already attempts to update the job row, but it does not verify that the update actually succeeded. In this stack, a write can silently affect zero rows without throwing, so the UI can report success while the broadcast flags were never persisted.
+### 1. Admin Calendar — `/admin/calendar`
 
-### What to change
+**File:** `src/pages/admin/AdminCalendar.tsx` (new)
+**Sidebar:** add entry in `DashboardLayout.tsx` admin links (icon `CalendarDays`, label "Calendar", between Jobs and Service Categories).
+**Route:** add to `App.tsx` admin routes.
 
-#### 1) Harden `useGenerateBroadcastOffers()` in `src/hooks/useOfferData.ts`
+**Features:**
+- View toggle: **Day / Week / Month** (Tabs), default = Week.
+- Date navigator: ◀ Today ▶ + visible date range label.
+- SP filter dropdown (All SPs / specific SP / Unassigned).
+- Status filter chips: Pending Acceptance, Accepted, In Progress, Completed.
+- Each job block shows:
+  - Job number (e.g. JOB-1024)
+  - Customer name
+  - Service category summary
+  - **Payout amount** (`$XXX`)
+  - **Status badge** (Pending / Accepted / In Progress / Completed)
+  - Assigned SP name (or "Unassigned")
+- **Visual states (per request):**
+  - `Offered` (waiting SP acceptance) → 50% opacity, dashed border, theme primary tint
+  - `Assigned` / `Accepted` → solid theme primary
+  - `InProgress` → solid theme accent (orange)
+  - `Completed` → solid muted green
+  - `Cancelled` → struck-through, muted
+- Click a job block → opens a side sheet (existing `Sheet` component) with full job details + quick actions:
+  - **Schedule / Reschedule**: date + time pickers (15-min increments) → updates `scheduled_date`, `scheduled_time`.
+  - **Unschedule**: clears `scheduled_date` and `scheduled_time` (job remains, just leaves the calendar).
+  - **Reassign SP**: select dropdown → updates `assigned_sp_id`.
+  - Link "Open full job" → `/admin/jobs/:id`.
+- Empty day cells include a "+ Schedule job" affordance that opens a picker of unscheduled jobs.
 
-Replace the current unchecked job update with a verified update:
+**Day view:** 24h hour rail (or 6am–10pm condensed), jobs positioned by `scheduled_time`, height by `estimated_duration` minutes.
+**Week view:** 7 columns (Sun–Sat or Mon–Sun depending on locale; default Mon–Sun), same hour rail.
+**Month view:** classic 6-row grid; each cell shows up to 3 job pills + "+N more" overflow.
 
-- update `jobs`
-- request the updated row back with `.select(...)`
-- use `.single()`
-- throw if:
-  - `error` exists
-  - no row is returned
-  - `is_broadcast` is not `true`
-  - `status` is not `Offered`
+---
 
-Use the verified fields:
-- `status: "Offered"`
-- `is_broadcast: true`
-- `broadcast_radius_km: job.broadcastRadiusKm ?? 100`
-- `broadcast_note: job.broadcastNote ?? ""`
+### 2. SP Calendar — `/calendar`
 
-This makes the mutation fail loudly instead of falsely reporting success.
+**File:** `src/pages/sp/SPCalendar.tsx` (new)
+**Sidebar:** add entry in `DashboardLayout.tsx` sp links (icon `CalendarDays`, label "Calendar", between My Jobs and Job Offers).
+**Route:** add to `App.tsx` SP routes.
 
-#### 2) Make the broadcast mutation transactional in behavior
+**Features:**
+- Same Day / Week / Month toggle and navigation.
+- Read-only schedule (SPs cannot move jobs; only admins reschedule).
+- Shows the SP's own scheduled jobs from two sources:
+  - Pending offers (status `Offered`, a Pending offer to this SP) → **transparent / dashed**.
+  - Assigned/Accepted/InProgress/Completed jobs (`assigned_sp_id = me`) → **solid theme color**.
+- Job block shows: time, customer name, service summary, payout, status badge.
+- Click block → side sheet with details + actions based on status:
+  - **Offered (pending acceptance)** → `Accept` (calls `accept_offer` RPC) and `Reject` (calls `decline_offer` RPC). On reject the job disappears from the SP's calendar.
+  - **Assigned / Accepted** → `Mark In Progress` button (existing `useUpdateJobStatus`).
+  - **InProgress** → `Mark Completed` button.
+  - **Completed / Cancelled** → read-only.
+- Link "Open full job" → `/sp/jobs/:id`.
 
-Inside the same hook, if the job-row verification fails after offers were inserted:
+---
 
-- throw a descriptive error like:
-  - “Broadcast offers were created, but the job broadcast status could not be saved.”
-- do not show the success toast
-- let the caller surface a destructive toast instead
+### 3. Shared calendar component
 
-This prevents the admin from thinking the toggle worked when it did not.
+**File:** `src/components/calendar/JobCalendar.tsx` (new)
 
-#### 3) Tighten the Jobs-page success path in `src/pages/admin/JobManagement.tsx`
+A reusable view-aware component receiving:
+- `jobs: Job[]` (already filtered to `Scheduled` + has `scheduled_date`)
+- `view: "day" | "week" | "month"`
+- `currentDate: Date`
+- `onJobClick: (job) => void`
+- `mode: "admin" | "sp"` (controls click affordances)
+- `getJobAppearance: (job) => { variant, opacity, dashed }` — keeps theme rules in one place.
 
-Keep the current dialog/toggle UX, but adjust the success handling so the page only shows broadcast success after the mutation fully succeeds.
+Renders the appropriate sub-grid (`DayGrid`, `WeekGrid`, `MonthGrid`) — internal helpers in the same file. No external calendar library needed; built with Tailwind + grid utilities to match the existing clean-SaaS aesthetic.
 
-Also improve the failure toast to clarify the mismatch:
-- offers may have been created
-- but the job was not marked as broadcast
-- the toggle will remain Off until the job row is successfully updated
+**File:** `src/components/calendar/JobBlock.tsx` (new)
+Renders the colored block with payout, customer, status, SP name. Applies opacity + dashed border for `Offered`, solid theme color for accepted states. Uses existing `StatusBadge` and theme tokens (`primary`, `accent`, semantic green for `Completed`).
 
-#### 4) Add a defensive refresh after start/stop
+---
 
-After successful start or stop broadcast:
-- keep invalidating `["jobs"]` and `["offers"]`
-- optionally also close the dialog only after the mutation resolves successfully
+### 4. Data wiring
 
-This ensures the switch state always reflects fresh backend data.
+Reuses existing hooks — no schema or RPC changes needed:
+- `useJobs()` — already returns scheduled fields and joined services.
+- `useServiceProviders()` — for SP filter and SP-name lookup.
+- `useOffers()` (already exists in `useOfferData.ts`) — to identify SP's pending offers for the calendar.
+- `useUpdateJob()` — admin reschedule / unschedule (sets `scheduled_date`, `scheduled_time`, or nulls them).
+- `useAssignJob()` — admin reassign SP.
+- `accept_offer` / `decline_offer` RPCs — SP accept/reject.
+- `useUpdateJobStatus()` — SP InProgress / Completed transitions.
 
-### Why this is the right fix
+The existing `enforce_sp_job_update` trigger already permits the SP `Assigned → InProgress → Completed` transitions and gives admin/owner full control, so reschedule writes from admins will pass.
 
-- The current code already maps `is_broadcast`, `broadcast_radius_km`, and `broadcast_note` correctly in `dbToJob()`.
-- The Jobs page already renders the switch from `job.isBroadcast`.
-- The network/data evidence shows the real gap is persistence verification, not display mapping.
-- No schema change is required.
+Filtering rule applied in both pages:
+```
+job.urgency === "Scheduled" && job.scheduledDate
+```
 
-### Files to update
+---
 
-- `src/hooks/useOfferData.ts`
-  - verify the `jobs` update result inside `useGenerateBroadcastOffers()`
-  - throw when the row was not actually updated
-- `src/pages/admin/JobManagement.tsx`
-  - improve error handling/message around `runBroadcast()`
-  - keep dialog/toggle flow tied to actual mutation success
+### 5. Files touched
 
-### Acceptance criteria
+**New**
+- `src/pages/admin/AdminCalendar.tsx`
+- `src/pages/sp/SPCalendar.tsx`
+- `src/components/calendar/JobCalendar.tsx`
+- `src/components/calendar/JobBlock.tsx`
 
-- Turning Broadcast on from `/admin/jobs` keeps the switch On after refetch.
-- The row label changes to `On · Nkm`.
-- Refreshing the page still shows the job as broadcast.
-- If the job row cannot be updated, the admin sees a failure message and the UI does not pretend the toggle succeeded.
-- Stop Broadcast continues to turn the switch Off and persist correctly.
+**Edited**
+- `src/App.tsx` — add `/admin/calendar` (admin) and `/calendar` (sp) routes.
+- `src/components/DashboardLayout.tsx` — add Calendar nav entry to both `adminLinks` and `spLinks`.
+
+No DB migration. No new dependencies (uses `date-fns` already in project + Tailwind grid).
+
+---
+
+### Acceptance
+
+- Admin opens `/admin/calendar`, sees all scheduled jobs across Day/Week/Month, can filter by SP and status, can click a job to reschedule/unschedule/reassign, and changes persist.
+- Each job block on the admin calendar shows payout, status badge, and customer.
+- Pending-acceptance jobs render visibly more transparent (dashed/50% opacity); accepted+ jobs render solid in the theme primary.
+- SP opens `/calendar`, sees only their own scheduled jobs and pending offers; can accept/reject offers inline (rejected jobs disappear); can move accepted jobs to In Progress and then Completed.
+- Only `Scheduled` urgency jobs with a date appear; ASAP and Anytime-soon jobs do not show.
 
