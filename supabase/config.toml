@@ -8,3 +8,12 @@ verify_jwt = false
 
 [functions.send-offer-sms]
 verify_jwt = false
+
+[functions.send-offer-push]
+verify_jwt = false
+
+[functions.save-push-subscription]
+verify_jwt = false
+
+[functions.delete-push-subscription]
+verify_jwt = false
