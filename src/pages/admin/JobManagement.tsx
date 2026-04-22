@@ -1,22 +1,47 @@
-import { useState } from "react";
-import { useJobs, useServiceProviders, useServiceCategories } from "@/hooks/useSupabaseData";
+import { useMemo, useState } from "react";
+import { useJobs, useServiceProviders, useServiceCategories, useDeleteJob } from "@/hooks/useSupabaseData";
+import { useGenerateBroadcastOffers } from "@/hooks/useOfferData";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge, URGENCY_PRIORITY } from "@/components/UrgencyBadge";
 import { JobServicesCodesSummary } from "@/components/JobServicesDisplay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Eye, Pencil, UserPlus } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Search, Plus, Eye, Pencil, UserPlus, Trash2, Radio, X } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+
+const NON_BROADCASTABLE = new Set(["Assigned", "InProgress", "Completed", "Cancelled", "Archived"]);
 
 export default function JobManagement() {
   const [search, setSearch] = useState("");
   const [urgencyFilter, setUrgencyFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("default");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string[] | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [broadcastRadius, setBroadcastRadius] = useState(100);
+  const [broadcastNote, setBroadcastNote] = useState("");
+  const [busy, setBusy] = useState(false);
+
   const { data: jobs = [], isLoading } = useJobs();
   const { data: providers = [] } = useServiceProviders();
   const { data: categories = [] } = useServiceCategories();
+  const deleteJob = useDeleteJob();
+  const broadcast = useGenerateBroadcastOffers();
+  const { toast } = useToast();
 
   const spMap = new Map(providers.map((sp) => [sp.id, sp.name]));
 
@@ -42,6 +67,30 @@ export default function JobManagement() {
     filtered = [...filtered].sort((a, b) => (a.scheduledDate || "").localeCompare(b.scheduledDate || ""));
   }
 
+  const visibleIds = useMemo(() => filtered.map((j) => j.dbId), [filtered]);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const someVisibleSelected = visibleIds.some((id) => selectedIds.has(id));
+
+  const toggleAllVisible = (checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) visibleIds.forEach((id) => next.add(id));
+      else visibleIds.forEach((id) => next.delete(id));
+      return next;
+    });
+  };
+
+  const toggleOne = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
   const statusVariant = (s: string) => {
     switch (s) {
       case "Assigned": case "Accepted": return "info";
@@ -53,12 +102,106 @@ export default function JobManagement() {
     }
   };
 
-  const statusLabel = (s: string) => {
-    switch (s) {
-      case "InProgress": return "In Progress";
-      default: return s;
-    }
+  const statusLabel = (s: string) => s === "InProgress" ? "In Progress" : s;
+
+  const openDeleteSingle = (jobDbId: string) => {
+    setDeleteTarget([jobDbId]);
+    setDeleteConfirmText("");
+    setDeleteOpen(true);
   };
+
+  const openDeleteBulk = () => {
+    setDeleteTarget(Array.from(selectedIds));
+    setDeleteConfirmText("");
+    setDeleteOpen(true);
+  };
+
+  const runDelete = async () => {
+    if (!deleteTarget) return;
+    setBusy(true);
+    let ok = 0;
+    let fail = 0;
+    for (const id of deleteTarget) {
+      try {
+        await deleteJob.mutateAsync(id);
+        ok++;
+      } catch {
+        fail++;
+      }
+    }
+    if (deleteTarget.length > 1) {
+      try {
+        await supabase.from("admin_audit_logs").insert({
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          user_email: (await supabase.auth.getUser()).data.user?.email ?? "",
+          action: "bulk_delete_jobs",
+          details: { job_ids: deleteTarget, count: deleteTarget.length, ok, fail },
+        } as any);
+      } catch { /* audit best-effort */ }
+    }
+    setBusy(false);
+    setDeleteOpen(false);
+    setDeleteTarget(null);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      deleteTarget.forEach((id) => next.delete(id));
+      return next;
+    });
+    toast({
+      title: fail === 0 ? "Jobs deleted" : "Partial delete",
+      description: `${ok} deleted${fail ? `, ${fail} failed` : ""}.`,
+      variant: fail === 0 ? "default" : "destructive",
+    });
+  };
+
+  const runBroadcast = async () => {
+    const targets = jobs.filter((j) => selectedIds.has(j.dbId) && !NON_BROADCASTABLE.has(j.status));
+    const skipped = selectedIds.size - targets.length;
+    if (targets.length === 0) {
+      toast({ title: "Nothing to broadcast", description: "Selected jobs are all in non-broadcastable statuses.", variant: "destructive" });
+      return;
+    }
+    setBusy(true);
+    let ok = 0;
+    let fail = 0;
+    for (const job of targets) {
+      try {
+        const jobWithRadius = { ...job, broadcastRadiusKm: broadcastRadius, broadcastNote } as any;
+        await broadcast.mutateAsync({ job: jobWithRadius, serviceProviders: providers });
+        ok++;
+      } catch {
+        fail++;
+      }
+    }
+    try {
+      await supabase.from("admin_audit_logs").insert({
+        user_id: (await supabase.auth.getUser()).data.user?.id,
+        user_email: (await supabase.auth.getUser()).data.user?.email ?? "",
+        action: "bulk_broadcast_jobs",
+        details: {
+          job_ids: targets.map((t) => t.dbId),
+          count: targets.length,
+          radius_km: broadcastRadius,
+          note: broadcastNote,
+          skipped,
+          ok,
+          fail,
+        },
+      } as any);
+    } catch { /* best-effort */ }
+    setBusy(false);
+    setBroadcastOpen(false);
+    setBroadcastNote("");
+    clearSelection();
+    toast({
+      title: "Broadcast complete",
+      description: `${ok} broadcast${fail ? `, ${fail} failed` : ""}${skipped ? `, ${skipped} skipped` : ""}.`,
+    });
+  };
+
+  const deleteCount = deleteTarget?.length ?? 0;
+  const requireTypeConfirm = deleteCount > 1;
+  const canConfirmDelete = !busy && (!requireTypeConfirm || deleteConfirmText === "DELETE");
 
   if (isLoading) return <div className="py-20 text-center text-muted-foreground">Loading jobs...</div>;
 
@@ -110,10 +253,36 @@ export default function JobManagement() {
         </Select>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/5 px-4 py-3 shadow-sm">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium">{selectedIds.size} selected</span>
+            <Button size="sm" variant="ghost" onClick={clearSelection}>
+              <X className="h-4 w-4 mr-1" />Clear
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setBroadcastOpen(true)}>
+              <Radio className="h-4 w-4 mr-2" />Broadcast Selected
+            </Button>
+            <Button size="sm" variant="destructive" onClick={openDeleteBulk}>
+              <Trash2 className="h-4 w-4 mr-2" />Delete Selected
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="metric-card overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left">
+              <th className="pb-3 pr-2 w-8">
+                <Checkbox
+                  checked={allVisibleSelected ? true : (someVisibleSelected ? "indeterminate" : false)}
+                  onCheckedChange={(v) => toggleAllVisible(!!v)}
+                  aria-label="Select all visible jobs"
+                />
+              </th>
               <th className="pb-3 font-medium text-muted-foreground">Job #</th>
               <th className="pb-3 font-medium text-muted-foreground">Customer</th>
               <th className="pb-3 font-medium text-muted-foreground">Service(s)</th>
@@ -127,43 +296,137 @@ export default function JobManagement() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((job) => (
-              <tr key={job.id} className="border-b last:border-0">
-                <td className="py-3 font-medium">{job.id}</td>
-                <td className="py-3">{job.customerName}</td>
-                <td className="py-3">
-                  <JobServicesCodesSummary services={job.services} categories={categories} fallbackCategory={job.serviceCategory} />
-                </td>
-                <td className="py-3 font-medium">${job.payout}</td>
-                <td className="py-3 text-muted-foreground">{job.jobAddress.city}</td>
-                <td className="py-3">
-                  <UrgencyBadge urgency={job.urgency} />
-                </td>
-                <td className="py-3">
-                  <StatusBadge label={statusLabel(job.status)} variant={statusVariant(job.status) as any} />
-                </td>
-                <td className="py-3 text-muted-foreground">
-                  {job.assignedSpId ? spMap.get(job.assignedSpId) ?? "—" : "—"}
-                </td>
-                <td className="py-3 text-muted-foreground">{job.scheduledDate}</td>
-                <td className="py-3">
-                  <div className="flex items-center gap-1">
-                    <Link to={`/admin/jobs/${job.dbId}`}>
-                      <Button size="sm" variant="ghost" title="View"><Eye className="h-4 w-4" /></Button>
-                    </Link>
-                    <Link to={`/admin/jobs/${job.dbId}/edit`}>
-                      <Button size="sm" variant="ghost" title="Edit"><Pencil className="h-4 w-4" /></Button>
-                    </Link>
-                    <Link to={`/admin/jobs/${job.dbId}?assign=true`}>
-                      <Button size="sm" variant="ghost" title="Assign SP"><UserPlus className="h-4 w-4" /></Button>
-                    </Link>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {filtered.map((job) => {
+              const checked = selectedIds.has(job.dbId);
+              return (
+                <tr key={job.id} className={`border-b last:border-0 ${checked ? "bg-primary/5" : ""}`}>
+                  <td className="py-3 pr-2">
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={(v) => toggleOne(job.dbId, !!v)}
+                      aria-label={`Select ${job.id}`}
+                    />
+                  </td>
+                  <td className="py-3 font-medium">{job.id}</td>
+                  <td className="py-3">{job.customerName}</td>
+                  <td className="py-3">
+                    <JobServicesCodesSummary services={job.services} categories={categories} fallbackCategory={job.serviceCategory} />
+                  </td>
+                  <td className="py-3 font-medium">${job.payout}</td>
+                  <td className="py-3 text-muted-foreground">{job.jobAddress.city}</td>
+                  <td className="py-3"><UrgencyBadge urgency={job.urgency} /></td>
+                  <td className="py-3">
+                    <StatusBadge label={statusLabel(job.status)} variant={statusVariant(job.status) as any} />
+                  </td>
+                  <td className="py-3 text-muted-foreground">
+                    {job.assignedSpId ? spMap.get(job.assignedSpId) ?? "—" : "—"}
+                  </td>
+                  <td className="py-3 text-muted-foreground">{job.scheduledDate}</td>
+                  <td className="py-3">
+                    <div className="flex items-center gap-1">
+                      <Link to={`/admin/jobs/${job.dbId}`}>
+                        <Button size="sm" variant="ghost" title="View"><Eye className="h-4 w-4" /></Button>
+                      </Link>
+                      <Link to={`/admin/jobs/${job.dbId}/edit`}>
+                        <Button size="sm" variant="ghost" title="Edit"><Pencil className="h-4 w-4" /></Button>
+                      </Link>
+                      <Link to={`/admin/jobs/${job.dbId}?assign=true`}>
+                        <Button size="sm" variant="ghost" title="Assign SP"><UserPlus className="h-4 w-4" /></Button>
+                      </Link>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        title="Delete"
+                        onClick={() => openDeleteSingle(job.dbId)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={deleteOpen} onOpenChange={(o) => { if (!busy) setDeleteOpen(o); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deleteCount} job{deleteCount === 1 ? "" : "s"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the job{deleteCount === 1 ? "" : "s"}, their services, photos, offers, assignments, and history.
+              This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {requireTypeConfirm && (
+            <div className="space-y-2">
+              <Label htmlFor="delete-confirm">Type <span className="font-mono font-semibold">DELETE</span> to confirm</Label>
+              <Input
+                id="delete-confirm"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="DELETE"
+                autoComplete="off"
+              />
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); if (canConfirmDelete) runDelete(); }}
+              disabled={!canConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {busy ? "Deleting…" : `Delete ${deleteCount}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk broadcast dialog */}
+      <Dialog open={broadcastOpen} onOpenChange={(o) => { if (!busy) setBroadcastOpen(o); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Broadcast {selectedIds.size} job{selectedIds.size === 1 ? "" : "s"}</DialogTitle>
+            <DialogDescription>
+              Sends offers to all eligible Service Providers. Jobs already Assigned, In Progress, Completed, or Cancelled are skipped.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="broadcast-radius">Broadcast radius (km)</Label>
+              <Input
+                id="broadcast-radius"
+                type="number"
+                min={1}
+                max={100}
+                value={broadcastRadius}
+                onChange={(e) => setBroadcastRadius(Math.min(100, Math.max(1, Number(e.target.value) || 100)))}
+              />
+              <p className="text-xs text-muted-foreground">Max 100 km (system limit).</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="broadcast-note">Note to providers (optional)</Label>
+              <Textarea
+                id="broadcast-note"
+                value={broadcastNote}
+                onChange={(e) => setBroadcastNote(e.target.value)}
+                placeholder="e.g. Bundled job — please respond within 30 min."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBroadcastOpen(false)} disabled={busy}>Cancel</Button>
+            <Button onClick={runBroadcast} disabled={busy}>
+              <Radio className="h-4 w-4 mr-2" />
+              {busy ? "Broadcasting…" : `Broadcast ${selectedIds.size}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
