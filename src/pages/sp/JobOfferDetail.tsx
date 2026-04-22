@@ -169,6 +169,9 @@ export default function JobOfferDetail() {
         </div>
       )}
 
+      {/* Photos */}
+      <JobPhotosCard jobId={id} />
+
       {/* Allocation Transparency */}
       {job.scores && (
         <div className="metric-card space-y-4">

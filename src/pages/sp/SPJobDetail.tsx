@@ -159,6 +159,9 @@ export default function SPJobDetail() {
         </div>
       )}
 
+      {/* Photos */}
+      <JobPhotosCard jobId={id} />
+
       {/* Status Update Actions */}
       {isMyJob && (canMarkInProgress || canMarkCompleted) && (
         <div className="metric-card space-y-4">
