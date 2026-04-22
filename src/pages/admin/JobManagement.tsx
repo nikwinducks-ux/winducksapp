@@ -397,6 +397,27 @@ export default function JobManagement() {
                   <td className="py-3">
                     <StatusBadge label={statusLabel(job.status)} variant={statusVariant(job.status) as any} />
                   </td>
+                  <td className="py-3">
+                    {NON_BROADCASTABLE.has(job.status) ? (
+                      <Badge variant="outline" className="text-muted-foreground">N/A</Badge>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={!!job.isBroadcast}
+                          onCheckedChange={(v) => {
+                            if (v) openStartBroadcast(job);
+                            else setStopBroadcastJobId(job.dbId);
+                          }}
+                          aria-label="Toggle broadcast"
+                        />
+                        {job.isBroadcast ? (
+                          <span className="text-xs text-muted-foreground">On · {job.broadcastRadiusKm || 100}km</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Off</span>
+                        )}
+                      </div>
+                    )}
+                  </td>
                   <td className="py-3 text-muted-foreground">
                     {job.assignedSpId ? spMap.get(job.assignedSpId) ?? "—" : "—"}
                   </td>
