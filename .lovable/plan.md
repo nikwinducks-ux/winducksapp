@@ -1,60 +1,53 @@
 
 
-## Toggle Broadcast Status from the Jobs Page
+## Fix: Broadcast toggle doesn't persist
 
-Add inline broadcast on/off control on the Admin Jobs list, plus a bulk "Stop Broadcast" action — without leaving the page.
+### Root cause
 
-### What changes in the UI — `src/pages/admin/JobManagement.tsx`
+When admin flips the **Broadcast** switch from Off → On in `JobManagement.tsx`, the dialog calls `useGenerateBroadcastOffers` which inserts offer rows and sets `jobs.status = 'Offered'` — but it **never sets `jobs.is_broadcast = true`**, nor persists the new `broadcast_radius_km` / `broadcast_note`. So:
 
-**New "Broadcast" column** (between Status and Assigned SP):
-- Shows a small switch + label:
-  - `On` (with radius badge, e.g. "On · 80km") when `is_broadcast = true`
-  - `Off` when `is_broadcast = false`
-- Toggle is disabled (read-only badge) for jobs in `Assigned`, `InProgress`, `Completed`, `Cancelled`, `Archived` — those can't be re-broadcast.
+- The optimistic UI looks like it flipped (briefly), then the next `["jobs"]` invalidation refetches `is_broadcast = false` from the DB and the switch snaps back to Off.
+- Stop Broadcast already works correctly because the `stop_broadcast` RPC explicitly sets `is_broadcast = false`.
 
-**Toggle behavior:**
-- **Off → On**: opens a small popover/dialog asking for radius (default current value or 100km) + optional note → on confirm, runs the existing broadcast generation (same as the bulk Broadcast dialog) so offers fan out to eligible SPs. Job status moves to `Offered`.
-- **On → Off** ("Stop Broadcast"): confirmation `AlertDialog` → sets `is_broadcast = false`, cancels all `Pending` offers for the job (`status = 'Cancelled'`), and if the job's status is `Offered` (no acceptance yet) reverts it to `Created`. Audit row written.
+A second contributing issue: the broadcast dialog sends a job clone with `broadcastRadiusKm`/`broadcastNote` overrides only into the offer-eligibility math — these admin-entered overrides are never written back to the `jobs` row either.
 
-**Bulk action bar** (already present when rows are selected) gains a third button:
-- **Stop Broadcast** — runs the same Off action for every selected job currently `is_broadcast = true`. Skips ineligible jobs and reports counts in toast.
+### Fix
 
-### Backend
+**Edit `src/hooks/useOfferData.ts` — `useGenerateBroadcastOffers`**
 
-New SECURITY DEFINER RPC `stop_broadcast(_job_id uuid)`:
-1. Check `is_admin_or_owner(auth.uid())`.
-2. `UPDATE offers SET status = 'Cancelled', responded_at = now() WHERE job_id = _job_id AND status = 'Pending'`.
-3. `UPDATE jobs SET is_broadcast = false, status = CASE WHEN status = 'Offered' AND assigned_sp_id IS NULL THEN 'Created' ELSE status END WHERE id = _job_id`.
-4. Insert a `job_status_events` row if status changed.
-5. Returns `{ success: true, cancelled_offer_count }`.
+In the `mutationFn`, replace the single line:
+```
+await supabase.from("jobs").update({ status: "Offered" }).eq("id", job.dbId);
+```
+with an update that also persists the broadcast flags:
+```
+await supabase.from("jobs").update({
+  status: "Offered",
+  is_broadcast: true,
+  broadcast_radius_km: job.broadcastRadiusKm ?? 100,
+  broadcast_note: job.broadcastNote ?? "",
+}).eq("id", job.dbId);
+```
 
-The "turn On" path reuses the existing `useGenerateBroadcastOffers` hook + a direct `is_broadcast = true` update (same code path already used in `JobDetail.tsx`).
+That single change makes the toggle persist — on next refetch the row comes back with `is_broadcast = true` and the switch stays On with the correct "On · Nkm" label. It also persists the radius/note the admin entered in the dialog so future Stop/Restart flows show the right values.
 
-### New hooks — `src/hooks/useSupabaseData.ts`
+### Why no other changes are needed
 
-- `useStopBroadcast()` → calls the RPC, invalidates `["jobs"]`, `["offers"]`.
-- `useStartBroadcast()` (thin wrapper) → flips `is_broadcast = true`, sets new `broadcast_radius_km` / `broadcast_note`, then calls `useGenerateBroadcastOffers`. Invalidates the same caches.
-
-### Audit
-
-- Single-row toggle: insert `admin_audit_logs` with `action = 'start_broadcast'` or `'stop_broadcast'`, `details = { job_id, radius_km?, note?, cancelled_offer_count? }`.
-- Bulk stop: one row with `action = 'bulk_stop_broadcast'`, `details = { job_ids, count, ok, fail }`.
-
-### SP-side propagation
-
-No SP-side code changes required. RLS already hides non-broadcast / non-eligible jobs, and the SP `JobOffers` page polls every 10s and respects offer status — cancelled offers vanish automatically.
-
-### Files
-
-- **New migration**: `stop_broadcast` RPC.
-- **Edit** `src/pages/admin/JobManagement.tsx`: Broadcast column, start/stop dialogs, bulk Stop Broadcast button.
-- **Edit** `src/hooks/useSupabaseData.ts`: `useStopBroadcast`, `useStartBroadcast`.
+- `dbToJob` already maps `is_broadcast → isBroadcast`, `broadcast_radius_km → broadcastRadiusKm`, `broadcast_note → broadcastNote`.
+- `useGenerateBroadcastOffers.onSuccess` already invalidates `["jobs"]` and `["offers"]`.
+- `useStopBroadcast` (Off path) is correct — the `stop_broadcast` RPC sets `is_broadcast = false` server-side.
+- The Switch component, `openStartBroadcast`, `runBroadcast`, and audit logging all work — they just relied on a backend write that wasn't happening.
 
 ### Acceptance
 
-- A `Created` job shows "Off" switch in the Broadcast column; flipping it on opens a radius prompt and immediately broadcasts.
-- A broadcast `Offered` job shows "On · Nkm"; flipping it off cancels all pending offers and returns the job to `Created`.
-- Selecting multiple broadcast jobs and clicking "Stop Broadcast" stops all of them in one action.
-- Jobs in `Assigned`/`InProgress`/`Completed` show a static badge and cannot be toggled.
-- SP portals stop seeing the job/offer on next refresh.
+- Flip Off → On, confirm radius dialog → switch stays On with "On · Nkm" label after the table refetches.
+- Refresh the page → switch is still On.
+- Flip On → Off, confirm → switch goes Off and stays Off.
+- SP portal still receives broadcast offers as before (no behavior change there).
+
+### Files
+
+- **Edit** `src/hooks/useOfferData.ts` — extend the `jobs` update inside `useGenerateBroadcastOffers` (one statement).
+
+No DB migration, no other UI edits.
 
