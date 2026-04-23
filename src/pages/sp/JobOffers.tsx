@@ -281,8 +281,8 @@ export default function JobOffers() {
             {offerJobs.map(({ offer, job }) => {
               const minutesLeft = Math.max(0, Math.round((new Date(offer.expires_at).getTime() - Date.now()) / 60000));
               return (
-                <Link key={offer.id} to={`/jobs/${job.dbId}?offer=${offer.id}`} className="metric-card flex items-center gap-4 hover:border-primary/30 transition-colors">
-                  <div className="flex-1 min-w-0">
+                <div key={offer.id} className="metric-card flex flex-col sm:flex-row sm:items-center gap-4 hover:border-primary/30 transition-colors">
+                  <Link to={`/jobs/${job.dbId}?offer=${offer.id}`} className="flex-1 min-w-0 block">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold truncate">{job.customerName}</p>
                       <StatusBadge label={
@@ -310,11 +310,25 @@ export default function JobOffers() {
                         <span className="truncate">{job.notes.slice(0, 120)}{job.notes.length > 120 ? "..." : ""}</span>
                       </p>
                     )}
-                  </div>
-                  <div className="text-right shrink-0">
+                  </Link>
+                  <div className="flex sm:flex-col items-end gap-2 shrink-0">
                     <p className="text-xl font-bold text-primary flex items-center gap-1"><DollarSign className="h-4 w-4" />{job.payout}</p>
+                    <div className="flex gap-2">
+                      <Button asChild size="sm" variant="outline">
+                        <Link to={`/jobs/${job.dbId}?offer=${offer.id}`}>
+                          <Eye className="h-3.5 w-3.5 mr-1" /> View
+                        </Link>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => setDeclineTarget({ offerId: offer.id, jobNumber: job.id, customerName: job.customerName })}
+                      >
+                        Decline
+                      </Button>
+                    </div>
                   </div>
-                </Link>
+                </div>
               );
             })}
           </div>
