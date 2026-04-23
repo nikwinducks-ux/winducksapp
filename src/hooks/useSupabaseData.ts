@@ -65,6 +65,7 @@ function dbToSP(row: any): ServiceProvider {
     totalJobsCompleted: row.total_jobs_completed,
     notes: row.notes,
     archived: row.status === "Archived",
+    calendarColor: row.calendar_color ?? null,
   };
 }
 
