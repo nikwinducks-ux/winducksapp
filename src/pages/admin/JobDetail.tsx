@@ -471,24 +471,106 @@ export default function JobDetail() {
         )}
       </div>
 
-      {/* Assignment panel */}
+      {/* Crew panel */}
       <div className="metric-card space-y-4">
-        <h2 className="section-title">Assignment</h2>
-        {assignedSp ? (
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm">
-              {assignedSp.avatar}
-            </div>
-            <div>
-              <p className="font-medium">{assignedSp.name}</p>
-              <p className="text-xs text-muted-foreground">{assignedSp.baseAddress.city} · {assignedSp.travelRadius} km radius · {assignedSp.complianceStatus}</p>
-            </div>
-            <Link to={`/admin/providers/${assignedSp.id}`} className="ml-auto text-xs text-primary hover:underline">
-              View SP →
-            </Link>
-          </div>
+        <div className="flex items-center justify-between">
+          <h2 className="section-title flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Crew ({crew.length})
+          </h2>
+          {crew.length > 1 && (
+            <p className="text-xs text-muted-foreground">
+              ${(job.payout / crew.length).toFixed(2)} per SP (= ${job.payout} ÷ {crew.length})
+            </p>
+          )}
+        </div>
+
+        {crew.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No SPs assigned yet.</p>
         ) : (
-          <p className="text-sm text-muted-foreground">No SP assigned yet.</p>
+          <div className="space-y-2">
+            {crew.map((m) => {
+              const sp = providers.find((p) => p.id === m.spId);
+              const canRemove = !["Completed", "Cancelled"].includes(job.status);
+              return (
+                <div key={m.id} className="flex items-center gap-3 rounded-md border p-2">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-semibold">
+                    {sp?.avatar ?? "?"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{sp?.name ?? "Unknown SP"}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {sp?.baseAddress.city} · {sp?.travelRadius} km · {sp?.complianceStatus}
+                    </p>
+                  </div>
+                  {sp && (
+                    <Link to={`/admin/providers/${sp.id}`} className="text-xs text-primary hover:underline">
+                      View
+                    </Link>
+                  )}
+                  <Button
+                    size="sm"
+                    variant={m.isLead ? "default" : "ghost"}
+                    onClick={() => !m.isLead && setLead.mutate({ jobId: job.dbId, spId: m.spId })}
+                    disabled={m.isLead || setLead.isPending}
+                    className="h-7 px-2 text-xs"
+                  >
+                    <Star className={`h-3 w-3 ${m.isLead ? "fill-current" : ""}`} />
+                    {m.isLead ? " Lead" : ""}
+                  </Button>
+                  {canRemove && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        if (confirm(`Remove ${sp?.name ?? "this SP"} from the crew?`)) {
+                          removeCrew.mutate({ jobId: job.dbId, spId: m.spId });
+                        }
+                      }}
+                      disabled={removeCrew.isPending}
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Add crew member */}
+        {crew.length > 0 && !["Completed", "Cancelled"].includes(job.status) && (
+          <div className="flex gap-2 items-end pt-2 border-t">
+            <div className="flex-1 space-y-1">
+              <Label className="text-xs">Add SP to crew</Label>
+              <Select value={addCrewSpId} onValueChange={setAddCrewSpId}>
+                <SelectTrigger><SelectValue placeholder="Select SP..." /></SelectTrigger>
+                <SelectContent>
+                  {providers
+                    .filter((sp) => sp.status === "Active" && !crew.some((c) => c.spId === sp.id))
+                    .map((sp) => (
+                      <SelectItem key={sp.id} value={sp.id}>
+                        {sp.name} — {sp.baseAddress.city}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (!addCrewSpId) return;
+                addCrew.mutate(
+                  { jobId: job.dbId, spId: addCrewSpId, userId: user?.id ?? null },
+                  { onSuccess: () => setAddCrewSpId("") }
+                );
+              }}
+              disabled={!addCrewSpId || addCrew.isPending}
+            >
+              <Plus className="h-4 w-4 mr-1" />Add
+            </Button>
+          </div>
         )}
       </div>
 
