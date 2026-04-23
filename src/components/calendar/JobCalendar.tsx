@@ -19,6 +19,7 @@ import {
 } from "@dnd-kit/core";
 import type { Job, ServiceProvider } from "@/data/mockData";
 import { JobBlock, type ColorMode } from "./JobBlock";
+import { getSpColor, type SpColor } from "./spColors";
 import { cn } from "@/lib/utils";
 import {
   useCalendarDnd,
@@ -60,6 +61,11 @@ interface JobCalendarProps {
 function spNameLookup(providers: ServiceProvider[]) {
   const map = new Map(providers.map((p) => [p.id, p.name]));
   return (id?: string) => (id ? map.get(id) ?? "Unknown SP" : "Unassigned");
+}
+
+function spColorLookup(providers: ServiceProvider[]) {
+  const map = new Map(providers.map((p) => [p.id, p.calendarColor ?? null]));
+  return (id?: string): SpColor => getSpColor(id, id ? map.get(id) ?? null : null);
 }
 
 /** Parse a Postgres `date` string ("YYYY-MM-DD") as a local date to avoid TZ shifts. */
@@ -313,6 +319,7 @@ interface DayColumnProps {
   date: Date;
   jobs: Job[];
   getSpName: (id?: string) => string;
+  getSpColorFor: (id?: string) => SpColor;
   showSp: boolean;
   compact: boolean;
   showDebug?: boolean;
@@ -327,6 +334,7 @@ function DayColumn({
   date,
   jobs,
   getSpName,
+  getSpColorFor,
   showSp,
   compact,
   showDebug,
@@ -358,6 +366,7 @@ function DayColumn({
                 showDebug={showDebug}
                 colorMode={colorMode}
                 spName={showSp ? getSpName(job.assignedSpId) : undefined}
+                spColor={getSpColorFor(job.assignedSpId)}
                 onClick={() => onJobClick(job)}
                 enableDnd={dndEnabled}
               />
@@ -374,6 +383,7 @@ function DayColumn({
                 showDebug={showDebug}
                 colorMode={colorMode}
                 spName={showSp ? getSpName(job.assignedSpId) : undefined}
+                spColor={getSpColorFor(job.assignedSpId)}
                 onClick={() => onJobClick(job)}
                 enableDnd={dndEnabled}
               />
@@ -401,6 +411,7 @@ function DayColumn({
         showDebug={showDebug}
         colorMode={colorMode}
         getSpName={getSpName}
+        getSpColorFor={getSpColorFor}
         showSp={showSp}
         onJobClick={onJobClick}
         dnd={dnd}
@@ -419,6 +430,7 @@ interface DayGridDroppableProps {
   showDebug?: boolean;
   colorMode: ColorMode;
   getSpName: (id?: string) => string;
+  getSpColorFor: (id?: string) => SpColor;
   showSp: boolean;
   onJobClick: (job: Job) => void;
   dnd?: DndApi;
@@ -426,7 +438,7 @@ interface DayGridDroppableProps {
 
 function DayGridDroppable({
   date, today, showNowLine, nowTop, grid, compact, showDebug, colorMode,
-  getSpName, showSp, onJobClick, dnd,
+  getSpName, getSpColorFor, showSp, onJobClick, dnd,
 }: DayGridDroppableProps) {
   const dndEnabled = !!dnd?.enabled;
   const { setNodeRef, isOver, node } = useDroppable({
@@ -501,6 +513,7 @@ function DayGridDroppable({
             showDebug={showDebug}
             colorMode={colorMode}
             spName={showSp ? getSpName(item.job.assignedSpId) : undefined}
+            spColor={getSpColorFor(item.job.assignedSpId)}
             onClick={() => onJobClick(item.job)}
             enableDnd={dndEnabled}
             style={{
@@ -582,6 +595,7 @@ function DayView({
   dnd,
 }: ViewProps) {
   const getSpName = spNameLookup(providers);
+  const getSpColorFor = spColorLookup(providers);
   const dayJobs = jobsOnDate(jobs, currentDate);
   const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
   const showEmpty = dayJobs.length === 0 && (nearestPrevious || nearestNext);
@@ -602,6 +616,7 @@ function DayView({
           date={currentDate}
           jobs={dayJobs}
           getSpName={getSpName}
+          getSpColorFor={getSpColorFor}
           showSp={mode === "admin"}
           compact={false}
           showDebug={showDebug}
@@ -633,6 +648,7 @@ function WeekView({
   dnd,
 }: ViewProps) {
   const getSpName = spNameLookup(providers);
+  const getSpColorFor = spColorLookup(providers);
   const start = startOfWeek(currentDate, { weekStartsOn: 1 });
   const end = endOfWeek(currentDate, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start, end });
@@ -677,6 +693,7 @@ function WeekView({
               date={d}
               jobs={dayJobs}
               getSpName={getSpName}
+              getSpColorFor={getSpColorFor}
               showSp={mode === "admin"}
               compact
               showDebug={showDebug}
@@ -706,6 +723,7 @@ function WeekView({
 // ===== Month View =====
 function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug, dnd }: ViewProps) {
   const getSpName = spNameLookup(providers);
+  const getSpColorFor = spColorLookup(providers);
   const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -748,6 +766,7 @@ function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, 
               showDebug={showDebug}
               colorMode={colorMode}
               getSpName={getSpName}
+              getSpColorFor={getSpColorFor}
               mode={mode}
               onJobClick={onJobClick}
               onEmptyDayClick={onEmptyDayClick}
@@ -769,6 +788,7 @@ interface MonthCellProps {
   showDebug?: boolean;
   colorMode: ColorMode;
   getSpName: (id?: string) => string;
+  getSpColorFor: (id?: string) => SpColor;
   mode: "admin" | "sp";
   onJobClick: (job: Job) => void;
   onEmptyDayClick?: (date: Date) => void;
@@ -776,7 +796,7 @@ interface MonthCellProps {
 }
 
 function MonthCell({
-  date, inMonth, dayJobs, visible, overflow, showDebug, colorMode, getSpName,
+  date, inMonth, dayJobs, visible, overflow, showDebug, colorMode, getSpName, getSpColorFor,
   mode, onJobClick, onEmptyDayClick, dndEnabled,
 }: MonthCellProps) {
   const { setNodeRef, isOver } = useDroppable({
@@ -813,6 +833,7 @@ function MonthCell({
           showDebug={showDebug}
           colorMode={colorMode}
           spName={mode === "admin" ? getSpName(job.assignedSpId) : undefined}
+          spColor={getSpColorFor(job.assignedSpId)}
           onClick={() => onJobClick(job)}
           enableDnd={dndEnabled}
         />

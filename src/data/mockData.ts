@@ -51,6 +51,8 @@ export interface ServiceProvider {
   totalJobsCompleted: number;
   notes?: string;
   archived?: boolean;
+  /** Admin-picked palette key (e.g. "blue", "violet"); null = auto-hash. */
+  calendarColor?: string | null;
 }
 
 // ===== JOBS =====
