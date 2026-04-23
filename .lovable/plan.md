@@ -1,47 +1,64 @@
 
 
-## Add ability to restore archived Service Providers
+## Let admins assign a calendar color to each Service Provider
 
-Currently SPs can be archived (`status = "Archived"`) but the list filters them out with no way to view or restore them. Add an "Archived" view + restore action.
+Today every SP gets an automatic calendar color from a hash of their UUID, so admins can't choose what color a given SP uses. This adds an explicit, persistent color picker on the SP profile page that overrides the auto-assigned color everywhere the calendar is rendered.
 
-### Behavior
+### What changes
 
-**1. Toggle to view archived SPs**
-On `/admin/providers`, add a small toggle / tab next to the search bar: **Active** (default) | **Archived**. Switching to Archived shows only `status === "Archived"` providers.
+**1. New field on Service Providers**
+- Add `calendar_color` (text, nullable) to `service_providers`. Stores a palette key like `"blue"`, `"teal"`, `"violet"`, etc. — not raw hex, so it always maps to a Tailwind palette entry that pairs nicely with the existing solid/soft/swatch variants.
+- Null = "use auto color" (current behavior).
 
-**2. Restore action**
-On rows in the Archived view, replace the Archive icon with a **Restore** button (rotate-ccw icon, "Restore" tooltip). Clicking it sets `status` back to **Active** and shows a toast "Provider restored". Row disappears from the Archived view (and reappears in Active).
+**2. Color picker on the SP profile page (`/admin/providers/:id`)**
+- New "Calendar Color" section in the **Profile** tab on `SPDetail.tsx`, just above Base Address.
+- Renders a row of 10 color swatches matching the existing palette plus an "Auto" option.
+- Shows the current color with a ring + check.
+- Clicking a swatch saves immediately via a new `useUpdateSPColor()` mutation, with an undo-friendly toast: "Color updated. {SPName} will now appear in {Color} on the calendar."
+- "Auto" clears the field back to hash-based assignment.
 
-**3. Confirmation**
-Wrap Restore in an `AlertDialog` confirming "Restore {sp.name}? They will become Active and eligible for job allocation again." — matches existing destructive-action pattern.
+**3. Color picker also surfaced on `SPForm` (create/edit)**
+- Same swatch picker added to the Settings section so the color can be set during creation or via the standard edit form.
 
-**4. Archive action gets confirmation too (small UX improvement)**
-While here, also wrap the existing Archive button in a confirmation dialog so it's no longer a one-click destructive action.
+**4. Calendar uses the assigned color when present**
+- `getSpColor()` in `src/components/calendar/spColors.ts` gains an optional second arg: `getSpColor(spId, assignedKey?)`.
+- When `assignedKey` matches a palette name, return that palette entry. Otherwise fall back to the existing hash logic.
+- Export `PALETTE_BY_KEY` and a `PALETTE_KEYS` list so the picker and the calendar share one source of truth.
 
-**5. Empty state**
-When the Archived tab has zero rows, show "No archived providers" centered in the table area.
+**5. Plumbing through the calendar**
+- `Job` type already carries `assignedSpId`. Calendar components look up the SP from the `providers` array they already receive (`AdminCalendar`, `SPCalendar` both pass `useServiceProviders()`). Add `calendarColor?: string` to the `ServiceProvider` type and read it in `JobBlock`'s `getSpJobAppearance` via a small `spColorByIdLookup(providers)` helper passed down from `JobCalendar`.
+- Legend in `AdminCalendar` automatically reflects the assigned colors since it uses the same lookup.
 
-**6. Counts in the header**
-Update the page sub-header to reflect the active view: "12 active providers" or "3 archived providers".
+**6. SP collision handling**
+- Two SPs are allowed to share a color (admin's choice). No warning shown — fully manual control.
 
 ### Files to update
 
-- `src/hooks/useSupabaseData.ts` — add `useRestoreSP()` mutation that sets `status = "Active"` and invalidates `["service_providers"]` (mirrors `useArchiveSP`).
-- `src/pages/admin/SPManagement.tsx`:
-  - Add `view: "active" | "archived"` state + `Tabs` (or two-button toggle) above the table.
-  - Filter rows by `view`.
-  - In Archived view: show Restore button (with `AlertDialog` confirm) instead of Archive; hide Suspend/Edit/Login actions to keep the row focused (View stays available).
-  - Wrap existing Archive button in `AlertDialog` confirm.
-  - Update header count + add empty state.
-
-No DB schema changes — `service_providers.status` already accepts `"Active" | "Suspended" | "Archived"`. No RLS changes needed (admin full access already covers this).
+- **DB migration**: `ALTER TABLE service_providers ADD COLUMN calendar_color text;` (nullable, no default; no RLS changes needed — admin full access already covers it; SP self-update policy already allows update of own row but the picker is admin-only UI).
+- `src/integrations/supabase/types.ts` — auto-regenerated by Supabase.
+- `src/data/mockData.ts` — add `calendarColor?: string` to `ServiceProvider` interface.
+- `src/hooks/useSupabaseData.ts`:
+  - Map `calendar_color` → `calendarColor` in the SP row mapper.
+  - New mutation `useUpdateSPColor()` that updates `calendar_color` and invalidates `["service_providers"]`.
+  - Include `calendar_color` in existing `useCreateSP` / `useUpdateSP` payloads.
+- `src/components/calendar/spColors.ts`:
+  - Export `PALETTE_KEYS = ["blue","teal","violet","amber","rose","emerald","indigo","orange","cyan","fuchsia"]`
+  - Export `PALETTE_BY_KEY: Record<string, SpColor>`
+  - Update `getSpColor(spId, assignedKey?)` to honor `assignedKey` first.
+- `src/components/calendar/JobBlock.tsx` — accept an optional `spColorOverride?: SpColor` prop or look up via a `providers` map; use it instead of the hash.
+- `src/components/calendar/JobCalendar.tsx` — build a `Map<spId, calendarColor>` from `providers` and pass the resolved `SpColor` into each `JobBlock` (or expose a `getColorForSp` callback).
+- `src/pages/admin/SPDetail.tsx` — new "Calendar Color" section in the Profile tab using a small `<SPColorPicker />`.
+- `src/pages/admin/SPForm.tsx` — same picker in the Settings section.
+- `src/components/admin/SPColorPicker.tsx` (new) — swatch row + Auto option, controlled component.
+- `src/pages/admin/AdminCalendar.tsx` — legend already reads from providers; no logic change needed beyond the new lookup wired through `JobCalendar`.
 
 ### Acceptance
 
-- Admin can switch between Active and Archived views from `/admin/providers`
-- Archived view lists every SP with `status = "Archived"`
-- Each archived row has a Restore action with confirmation
-- Restoring sets status to Active, the row leaves Archived view, the SP reappears in Active and becomes allocation-eligible
-- Archiving from Active view now requires confirmation
-- Header counts and empty states reflect the current view
+- Admin opens an SP's profile, picks "Violet", sees a toast, and any job assigned to that SP shows in violet across Day, Week, and Month views (admin calendar) for all admins.
+- Picking "Auto" reverts that SP to the hash-derived color.
+- Color persists across sessions and devices (stored in DB).
+- Legend in `AdminCalendar` reflects the assigned color, not the old hash color.
+- Two SPs can share the same color if the admin chooses; no enforcement.
+- SP portal calendar (`/sp/calendar`) is unchanged (still status-colored).
+- Existing jobs without `assignedSpId` still render as the neutral "Unassigned" style.
 
