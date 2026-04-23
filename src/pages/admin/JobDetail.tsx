@@ -1,6 +1,6 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { JobServicesDisplay } from "@/components/JobServicesDisplay";
-import { useJobs, useServiceProviders, useAssignJob, useActiveServiceCategories, useServiceCategories } from "@/hooks/useSupabaseData";
+import { useJobs, useServiceProviders, useAssignJob, useActiveServiceCategories, useServiceCategories, useJobCrew, useAddCrewMember, useRemoveCrewMember, useSetCrewLead } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOffers, useCreateManualOffer, useGenerateBroadcastOffers, useGenerateOffers, useCancelOffers } from "@/hooks/useOfferData";
 import { useActivePolicy, useFairnessContext, useSaveAllocationRun } from "@/hooks/useAllocationData";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
-import { ArrowLeft, MapPin, Calendar, Clock, DollarSign, User, Pencil, UserPlus, AlertCircle, FileText, Send, Radio, Bug, ChevronDown, FlaskConical, Zap, Shield } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, Clock, DollarSign, User, Pencil, UserPlus, AlertCircle, FileText, Send, Radio, Bug, ChevronDown, FlaskConical, Zap, Shield, Users, Star, X, Plus } from "lucide-react";
 import { useState } from "react";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { useJobServices } from "@/hooks/useSupabaseData";
