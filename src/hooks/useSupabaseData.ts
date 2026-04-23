@@ -845,12 +845,13 @@ export function useAcceptJobOffer() {
         throw new Error(`Job is no longer available (status: ${jobRow.status}).`);
       }
 
-      // 2. Update job
-      const { error: jobErr } = await supabase.from("jobs").update({
-        assigned_sp_id: spId,
-        status: "Assigned",
-      }).eq("id", jobDbId).is("assigned_sp_id", null);
-      if (jobErr) throw new Error("Failed to accept job. It may have been taken.");
+      // 2. Insert crew member (lead). Trigger updates jobs.assigned_sp_id + status.
+      const { error: crewErr } = await supabase.from("job_crew_members" as any).insert({
+        job_id: jobDbId,
+        sp_id: spId,
+        is_lead: true,
+      });
+      if (crewErr) throw new Error("Failed to accept job. It may have been taken.");
 
       // 3. Insert assignment audit
       const { error: assignErr } = await supabase.from("job_assignments").insert({
