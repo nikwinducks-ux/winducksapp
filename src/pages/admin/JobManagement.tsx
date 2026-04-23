@@ -821,12 +821,32 @@ export default function JobManagement() {
                           <div className="flex flex-col leading-tight">
                             <span className="text-foreground">{dateStr}</span>
                             {job.scheduledTime && <span className="text-xs">{timeStr || job.scheduledTime}</span>}
+                            {debug && (
+                              <ScheduleDebugBadge
+                                scheduledDate={job.scheduledDate}
+                                scheduledTime={job.scheduledTime}
+                              />
+                            )}
                           </div>
                         );
                       }
-                      if (urgency === "ASAP") return <span className="text-destructive font-medium">ASAP</span>;
-                      if (urgency === "Anytime soon") return <span>Flexible</span>;
-                      return <span className="italic">Not scheduled</span>;
+                      return (
+                        <div className="flex flex-col leading-tight">
+                          {urgency === "ASAP" ? (
+                            <span className="text-destructive font-medium">ASAP</span>
+                          ) : urgency === "Anytime soon" ? (
+                            <span>Flexible</span>
+                          ) : (
+                            <span className="italic">Not scheduled</span>
+                          )}
+                          {debug && (
+                            <ScheduleDebugBadge
+                              scheduledDate={job.scheduledDate}
+                              scheduledTime={job.scheduledTime}
+                            />
+                          )}
+                        </div>
+                      );
                     })()}
                   </td>
                   <td className="py-3">
