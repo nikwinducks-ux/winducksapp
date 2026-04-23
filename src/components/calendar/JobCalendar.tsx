@@ -30,6 +30,7 @@ interface JobCalendarProps {
   onJobClick: (job: Job) => void;
   onEmptyDayClick?: (date: Date) => void;
   mode: "admin" | "sp";
+  showDebug?: boolean;
 }
 
 function spNameLookup(providers: ServiceProvider[]) {
