@@ -732,26 +732,48 @@ export function useAssignJob() {
   const qc = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: async ({ jobId, spId, assignedByUserId }: {
-      jobId: string; spId: string; assignedByUserId: string | null;
+    mutationFn: async ({ jobId, spId, assignedByUserId, spIds, leadSpId }: {
+      jobId: string;
+      spId?: string;
+      assignedByUserId: string | null;
+      spIds?: string[];
+      leadSpId?: string;
     }) => {
-      const { error: jobErr } = await supabase.from("jobs").update({
-        assigned_sp_id: spId,
-        status: "Assigned",
-      }).eq("id", jobId);
-      if (jobErr) throw jobErr;
+      // Support both legacy single-SP call (spId) and crew (spIds)
+      const ids = spIds && spIds.length > 0 ? spIds : (spId ? [spId] : []);
+      if (ids.length === 0) throw new Error("No SP selected");
+      const lead = leadSpId && ids.includes(leadSpId) ? leadSpId : ids[0];
 
-      const { error: assignErr } = await supabase.from("job_assignments").insert({
+      // Replace any existing crew for this job
+      const { error: delErr } = await supabase
+        .from("job_crew_members" as any)
+        .delete()
+        .eq("job_id", jobId);
+      if (delErr) throw delErr;
+
+      const rows = ids.map((sp_id) => ({
         job_id: jobId,
-        sp_id: spId,
+        sp_id,
+        is_lead: sp_id === lead,
+        added_by_user_id: assignedByUserId,
+      }));
+      const { error: insErr } = await supabase.from("job_crew_members" as any).insert(rows);
+      if (insErr) throw insErr;
+
+      // Audit each assignment
+      const auditRows = ids.map((sp_id) => ({
+        job_id: jobId,
+        sp_id,
         assigned_by_user_id: assignedByUserId,
         assignment_type: "Manual",
-      });
-      if (assignErr) console.error("Assignment audit error:", assignErr);
+      }));
+      const { error: auditErr } = await supabase.from("job_assignments").insert(auditRows);
+      if (auditErr) console.error("Assignment audit error:", auditErr);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
-      toast({ title: "SP assigned", description: "Job has been assigned." });
+      qc.invalidateQueries({ queryKey: ["job_crew", undefined] });
+      toast({ title: "Crew assigned", description: "Job crew has been updated." });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
