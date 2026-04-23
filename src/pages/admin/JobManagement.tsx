@@ -462,6 +462,12 @@ export default function JobManagement() {
             </Button>
           </div>
           <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => { setBulkAssignSpId(""); setBulkAssignOpen(true); }}>
+              <UserPlus className="h-4 w-4 mr-2" />Assign Selected
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setBulkUnassignOpen(true)}>
+              <UserX className="h-4 w-4 mr-2" />Unassign Selected
+            </Button>
             <Button size="sm" variant="outline" onClick={() => { setStartBroadcastJobId(null); setBroadcastOpen(true); }}>
               <Radio className="h-4 w-4 mr-2" />Broadcast Selected
             </Button>
