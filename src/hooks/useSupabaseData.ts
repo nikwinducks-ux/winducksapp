@@ -709,6 +709,51 @@ export function useAssignJob() {
   });
 }
 
+export function useUnassignJob() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ jobDbId, userId }: { jobDbId: string; userId: string | null }) => {
+      const { data: jobRow, error: fetchErr } = await supabase
+        .from("jobs")
+        .select("id, status, assigned_sp_id")
+        .eq("id", jobDbId)
+        .single();
+      if (fetchErr) throw fetchErr;
+      if (!jobRow.assigned_sp_id) throw new Error("Job is not assigned.");
+
+      const { error: jobErr } = await supabase.from("jobs").update({
+        assigned_sp_id: null,
+        status: "Created",
+      }).eq("id", jobDbId);
+      if (jobErr) throw jobErr;
+
+      // Cancel any pending offers
+      await supabase.from("offers")
+        .update({ status: "Cancelled", responded_at: new Date().toISOString() })
+        .eq("job_id", jobDbId)
+        .eq("status", "Pending");
+
+      // Audit
+      await supabase.from("job_status_events").insert({
+        job_id: jobDbId,
+        old_status: jobRow.status,
+        new_status: "Created",
+        changed_by_user_id: userId,
+        note: "Unassigned by admin",
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["offers"] });
+      toast({ title: "SP unassigned", description: "Job returned to Created." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+}
+
 export function useAcceptJobOffer() {
   const qc = useQueryClient();
   const { toast } = useToast();
