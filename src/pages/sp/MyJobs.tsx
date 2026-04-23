@@ -37,7 +37,9 @@ export default function MyJobs() {
     <div className="space-y-8 animate-fade-in">
       <div>
         <h1 className="page-header">My Jobs</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{activeJobs.length} active, {pastJobs.length} past</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Logged in as <span className="font-medium text-foreground">{sp?.name ?? user?.email ?? "—"}</span> · {activeJobs.length} active, {pastJobs.length} past
+        </p>
       </div>
 
       {activeJobs.length === 0 && pastJobs.length === 0 && (
