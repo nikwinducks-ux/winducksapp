@@ -595,6 +595,7 @@ function DayView({
   dnd,
 }: ViewProps) {
   const getSpName = spNameLookup(providers);
+  const getSpColorFor = spColorLookup(providers);
   const dayJobs = jobsOnDate(jobs, currentDate);
   const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
   const showEmpty = dayJobs.length === 0 && (nearestPrevious || nearestNext);
@@ -615,6 +616,7 @@ function DayView({
           date={currentDate}
           jobs={dayJobs}
           getSpName={getSpName}
+          getSpColorFor={getSpColorFor}
           showSp={mode === "admin"}
           compact={false}
           showDebug={showDebug}
