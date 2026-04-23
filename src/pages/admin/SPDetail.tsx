@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArrowLeft, MapPin, Pencil, Eye } from "lucide-react";
 import SPLoginAccess from "@/components/admin/SPLoginAccess";
 import SPAvailabilityEditor from "@/components/admin/SPAvailabilityEditor";
+import SPReviewsTab from "@/components/admin/SPReviewsTab";
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -146,6 +147,7 @@ export default function SPDetail() {
           <TabsTrigger value="availability">Availability</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
+          <TabsTrigger value="reviews">Reviews</TabsTrigger>
           <TabsTrigger value="login">Login & Access</TabsTrigger>
         </TabsList>
 
@@ -217,6 +219,10 @@ export default function SPDetail() {
               <div><p className="text-xs text-muted-foreground mb-1">Avg Response</p><p className="text-lg font-bold">{sp.avgResponseTime}</p></div>
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="reviews">
+          <SPReviewsTab spId={sp.id} />
         </TabsContent>
 
         <TabsContent value="login">

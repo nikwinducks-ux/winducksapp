@@ -278,6 +278,93 @@ export type Database = {
         }
         Relationships: []
       }
+      email_send_log: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          message_id: string | null
+          metadata: Json | null
+          recipient_email: string
+          status: string
+          template_name: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message_id?: string | null
+          metadata?: Json | null
+          recipient_email: string
+          status: string
+          template_name: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message_id?: string | null
+          metadata?: Json | null
+          recipient_email?: string
+          status?: string
+          template_name?: string
+        }
+        Relationships: []
+      }
+      email_send_state: {
+        Row: {
+          auth_email_ttl_minutes: number
+          batch_size: number
+          id: number
+          retry_after_until: string | null
+          send_delay_ms: number
+          transactional_email_ttl_minutes: number
+          updated_at: string
+        }
+        Insert: {
+          auth_email_ttl_minutes?: number
+          batch_size?: number
+          id?: number
+          retry_after_until?: string | null
+          send_delay_ms?: number
+          transactional_email_ttl_minutes?: number
+          updated_at?: string
+        }
+        Update: {
+          auth_email_ttl_minutes?: number
+          batch_size?: number
+          id?: number
+          retry_after_until?: string | null
+          send_delay_ms?: number
+          transactional_email_ttl_minutes?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      email_unsubscribe_tokens: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          token: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          token: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          token?: string
+          used_at?: string | null
+        }
+        Relationships: []
+      }
       job_assignments: {
         Row: {
           assigned_at: string
@@ -354,6 +441,76 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_reviews: {
+        Row: {
+          comment: string | null
+          communication_score: number | null
+          created_at: string
+          customer_id: string | null
+          id: string
+          job_id: string
+          on_time_score: number | null
+          overall_rating: number | null
+          quality_score: number | null
+          review_token: string
+          sp_id: string
+          status: string
+          submitted_at: string | null
+        }
+        Insert: {
+          comment?: string | null
+          communication_score?: number | null
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          job_id: string
+          on_time_score?: number | null
+          overall_rating?: number | null
+          quality_score?: number | null
+          review_token: string
+          sp_id: string
+          status?: string
+          submitted_at?: string | null
+        }
+        Update: {
+          comment?: string | null
+          communication_score?: number | null
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          job_id?: string
+          on_time_score?: number | null
+          overall_rating?: number | null
+          quality_score?: number | null
+          review_token?: string
+          sp_id?: string
+          status?: string
+          submitted_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_reviews_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_reviews_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_reviews_sp_id_fkey"
+            columns: ["sp_id"]
+            isOneToOne: false
+            referencedRelation: "service_providers"
             referencedColumns: ["id"]
           },
         ]
@@ -835,6 +992,30 @@ export type Database = {
           },
         ]
       }
+      suppressed_emails: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          metadata: Json | null
+          reason: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          metadata?: Json | null
+          reason: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          metadata?: Json | null
+          reason?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           disabled_at: string | null
@@ -883,7 +1064,16 @@ export type Database = {
         Args: { _offer_id: string; _reason?: string }
         Returns: Json
       }
+      delete_email: {
+        Args: { message_id: number; queue_name: string }
+        Returns: boolean
+      }
       delete_job: { Args: { _job_id: string }; Returns: Json }
+      enqueue_email: {
+        Args: { payload: Json; queue_name: string }
+        Returns: number
+      }
+      get_review_by_token: { Args: { _token: string }; Returns: Json }
       get_user_sp_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
@@ -898,11 +1088,38 @@ export type Database = {
       }
       is_admin_or_owner: { Args: { _user_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
+      move_to_dlq: {
+        Args: {
+          dlq_name: string
+          message_id: number
+          payload: Json
+          source_queue: string
+        }
+        Returns: number
+      }
+      read_email_batch: {
+        Args: { batch_size: number; queue_name: string; vt: number }
+        Returns: {
+          message: Json
+          msg_id: number
+          read_ct: number
+        }[]
+      }
       sp_eligible_for_broadcast_job: {
         Args: { _job_id: string; _sp_id: string }
         Returns: boolean
       }
       stop_broadcast: { Args: { _job_id: string }; Returns: Json }
+      submit_review: {
+        Args: {
+          _comment?: string
+          _communication: number
+          _on_time: number
+          _quality: number
+          _token: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "sp" | "owner"

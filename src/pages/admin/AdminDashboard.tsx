@@ -1,10 +1,29 @@
 import { MetricCard } from "@/components/MetricCard";
 import { useServiceProviders, useJobs } from "@/hooks/useSupabaseData";
-import { Users, Briefcase, TrendingUp, AlertTriangle } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Users, Briefcase, TrendingUp, AlertTriangle, Star } from "lucide-react";
 
 export default function AdminDashboard() {
   const { data: serviceProviders = [] } = useServiceProviders();
   const { data: jobs = [] } = useJobs();
+
+  const { data: avgRating30d } = useQuery({
+    queryKey: ["avg-rating-30d"],
+    queryFn: async () => {
+      const since = new Date();
+      since.setDate(since.getDate() - 30);
+      const { data, error } = await supabase
+        .from("job_reviews")
+        .select("overall_rating")
+        .eq("status", "submitted")
+        .gte("submitted_at", since.toISOString());
+      if (error) throw error;
+      if (!data || data.length === 0) return null;
+      const avg = data.reduce((s, r) => s + Number(r.overall_rating ?? 0), 0) / data.length;
+      return { avg: avg.toFixed(2), count: data.length };
+    },
+  });
 
   const activeSPs = serviceProviders.filter((s) => s.status === "Active").length;
   const pendingJobs = jobs.filter((j) => j.status === "Created" || j.status === "Offered").length;
@@ -18,10 +37,16 @@ export default function AdminDashboard() {
         <p className="mt-1 text-sm text-muted-foreground">System overview</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <MetricCard label="Active Providers" value={activeSPs} icon={<Users className="h-5 w-5" />} to="/admin/providers?status=Active" />
         <MetricCard label="Pending Jobs" value={pendingJobs} icon={<Briefcase className="h-5 w-5" />} to="/admin/jobs?status=Created,Offered" />
         <MetricCard label="Completed (Total)" value={completedJobs} icon={<TrendingUp className="h-5 w-5" />} to="/admin/jobs?status=Completed" />
+        <MetricCard
+          label="Avg Rating (30d)"
+          value={avgRating30d?.avg ?? "—"}
+          icon={<Star className="h-5 w-5" />}
+          subtitle={avgRating30d ? `${avgRating30d.count} review${avgRating30d.count > 1 ? "s" : ""}` : "No reviews yet"}
+        />
         <MetricCard label="Expiring Compliance" value={expiring} icon={<AlertTriangle className="h-5 w-5" />} subtitle={expiring > 0 ? "Needs attention" : "All clear"} trend={expiring > 0 ? "down" : "up"} to="/admin/providers?compliance=Expiring" />
       </div>
 
