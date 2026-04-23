@@ -256,6 +256,11 @@ export default function AdminCalendar() {
     setEditDate(job.scheduledDate ?? "");
     setEditTime(job.scheduledTime ?? "");
     setEditSp(job.assignedSpId ?? "unassigned");
+    const crewSeed: CrewPickerValue[] = (job.crew ?? []).map((c) => ({
+      spId: c.spId,
+      isLead: c.isLead,
+    }));
+    setSheetCrew(crewSeed);
   }
 
   function toggleStatus(id: string) {
@@ -309,16 +314,22 @@ export default function AdminCalendar() {
 
   async function reassign() {
     if (!selectedJob) return;
-    if (editSp === "unassigned" || !editSp) {
-      toast({ title: "Pick an SP", variant: "destructive" });
-      return;
+    try {
+      await assignCrew.mutateAsync({
+        jobId: selectedJob.dbId,
+        members: sheetCrew,
+        userId: user?.id ?? null,
+      });
+      toast({
+        title: sheetCrew.length === 0 ? "Crew cleared" : "Crew updated",
+        description: sheetCrew.length === 0
+          ? "Job returned to Created."
+          : `${sheetCrew.length} SP(s) assigned.`,
+      });
+      setSelectedJob(null);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
-    await assignJob.mutateAsync({
-      jobId: selectedJob.dbId,
-      spId: editSp,
-      assignedByUserId: user?.id ?? null,
-    });
-    setSelectedJob(null);
   }
 
   async function handleReschedule(job: Job, dateISO: string, timeHHMM: string | null) {
