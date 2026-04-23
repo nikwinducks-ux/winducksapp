@@ -359,6 +359,7 @@ function DayColumn({
 function DayView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug }: JobCalendarProps) {
   const getSpName = spNameLookup(providers);
   const dayJobs = jobsOnDate(jobs, currentDate);
+  const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="border-b px-4 py-2 flex items-center justify-between">
@@ -379,6 +380,7 @@ function DayView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mo
           showSp={mode === "admin"}
           compact={false}
           showDebug={showDebug}
+          colorMode={colorMode}
           onJobClick={onJobClick}
           onEmptyDayClick={onEmptyDayClick}
           showAddAffordance={mode === "admin" && !!onEmptyDayClick}
