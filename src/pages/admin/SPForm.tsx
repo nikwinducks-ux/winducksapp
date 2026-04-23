@@ -142,6 +142,13 @@ export default function SPForm() {
               ))}
             </div>
           </div>
+          <div>
+            <Label className="mb-2 block">Calendar Color</Label>
+            <SPColorPicker
+              value={formData.calendarColor}
+              onChange={(key: PaletteKey | null) => setForm({ ...formData, calendarColor: key })}
+            />
+          </div>
           <div className="space-y-1.5"><Label>Notes</Label><Textarea value={formData.notes} onChange={(e) => update("notes", e.target.value)} rows={3} /></div>
         </div>
 
