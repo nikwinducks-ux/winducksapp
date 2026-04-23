@@ -819,7 +819,17 @@ export default function JobManagement() {
                         const timeStr = job.scheduledTime ? formatScheduleToast("", job.scheduledTime).split("·").pop()?.trim() : "";
                         return (
                           <div className="flex flex-col leading-tight">
-                            <span className="text-foreground">{dateStr}</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-foreground">{dateStr}</span>
+                              <Link
+                                to={`/admin/calendar?date=${job.scheduledDate}`}
+                                title="Show on calendar"
+                                className="text-muted-foreground hover:text-primary transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <CalendarClock className="h-3.5 w-3.5" />
+                              </Link>
+                            </div>
                             {job.scheduledTime && <span className="text-xs">{timeStr || job.scheduledTime}</span>}
                             {debug && (
                               <ScheduleDebugBadge

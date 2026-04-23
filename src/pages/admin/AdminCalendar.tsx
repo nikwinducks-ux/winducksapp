@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   addDays, addMonths, addWeeks, format, startOfWeek, endOfWeek,
   startOfMonth, endOfMonth, subDays, subMonths, subWeeks,
+  isWithinInterval,
 } from "date-fns";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import {
@@ -56,8 +57,50 @@ function getBestCalendarStartDate(jobs: Job[]) {
 
   if (datedJobs.length === 0) return todayLocal;
 
-  const upcoming = datedJobs.find((date) => date.getTime() >= todayLocal.getTime());
-  return upcoming ?? datedJobs[datedJobs.length - 1];
+  // Within ±30 days of today, pick the date with the most jobs
+  const windowMs = 30 * 24 * 60 * 60 * 1000;
+  const inWindow = datedJobs.filter(
+    (d) => Math.abs(d.getTime() - todayLocal.getTime()) <= windowMs
+  );
+  if (inWindow.length > 0) {
+    const counts = new Map<number, number>();
+    for (const d of inWindow) {
+      counts.set(d.getTime(), (counts.get(d.getTime()) ?? 0) + 1);
+    }
+    let best = inWindow[0];
+    let bestCount = 0;
+    for (const [t, c] of counts) {
+      if (c > bestCount) {
+        bestCount = c;
+        best = new Date(t);
+      }
+    }
+    return best;
+  }
+
+  // Otherwise, the nearest job in either direction
+  return datedJobs.reduce((nearest, d) => {
+    return Math.abs(d.getTime() - todayLocal.getTime()) <
+      Math.abs(nearest.getTime() - todayLocal.getTime())
+      ? d
+      : nearest;
+  }, datedJobs[0]);
+}
+
+function getViewRange(view: CalendarView, currentDate: Date): { start: Date; end: Date } {
+  if (view === "day") {
+    const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+    const end = new Date(start);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }
+  if (view === "week") {
+    return {
+      start: startOfWeek(currentDate, { weekStartsOn: 1 }),
+      end: endOfWeek(currentDate, { weekStartsOn: 1 }),
+    };
+  }
+  return { start: startOfMonth(currentDate), end: endOfMonth(currentDate) };
 }
 
 export default function AdminCalendar() {
@@ -68,6 +111,7 @@ export default function AdminCalendar() {
   const assignJob = useAssignJob();
   const { toast } = useToast();
   const autoFocusedInitialDateRef = useRef(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [view, setView] = useState<CalendarView>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -90,6 +134,18 @@ export default function AdminCalendar() {
     return jobs.filter((j) => !!j.scheduledDate);
   }, [jobs]);
 
+  // ?date=YYYY-MM-DD takes precedence over auto-focus
+  useEffect(() => {
+    const dateParam = searchParams.get("date");
+    if (!dateParam) return;
+    const parsed = parseLocalDate(dateParam);
+    if (parsed) {
+      setCurrentDate(parsed);
+      setView("day");
+      autoFocusedInitialDateRef.current = true;
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     if (autoFocusedInitialDateRef.current || scheduledJobs.length === 0) return;
     setCurrentDate(getBestCalendarStartDate(scheduledJobs));
@@ -110,6 +166,26 @@ export default function AdminCalendar() {
       return true;
     });
   }, [scheduledJobs, spFilter, statusFilters]);
+
+  // Jobs that match filters but fall outside the visible date range
+  const outOfViewInfo = useMemo(() => {
+    const range = getViewRange(view, currentDate);
+    const outside = filteredJobs
+      .map((j) => ({ job: j, date: parseLocalDate(j.scheduledDate) }))
+      .filter((x): x is { job: Job; date: Date } => !!x.date)
+      .filter(({ date }) => !isWithinInterval(date, { start: range.start, end: range.end }))
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+    if (outside.length === 0) return null;
+    return {
+      count: outside.length,
+      earliest: outside[0].date,
+      latest: outside[outside.length - 1].date,
+    };
+  }, [filteredJobs, view, currentDate]);
+
+  function jumpTo(date: Date) {
+    setCurrentDate(date);
+  }
 
   function navigate(direction: -1 | 1) {
     if (view === "day") setCurrentDate((d) => (direction === 1 ? addDays(d, 1) : subDays(d, 1)));
@@ -275,6 +351,23 @@ export default function AdminCalendar() {
           Showing raw <span className="font-semibold">scheduledDate</span> /{" "}
           <span className="font-semibold">scheduledTime</span> for each job below.
           Red = parse failed (job won't land at the right slot).
+        </div>
+      )}
+
+      {outOfViewInfo && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+          <span className="text-foreground">
+            <span className="font-semibold">{outOfViewInfo.count}</span> scheduled job
+            {outOfViewInfo.count === 1 ? " is" : "s are"} not in this view.
+          </span>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => jumpTo(outOfViewInfo.earliest)}>
+              Jump to earliest ({format(outOfViewInfo.earliest, "MMM d, yyyy")})
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => jumpTo(outOfViewInfo.latest)}>
+              Jump to latest ({format(outOfViewInfo.latest, "MMM d, yyyy")})
+            </Button>
+          </div>
         </div>
       )}
 
