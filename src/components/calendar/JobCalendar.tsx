@@ -229,6 +229,7 @@ interface DayColumnProps {
   getSpName: (id?: string) => string;
   showSp: boolean;
   compact: boolean;
+  showDebug?: boolean;
   onJobClick: (job: Job) => void;
   onEmptyDayClick?: (date: Date) => void;
   showAddAffordance: boolean;
@@ -240,6 +241,7 @@ function DayColumn({
   getSpName,
   showSp,
   compact,
+  showDebug,
   onJobClick,
   onEmptyDayClick,
   showAddAffordance,
@@ -262,6 +264,7 @@ function DayColumn({
               <JobBlock
                 job={job}
                 compact={compact}
+                showDebug={showDebug}
                 spName={showSp ? getSpName(job.assignedSpId) : undefined}
                 onClick={() => onJobClick(job)}
               />
@@ -275,6 +278,7 @@ function DayColumn({
               <JobBlock
                 job={job}
                 compact={compact}
+                showDebug={showDebug}
                 spName={showSp ? getSpName(job.assignedSpId) : undefined}
                 onClick={() => onJobClick(job)}
               />
@@ -327,6 +331,7 @@ function DayColumn({
               key={item.job.dbId}
               job={item.job}
               compact={compact}
+              showDebug={showDebug}
               spName={showSp ? getSpName(item.job.assignedSpId) : undefined}
               onClick={() => onJobClick(item.job)}
               style={{
