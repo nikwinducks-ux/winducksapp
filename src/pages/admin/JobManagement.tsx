@@ -82,6 +82,14 @@ export default function JobManagement() {
   const [bulkUnassignOpen, setBulkUnassignOpen] = useState(false);
   const [unassignTarget, setUnassignTarget] = useState<{ jobDbId: string; jobNumber: string; spName: string } | null>(null);
 
+  // Schedule dialog state
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleMode, setScheduleMode] = useState<"single" | "bulk">("single");
+  const [scheduleTarget, setScheduleTarget] = useState<{ jobDbId: string; jobNumber: string; customerName: string; scheduledDate?: string; scheduledTime?: string } | null>(null);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [scheduleError, setScheduleError] = useState("");
+
   const { data: jobs = [], isLoading } = useJobs();
   const { data: providers = [] } = useServiceProviders();
   const { data: categories = [] } = useServiceCategories();
