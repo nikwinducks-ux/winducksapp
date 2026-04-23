@@ -227,14 +227,17 @@ export function useServiceProvider(id: string | undefined) {
 }
 
 export function useJobs() {
-  const { data: customers, isSuccess: customersReady, isError: customersError } = useCustomers();
+  // Customers are fetched in parallel; their names are merged in via the
+  // `select` transform below so jobs are NEVER blocked on customers loading.
+  const { data: customers = [] } = useCustomers();
+
   return useQuery({
     queryKey: ["jobs"],
-    // Wait for customers to resolve so customerName is correct on first paint.
-    // If customers errors out (e.g. SP RLS edge case), still run jobs so SPs aren't blocked.
-    enabled: customersReady || customersError,
     queryFn: async () => {
-      const { data, error } = await supabase.from("jobs").select("*").order("scheduled_date", { ascending: true });
+      const { data, error } = await supabase
+        .from("jobs")
+        .select("*")
+        .order("scheduled_date", { ascending: true });
       if (error) {
         console.error("[useJobs] jobs query failed", error);
         throw error;
@@ -265,8 +268,13 @@ export function useJobs() {
           crewMap[c.job_id].push({ spId: c.sp_id, isLead: c.is_lead });
         }
       }
-      return (data ?? []).map((r) => {
-        const job = dbToJob(r, customers ?? []);
+      // Stash raw rows + maps so the select transform can re-apply customer
+      // names whenever the customers query updates.
+      return { rows: data ?? [], servicesMap, crewMap };
+    },
+    select: ({ rows, servicesMap, crewMap }) => {
+      return rows.map((r: any) => {
+        const job = dbToJob(r, customers);
         job.services = servicesMap[r.id] ?? [];
         job.crew = crewMap[r.id] ?? [];
         const n = job.crew.length || 1;
