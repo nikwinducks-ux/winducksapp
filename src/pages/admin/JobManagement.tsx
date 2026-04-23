@@ -22,6 +22,12 @@ import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  ScheduleDebugBadge,
+  ScheduleDebugToggle,
+  isScheduleDebugEnabled,
+  setScheduleDebugEnabled,
+} from "@/components/calendar/ScheduleDebug";
 
 const NON_BROADCASTABLE = new Set(["Assigned", "InProgress", "Completed", "Cancelled", "Archived"]);
 const NON_ASSIGNABLE = new Set(["InProgress", "Completed", "Cancelled", "Archived"]);
@@ -90,6 +96,12 @@ export default function JobManagement() {
   const [scheduleTime, setScheduleTime] = useState("");
   const [scheduleError, setScheduleError] = useState("");
 
+  // Debug panel
+  const [debug, setDebug] = useState(() => isScheduleDebugEnabled());
+  function toggleDebug(next: boolean) {
+    setDebug(next);
+    setScheduleDebugEnabled(next);
+  }
   const { data: jobs = [], isLoading } = useJobs();
   const { data: providers = [] } = useServiceProviders();
   const { data: categories = [] } = useServiceCategories();
