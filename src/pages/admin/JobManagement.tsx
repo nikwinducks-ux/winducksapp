@@ -681,7 +681,7 @@ export default function JobManagement() {
               <th className="pb-3 font-medium text-muted-foreground">Status</th>
               <th className="pb-3 font-medium text-muted-foreground">Broadcast</th>
               <th className="pb-3 font-medium text-muted-foreground">Assigned SP</th>
-              <th className="pb-3 font-medium text-muted-foreground">Created</th>
+              <th className="pb-3 font-medium text-muted-foreground">Scheduled</th>
               <th className="pb-3 font-medium text-muted-foreground">Actions</th>
             </tr>
           </thead>
@@ -785,7 +785,27 @@ export default function JobManagement() {
                       );
                     })()}
                   </td>
-                  <td className="py-3 text-muted-foreground">{job.scheduledDate}</td>
+                  <td className="py-3 text-muted-foreground">
+                    {(() => {
+                      const urgency = job.urgency || "Scheduled";
+                      if (job.scheduledDate) {
+                        const d = new Date(`${job.scheduledDate}T00:00:00`);
+                        const dateStr = isNaN(d.getTime())
+                          ? job.scheduledDate
+                          : d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+                        const timeStr = job.scheduledTime ? formatScheduleToast("", job.scheduledTime).split("·").pop()?.trim() : "";
+                        return (
+                          <div className="flex flex-col leading-tight">
+                            <span className="text-foreground">{dateStr}</span>
+                            {job.scheduledTime && <span className="text-xs">{timeStr || job.scheduledTime}</span>}
+                          </div>
+                        );
+                      }
+                      if (urgency === "ASAP") return <span className="text-destructive font-medium">ASAP</span>;
+                      if (urgency === "Anytime soon") return <span>Flexible</span>;
+                      return <span className="italic">Not scheduled</span>;
+                    })()}
+                  </td>
                   <td className="py-3">
                     <div className="flex items-center gap-1">
                       <Link to={`/admin/jobs/${job.dbId}`}>
