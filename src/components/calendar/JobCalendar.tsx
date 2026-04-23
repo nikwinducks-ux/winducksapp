@@ -10,9 +10,22 @@ import {
   isSameMonth,
   isToday,
 } from "date-fns";
+import {
+  DndContext,
+  PointerSensor,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import type { Job, ServiceProvider } from "@/data/mockData";
 import { JobBlock, type ColorMode } from "./JobBlock";
 import { cn } from "@/lib/utils";
+import {
+  useCalendarDnd,
+  formatGhostTime,
+  yToSnappedMinutes,
+  type RescheduleHandler,
+} from "./useCalendarDnd";
 
 export type CalendarView = "day" | "week" | "month";
 
@@ -37,7 +50,12 @@ interface JobCalendarProps {
   nearestPreviousLabel?: string | null;
   nearestNextLabel?: string | null;
   onJumpToDate?: (date: Date) => void;
+  /** Enables drag-and-drop rescheduling (admin only). */
+  enableDnd?: boolean;
+  onReschedule?: RescheduleHandler;
+  onDragBlocked?: (job: Job, reason: string) => void;
 }
+
 
 function spNameLookup(providers: ServiceProvider[]) {
   const map = new Map(providers.map((p) => [p.id, p.name]));
