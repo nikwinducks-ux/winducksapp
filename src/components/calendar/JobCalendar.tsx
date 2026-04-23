@@ -25,8 +25,10 @@ import {
   useCalendarDnd,
   formatGhostTime,
   yToSnappedMinutes,
+  minutesToHHMM,
   type RescheduleHandler,
 } from "./useCalendarDnd";
+import type { SpUnavailableBlock } from "@/hooks/useSpUnavailable";
 
 export type CalendarView = "day" | "week" | "month";
 
