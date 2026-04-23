@@ -1,7 +1,9 @@
+import { useDraggable } from "@dnd-kit/core";
 import type { Job } from "@/data/mockData";
 import { cn } from "@/lib/utils";
 import { ScheduleDebugBadge } from "./ScheduleDebug";
 import { getSpColor } from "./spColors";
+import { isJobDraggable } from "./useCalendarDnd";
 
 export type ColorMode = "sp" | "status";
 
