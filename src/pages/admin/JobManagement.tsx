@@ -757,6 +757,89 @@ export default function JobManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Unassign single confirmation */}
+      <AlertDialog open={!!unassignTarget} onOpenChange={(o) => { if (!busy && !o) setUnassignTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Unassign {unassignTarget?.spName} from {unassignTarget?.jobNumber}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              The job will revert to Created and any pending offers will be cancelled.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); runUnassignSingle(); }}
+              disabled={busy}
+            >
+              {busy ? "Unassigning…" : "Unassign"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Assign dialog */}
+      <Dialog open={bulkAssignOpen} onOpenChange={(o) => { if (!busy) { setBulkAssignOpen(o); if (!o) setBulkAssignSpId(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign {selectedIds.size} job{selectedIds.size === 1 ? "" : "s"} to an SP</DialogTitle>
+            <DialogDescription>
+              Jobs in In Progress, Completed, Cancelled, or Archived will be skipped. Jobs already assigned will be reassigned to the selected SP.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="bulk-assign-sp">Service Provider</Label>
+            <Select value={bulkAssignSpId} onValueChange={setBulkAssignSpId}>
+              <SelectTrigger id="bulk-assign-sp"><SelectValue placeholder="Pick an SP…" /></SelectTrigger>
+              <SelectContent>
+                {activeSps.length === 0 ? (
+                  <div className="px-3 py-2 text-xs text-muted-foreground">No active SPs</div>
+                ) : (
+                  activeSps.map((sp) => (
+                    <SelectItem key={sp.id} value={sp.id}>
+                      {sp.name}
+                      <span className="ml-2 text-[11px] text-muted-foreground">
+                        {(sp.serviceCategories || []).join(", ") || "no categories"}
+                      </span>
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setBulkAssignOpen(false); setBulkAssignSpId(""); }} disabled={busy}>Cancel</Button>
+            <Button onClick={runBulkAssign} disabled={busy || !bulkAssignSpId}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              {busy ? "Assigning…" : `Assign ${selectedIds.size}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Unassign confirmation */}
+      <AlertDialog open={bulkUnassignOpen} onOpenChange={(o) => { if (!busy) setBulkUnassignOpen(o); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unassign selected jobs?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Clears the assigned SP from selected jobs (Assigned/Accepted only) and cancels any pending offers. Other statuses are skipped.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); runBulkUnassign(); }}
+              disabled={busy}
+            >
+              {busy ? "Unassigning…" : "Unassign"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
