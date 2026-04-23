@@ -365,6 +365,16 @@ export default function JobOffers() {
           )}
         </div>
       </div>
+
+      {declineTarget && (
+        <DeclineOfferDialog
+          open={!!declineTarget}
+          onOpenChange={(o) => { if (!o) setDeclineTarget(null); }}
+          offerId={declineTarget.offerId}
+          jobNumber={declineTarget.jobNumber}
+          customerName={declineTarget.customerName}
+        />
+      )}
     </div>
   );
 }
