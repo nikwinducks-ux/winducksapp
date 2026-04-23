@@ -472,6 +472,27 @@ export default function AdminCalendar() {
           onJobClick={openJob}
           mode="admin"
           showDebug={debug}
+          nearestPrevious={rangeDiagnostics.previous?.date ?? null}
+          nearestNext={rangeDiagnostics.next?.date ?? null}
+          nearestPreviousLabel={
+            rangeDiagnostics.previous
+              ? `${format(rangeDiagnostics.previous.date, "EEE MMM d")}${
+                  rangeDiagnostics.previous.job.scheduledTime
+                    ? ` at ${rangeDiagnostics.previous.job.scheduledTime}`
+                    : ""
+                }`
+              : null
+          }
+          nearestNextLabel={
+            rangeDiagnostics.next
+              ? `${format(rangeDiagnostics.next.date, "EEE MMM d")}${
+                  rangeDiagnostics.next.job.scheduledTime
+                    ? ` at ${rangeDiagnostics.next.job.scheduledTime}`
+                    : ""
+                }`
+              : null
+          }
+          onJumpToDate={jumpTo}
         />
       )}
 
