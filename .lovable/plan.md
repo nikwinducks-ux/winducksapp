@@ -1,70 +1,53 @@
 
 
-## Automated SP scoring via post-job customer reviews
+## Polish the customer review page with job context + validation
 
-When a job is marked **Completed**, email the customer a short rating form. Their responses feed a rolling calculation that updates the SP's `rating`, `on_time_rate`, `reliability_score`, and `completion_rate` automatically — replacing today's static seeded values with real data.
+The `/review/:token` page already exists and works (loads via `get_review_by_token`, submits via `submit_review`, blocks resubmission). Today it shows only the SP name and job number — customers don't see what work was done, when, or where. This update enriches that page with job details and tightens the validation feedback before submit.
 
-### Recommended approach
+### What changes
 
-A 3-question review (matches your existing scoring factors), one email per completed job, public token-based form (no customer login), and a database trigger that recomputes SP metrics whenever a new review lands.
+**1. Backend — extend `get_review_by_token` RPC**
 
-### What gets built
+Return more job context so the page can render details without a second round-trip:
+- `service_summary` — comma-joined list of `job_services.service_category` (or fallback to `jobs.service_category`)
+- `scheduled_date`, `scheduled_time`
+- `job_address_city`, `job_address_region`
+- `customer_name`
+- `completed_at`
 
-**1. New table: `job_reviews`**
-- `id`, `job_id`, `sp_id`, `customer_id`, `review_token` (unique, used in email link), `submitted_at`
-- Three 1–5 star scores: `on_time_score`, `quality_score`, `communication_score`
-- `overall_rating` (computed average of the three), optional `comment` (text)
-- One review per job (`UNIQUE(job_id)`)
-- RLS: admins read all; public can read/update only the row matching their token (via SECURITY DEFINER RPCs `get_review_by_token` and `submit_review`)
+No schema change. Pure RPC update; the function is already SECURITY DEFINER and token-gated, so no new RLS surface.
 
-**2. Trigger on `jobs`: when status flips to `Completed`**
-- Inserts a `job_reviews` row with a fresh token (status `pending`)
-- Calls `pg_net` to invoke a new edge function `send-review-request-email` (same pattern as `notify_offer_push`)
+**2. Frontend — `src/pages/ReviewSubmit.tsx`**
 
-**3. New edge function: `send-review-request-email`**
-- Uses Lovable's built-in email infrastructure (no third-party signup needed)
-- Sends the customer a branded email with a link: `https://winducksapp.lovable.app/review/{token}`
-- Subject: "How did {SP name} do? — {Job #}"
+Restructure the "ready" state into three sections:
 
-**4. New public page: `/review/:token`**
-- No auth required — token is the credential
-- Three star-rating inputs (On-time arrival, Quality of work, Communication), optional comment
-- Submits via `submit_review` RPC; shows a thank-you state on success
-- Handles already-submitted / invalid token gracefully
+- **Header**: "Rate your experience with {spName}"
+- **Job summary card** (new): job number, service list, completed date, location (city, region), greeting line ("Hi {customerName},")
+- **Rating form**: the existing 3 star inputs + comment, unchanged in behavior but with clearer per-question helper text:
+  - On-time arrival — "Did they arrive when expected?"
+  - Quality of work — "Were you happy with the result?"
+  - Communication — "Were they clear and responsive?"
+- **Inline validation**:
+  - Show a small red helper under any unrated question once the user clicks Submit (e.g., "Please rate this")
+  - Comment max 1000 chars with a live counter; submit disabled if over
+  - Submit button stays disabled until all three stars are set (existing behavior preserved)
+  - On submit failure, show the error inline above the button instead of replacing the whole page
 
-**5. Trigger on `job_reviews`: recompute SP scores on insert**
-- Pulls the SP's last 30 completed-and-reviewed jobs and updates `service_providers`:
-  - `rating` = avg(`overall_rating`)
-  - `on_time_rate` = avg(`on_time_score`) × 20 (1–5 → 0–100)
-  - `reliability_score` = weighted blend: 50% on-time + 30% quality + 20% communication, scaled to 0–100
-  - `completion_rate` = % of assigned jobs in window that ended in `Completed` (not `Cancelled`)
+**3. Types**
 
-**6. Admin visibility**
-- New "Reviews" tab on the SP detail page (`/admin/providers/:id`) listing recent reviews with stars + comments
-- Small "Review pending" / "Reviewed ⭐4.8" badge on the admin Job Detail page
-- New `MetricCard` on the Admin Dashboard: "Avg customer rating (30d)"
+Update the local `LoadState["ready"]` shape and the `submit_review` / `get_review_by_token` result types in the page to include the new fields. No edits to `src/integrations/supabase/types.ts` (auto-generated).
 
-### Email setup
+### Files touched
 
-Lovable's built-in email system needs a verified sender domain before the first email can be sent. The setup is a one-time, guided flow — after that, all review emails send automatically with no further action.
-
-### Why this design
-
-- **Matches your existing factors**: the three review questions map directly to `on_time_rate`, `rating` (quality), and the reliability formula already used by the allocation engine
-- **No customer accounts needed**: token links keep friction near zero, which is critical for response rate
-- **Self-healing scores**: any new review immediately recomputes the SP's metrics — no cron job, no manual admin action
-- **Extends, doesn't replace**: `cancellation_rate`, `acceptance_rate`, and `avg_response_time` continue to come from offer/job-status events as they do today
+- `supabase/migrations/<new>.sql` — replace `get_review_by_token` with the enriched version
+- `src/pages/ReviewSubmit.tsx` — new layout, validation, inline error handling
 
 ### Acceptance
 
-- Marking a job Completed sends a review email to that job's customer within ~30s
-- Customer opens the link, submits 3 stars + optional comment, sees a thank-you page
-- The SP's `rating`, `on_time_rate`, and `reliability_score` on `/admin/providers/:id` update within a second of submission
-- Admins can see all reviews (with comments) on the SP's new Reviews tab
-- A second submission attempt with the same token shows "already submitted"
-- Jobs without a customer email are skipped silently (no broken sends)
-
-### Open question before building
-
-Should the review email be sent **immediately** when status flips to Completed, or **delayed by a few hours** (so the customer has time to inspect the work)? Common choice is 2–4 hours later via a scheduled job; immediate is simpler. Let me know your preference and I'll build accordingly.
+- Opening a valid review link shows the SP name, job number, services performed, scheduled date/time, city, and a personalized greeting before the rating form
+- Clicking Submit without rating all three categories shows red helper text under each missing question and keeps the form mounted
+- Comment field shows "{n}/1000" counter; submit is disabled if exceeded
+- Submission errors (e.g., already-submitted, network) appear inline; the form is not replaced by a full-page error
+- Successful submission still shows the existing thank-you state
+- Already-submitted and invalid-token cases continue to render their existing dedicated states unchanged
 
