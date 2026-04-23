@@ -1,64 +1,92 @@
 
+## Why the calendar looks empty in your screenshot
 
-## Show customer names + color-code SPs on calendar blocks
+This is not a backend fetch failure. The database does have scheduled jobs, and the frontend is loading them.
 
-Replace the job-number title on every calendar block with the customer name, and tint each block based on the assigned SP so it's easy to scan who's doing what across the day/week/month.
+What the data shows:
+- There are **no scheduled jobs between Apr 20 and Apr 26, 2026**
+- The next scheduled jobs are:
+  - **JOB-1004** — Apr 27, 2026 at 09:00
+  - **JOB-1026** — Apr 27, 2026 at 10:00
+- Older scheduled jobs exist on **Feb 23–27**
+- Your screenshot is on **Week view: Apr 20–Apr 26**, so the grid is correctly empty for that range
 
-### What changes
+That is also why turning debug on shows nothing in the grid: the current debug badge only renders **on job cards**, and there are no job cards in that visible week.
 
-**1. `src/components/calendar/JobBlock.tsx` — title becomes customer name**
+## Fix the discoverability problem so the UI explains this clearly
 
-- The first line of every block currently shows `[time] JOB-1234`. Change it to `[time] {job.customerName}` (fall back to `"Unassigned customer"` if missing).
-- Job number is still useful — move it to a small muted line below the customer name in non-compact mode (Day / Week). In compact mode (Month chips) it's dropped to keep the chip clean.
-- Payout stays in the top-right.
+### 1. Add a real empty-state inside the calendar grid
+Update `src/components/calendar/JobCalendar.tsx` so Day and Week views show a centered empty state when:
+- there are no jobs in the visible day/week range, and
+- there are still filtered scheduled jobs outside the current range
 
-**2. SP color coding**
+The empty state should say:
+- “No scheduled jobs in this week”
+- “Next scheduled job: Mon Apr 27 at 9:00 AM” when available
+- buttons for:
+  - `Jump to next scheduled`
+  - `Jump to previous scheduled`
 
-Add a deterministic color per SP (independent of status):
+This solves the current confusion where the grid looks broken even though it is just empty.
 
-- New helper `getSpColor(spId?: string)` in a new file `src/components/calendar/spColors.ts`. It hashes the SP UUID into one of ~10 distinct hues and returns Tailwind-friendly classes for background tint, border, and text (e.g., `bg-blue-100 border-blue-400 text-blue-900`). Unassigned jobs get a neutral gray.
-- Palette uses calm, professional hues (blue, teal, violet, amber, rose, emerald, indigo, orange, cyan, fuchsia) — all light backgrounds with darker borders to keep text legible on the white calendar canvas.
-- Same SP always gets the same color across Day/Week/Month and across sessions (hash-based, no state).
+### 2. Make debug useful even when there are no visible cards
+Update `src/pages/admin/AdminCalendar.tsx` so debug mode also renders a lightweight diagnostics panel above the calendar listing:
+- current visible range
+- total filtered scheduled jobs
+- jobs inside current range
+- first previous scheduled date
+- first next scheduled date
 
-**3. `JobBlock` color logic**
+When debug is on, this should immediately explain:
+- “0 jobs in Apr 20–Apr 26”
+- “Next job is Apr 27”
 
-`getJobAppearance` currently colors blocks by **status** (pending = dashed primary, accepted = solid primary, in-progress = accent, completed = green, cancelled = muted). Replace this with a layered approach:
+This is the missing piece in the current debug approach.
 
-- **Base color** = SP color (from `getSpColor(job.assignedSpId)`).
-- **Status overlays** are kept as visual modifiers, not full color swaps:
-  - `Created` / `Offered` → keep the dashed border + reduced opacity (still SP-tinted)
-  - `Completed` → add a subtle green left border accent + checkmark-style opacity
-  - `Cancelled` / `Expired` → grayscale + line-through (SP color suppressed, since the job is dead)
-  - `InProgress` → solid SP color with a small pulsing dot indicator
-  - `Assigned` / `Accepted` → solid SP color, no overlay
+### 3. Pass “nearest scheduled job” metadata into the calendar
+In `src/pages/admin/AdminCalendar.tsx`, compute:
+- `visibleJobs`
+- `previousVisibleCandidate`
+- `nextVisibleCandidate`
 
-This keeps status legible while making SP identity the dominant visual signal.
+Then pass those into `JobCalendar` so the empty-state CTA can jump directly to the correct date.
 
-**4. Legend in `AdminCalendar.tsx`**
+### 4. Improve the top out-of-view banner copy
+Keep the existing banner, but make it more specific:
+- instead of only “11 scheduled jobs are not in this view”
+- also show “Nearest next: Apr 27, 2026” and “Nearest previous: Feb 27, 2026”
 
-Add a compact, collapsible "SP colors" legend strip below the filter row (admin mode only). It lists each SP currently visible in `filteredJobs` with their color swatch + name. Hidden when SP filter is set to a single SP (redundant). Unassigned swatch shown if any unassigned jobs are visible.
+That makes the message actionable at a glance.
 
-**5. SP portal calendar (`SPCalendar.tsx`)**
+### 5. Keep current rendering logic unchanged
+Do not change:
+- date parsing
+- job placement logic
+- SP color coding
+- customer-name titles
+- filters
+- sheet behavior
 
-In SP mode every job belongs to the same SP, so color-coding by SP is pointless. Keep status-based coloring there. Implementation: `JobBlock` accepts a new `colorMode?: "sp" | "status"` prop (default `"status"` for backward compat). `JobCalendar` passes `colorMode="sp"` only when `mode="admin"`.
+Those are not the source of the empty screenshot.
 
-### Files touched
+## Files to update
 
-- `src/components/calendar/spColors.ts` — new helper: hash → palette entry
-- `src/components/calendar/JobBlock.tsx` — customer name as title, job number demoted, SP color base + status overlays, new `colorMode` prop
-- `src/components/calendar/JobCalendar.tsx` — thread `colorMode` through Day/Week/Month based on `mode`
-- `src/pages/admin/AdminCalendar.tsx` — render SP color legend below the filter bar
+- `src/pages/admin/AdminCalendar.tsx`
+  - compute visible-range diagnostics
+  - compute previous/next scheduled jobs
+  - pass empty-state/debug metadata into calendar
+  - improve out-of-view banner copy
 
-No changes to `SPCalendar.tsx`, no DB changes, no changes to filters / sheet / debug behavior.
+- `src/components/calendar/JobCalendar.tsx`
+  - render explicit empty states in Day/Week
+  - add jump actions for nearest previous/next scheduled jobs
+  - optionally show compact debug summary when `showDebug` is on and there are no visible cards
 
-### Acceptance
+## Acceptance criteria
 
-- Each calendar block shows the customer name as its primary title (with optional time prefix), in Day / Week / Month
-- The job number appears as a small muted secondary line in Day and Week views; hidden in Month chips
-- Every block in admin views is tinted with a unique, stable color per SP; the same SP gets the same color across sessions and views
-- Unassigned jobs are visibly neutral (gray)
-- Pending (Created / Offered) blocks remain dashed and semi-transparent but still carry the SP tint
-- Cancelled / Expired blocks remain grayed-out with strikethrough
-- Admin calendar shows a legend mapping color swatches to SP names for SPs visible in the current view
-- SP portal calendar (`/sp/calendar`) is unchanged — still status-colored
-
+- On the Apr 20–Apr 26 week shown in your screenshot, the calendar no longer looks mysteriously blank
+- The page clearly states that there are **0 jobs in the current week**
+- The UI shows that the **next scheduled jobs are on Apr 27**
+- A single click jumps the user to the next scheduled day/week so jobs appear immediately
+- With debug on, the screen shows range-level scheduling diagnostics even when there are no visible job cards
+- Existing job rendering still works unchanged when the selected day/week actually contains jobs
