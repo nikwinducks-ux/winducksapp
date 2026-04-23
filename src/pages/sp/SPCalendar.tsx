@@ -227,7 +227,12 @@ export default function SPCalendar() {
         </Tabs>
       </div>
 
-      <SPVisibilityDiagnostics jobs={jobs} context="calendar" />
+      <SPVisibilityDiagnostics
+        jobs={jobs}
+        context="calendar"
+        queryState={jobsStatus as any}
+        queryError={jobsError ? (jobsError as any).message ?? String(jobsError) : null}
+      />
 
       <div className="flex items-center gap-1">
         <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
