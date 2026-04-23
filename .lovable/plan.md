@@ -1,87 +1,71 @@
 
 
-## Assign multiple Service Providers to one job (Crew model)
+## Extend crew assignment to Job Form and Calendar
 
-Today each job has a single `assigned_sp_id`. We'll add a crew model so admins can put 2+ SPs on one job, every assigned SP sees it on their My Jobs / calendar / job detail with an equally split payout, and any of them can move the status forward.
+The crew model already exists on the Job Detail page. This plan extends the same multi-SP assignment to two more entry points: the **Create/Edit Job** form and the **Calendar job sheet** (admin calendar's side panel).
 
 ### Behavior
 
-**1. Admin assigns a crew (Job Detail → Dispatch Actions)**
-- The "Assign SP Directly" panel becomes a multi-select: a checklist of active SPs (with city + radius) and a Confirm button.
-- Selecting 1 SP behaves like today. Selecting 2+ creates a crew. A small helper line shows the per-SP split: "Each SP will be paid $40.00 (=$120 ÷ 3)".
-- One SP is implicitly the **Lead** (first-selected, or admin can mark a star). Lead is informational only — every member has equal status powers.
+**1. Job Create/Edit page (`/admin/jobs/new`, `/admin/jobs/:id/edit`)**
+- New "Crew Assignment" section appears below the Customer/Payout block, above Location.
+- Multi-select checklist of active SPs (name + city + radius), with a star to mark the Lead. Same UI pattern as Job Detail.
+- Live helper line shows the equal-split payout: "Each SP will be paid $X.XX (= $payout ÷ N)".
+- **On Create**: after the job row is inserted, the selected SP ids are written to `job_crew_members` (lead first). The existing `sync_job_lead_on_crew_change` trigger sets `assigned_sp_id` and flips status to `Assigned`.
+- **On Edit**: shows the current crew pre-selected. Saving diffs the selection: inserts new members, deletes removed ones, and updates `is_lead` if the lead changed. Edits are blocked when the job is `Completed` / `Cancelled` (matches Job Detail rule).
+- If the admin clears the selection on edit, the job reverts to `Created` (trigger handles it).
+- Existing pending offers are cancelled when crew is set from the form (mirrors current direct-assign behavior on Job Detail).
 
-**2. Add or remove crew members later**
-- A new "Crew" section on the Job Detail page (above Dispatch Actions, visible whenever the job has ≥1 assigned SP) lists current crew members with avatar, name, "Lead" star, and a Remove button (× confirm).
-- An "+ Add SP to crew" button opens the same picker filtered to SPs not already on the crew. Adding/removing is allowed up through `InProgress`; blocked once `Completed` / `Cancelled`.
-- Removing the last crew member returns the job to `Created` and clears assignment (mirrors current Unassign).
+**2. Admin Calendar job sheet (`/admin/calendar`)**
+- The "Reassign" select in `AdminCalendar.tsx`'s side `Sheet` becomes a multi-select checklist with a Lead star — identical to the Job Detail picker, scaled to fit the sheet width.
+- A small "Crew (n)" pill appears next to the status badge in the sheet header when the job has 2+ members.
+- A new "Per-SP payout" helper line appears under the picker showing the live split.
+- "Save assignment" applies the diff via the same `useAssignCrew` flow used by Job Detail and Job Form.
+- "Unschedule" and "Save schedule" are unchanged.
 
-**3. SP experience**
-- **My Jobs**: a job appears for every SP on the crew, not just the lead. A small "Crew (3)" pill is shown next to the status badge so the SP knows others are on it.
-- **SP Job Detail**: a "Crew" card lists all members (name, avatar, Lead star). Payout shown to the SP is **their split** ("$40.00 — your share of $120"), not the headline figure.
-- **SP Calendar**: same job appears on every assigned SP's calendar; admin calendar still shows it once but tinted to the lead's color (with a small "+2" chip if crew > 1).
-
-**4. Status changes (any-SP-can-act)**
-- Start / Complete buttons appear for every assigned SP. The first to tap moves the whole job. Status events are audited with the acting SP's id (existing `job_status_events` already supports this).
-
-**5. Offers and broadcast**
-- No change to offer logic — offers still target one SP at a time. When an SP accepts an offer, they're added to the crew (instead of overwriting). Cancellation of pending offers on direct assign still applies.
-- Auto-accept rules continue to apply per-SP.
-
-**6. Backwards compatibility**
-- Existing single-SP jobs keep working unchanged. The legacy `jobs.assigned_sp_id` is mirrored to "the lead" and is auto-maintained when crew membership changes (so existing queries, RLS policies, and triggers keep working with zero changes).
+**3. Consistency**
+- All three entry points (Job Detail, Job Form, Calendar sheet) use the same shared `<CrewPicker />` component so behavior, validation, and the "$/SP" helper stay identical.
 
 ### Technical design
 
-**Database (new migration)**
-- New table `job_crew_members`:
-  - `id uuid PK default gen_random_uuid()`
-  - `job_id uuid NOT NULL`
-  - `sp_id uuid NOT NULL`
-  - `is_lead boolean NOT NULL default false`
-  - `added_by_user_id uuid NULL`
-  - `added_at timestamptz NOT NULL default now()`
-  - `UNIQUE(job_id, sp_id)`
-- RLS:
-  - Admin full access (`is_admin_or_owner(auth.uid())`).
-  - SP select rows where `sp_id = get_user_sp_id(auth.uid())`.
-- Trigger `sync_job_lead_on_crew_change`: after insert/delete on `job_crew_members`, set `jobs.assigned_sp_id` to the current lead (or first member if no lead, or NULL if empty) and adjust `jobs.status` (`Created` ↔ `Assigned`) when membership transitions to/from zero. Keeps existing RLS policies, triggers (`enforce_sp_job_update`), and offer flow working as-is.
-- Update RLS on `jobs`, `job_services`, `job_photos`, `job_status_events`, `customers` SP-select policies to also include rows where the SP is a crew member:
-  - `assigned_sp_id = get_user_sp_id(auth.uid()) OR EXISTS (SELECT 1 FROM job_crew_members c WHERE c.job_id = jobs.id AND c.sp_id = get_user_sp_id(auth.uid()))`
-  - Wrap that check in a small SECURITY DEFINER helper `sp_on_job_crew(_sp_id, _job_id)` to keep policies tidy and avoid recursion.
-- Update `enforce_sp_job_update`: an SP is allowed to update status if they're either the assigned SP or a crew member.
-- Backfill: for every existing job where `assigned_sp_id IS NOT NULL`, insert one `job_crew_members` row with `is_lead = true`.
+**New shared component**
+- `src/components/admin/CrewPicker.tsx` — controlled component:
+  - Props: `providers: ServiceProvider[]`, `value: { spId: string; isLead: boolean }[]`, `onChange(next)`, `payout: number`, `disabled?: boolean`.
+  - Renders a scrollable checklist with name, city, radius, a `★` lead toggle (auto-promotes first selected if no lead), and the live "$X.XX per SP" helper.
+  - Extracted from the inline picker currently in `JobDetail.tsx` so all three pages share one source of truth.
 
-**Hooks (`src/hooks/useSupabaseData.ts`)**
-- New `useJobCrew(jobId)` — fetches crew rows joined with `service_providers`.
-- New `useAssignCrew()` — replaces the body of the current direct-assign flow; takes `{ jobId, spIds: string[], leadSpId, userId }`, inserts crew rows in a single batch, marks lead, cancels pending offers.
-- New `useAddCrewMember()` / `useRemoveCrewMember()` / `useSetCrewLead()`.
-- Job mapper (`dbToJob`) gains `crew: { spId, isLead }[]` and a derived `payoutShare` (= `payout / crew.length`, rounded to 2dp).
-- `useAcceptJobOffer` now inserts a `job_crew_members` row instead of overwriting `assigned_sp_id` (the trigger updates it).
+**New hook**
+- `useAssignCrew()` in `src/hooks/useSupabaseData.ts`:
+  - Input: `{ jobId, members: { spId; isLead }[], userId }`.
+  - Reads existing `job_crew_members` for the job, computes insert/delete/lead-update diff, applies in a single batch.
+  - Cancels pending offers when first members are added (matches existing Job Detail logic).
+  - Invalidates `["jobs"]` and `["job_crew", jobId]`.
+- `JobDetail.tsx` is refactored to call `useAssignCrew` instead of the current per-row mutations (one save, one cache invalidation).
 
-**UI**
-- `src/pages/admin/JobDetail.tsx`:
-  - Replace single-select Assign panel with a multi-select crew picker (`Checkbox` list + lead star). Show live "$X.XX per SP" helper.
-  - Add a new "Crew" card showing members + add/remove/lead controls.
-- `src/pages/sp/MyJobs.tsx`: filter by `j.assignedSpId === user?.spId || j.crew?.some(c => c.spId === user?.spId)`. Add "Crew (n)" pill.
-- `src/pages/sp/SPJobDetail.tsx`: add "Crew" card; payout label shows "$share — your share of $total" when `crew.length > 1`.
-- `src/pages/sp/SPCalendar.tsx`: same crew-aware filter.
-- `src/components/calendar/JobBlock.tsx` (admin colorMode `sp`): if crew > 1, append a small `+N` chip.
+**Job Form changes (`src/pages/admin/JobForm.tsx`)**
+- New form state: `crewMembers: { spId; isLead }[]`.
+- On edit-load: prefill from `useJobCrew(id)`.
+- After insert/update of the job row, call `useAssignCrew({ jobId, members: crewMembers, userId })`.
+- Render `<CrewPicker />` in a new section.
+
+**Calendar sheet changes (`src/pages/admin/AdminCalendar.tsx`)**
+- Replace the single-SP `<Select>` reassign control with `<CrewPicker />` driven by local `sheetCrew` state, prefilled from `selectedJob.crew`.
+- "Save assignment" → `useAssignCrew(...)`.
+- Add the "Crew (n)" pill in the `SheetHeader`.
 
 **Files touched**
-- New migration in `supabase/migrations/` (table, helper fn, RLS updates, trigger, backfill).
-- `src/integrations/supabase/types.ts` (auto-regenerated).
-- `src/data/mockData.ts` (`Job.crew?: { spId: string; isLead: boolean }[]`, `Job.payoutShare?: number`).
-- `src/hooks/useSupabaseData.ts` (new hooks + mapper changes + offer-accept change).
-- `src/pages/admin/JobDetail.tsx`, `src/pages/sp/MyJobs.tsx`, `src/pages/sp/SPJobDetail.tsx`, `src/pages/sp/SPCalendar.tsx`.
-- `src/components/calendar/JobBlock.tsx`.
+- New: `src/components/admin/CrewPicker.tsx`.
+- `src/hooks/useSupabaseData.ts` — add `useAssignCrew`.
+- `src/pages/admin/JobForm.tsx` — add crew picker + save flow.
+- `src/pages/admin/JobDetail.tsx` — swap inline picker for shared component, route saves through `useAssignCrew`.
+- `src/pages/admin/AdminCalendar.tsx` — swap reassign control for `CrewPicker`, add crew pill.
+
+No DB schema changes — `job_crew_members`, `sync_job_lead_on_crew_change`, RLS, and `accept_offer` are already in place from the prior crew rollout.
 
 ### Acceptance
 
-- Admin can pick 2+ SPs from the Assign panel and confirm; the job is `Assigned` with all selected SPs in the Crew card.
-- Each selected SP sees the job on My Jobs, on their SP Calendar, and on the SP Job Detail page, with their payout shown as the equal split.
-- Any crew member can mark the job InProgress / Completed and it reflects everywhere.
-- Admin can add/remove crew members on a live job and re-assign Lead; offers stay coherent (existing pending offers cancelled on first crew assignment, just like today).
-- Removing all crew members reverts the job to `Created`.
-- Existing single-SP jobs continue to work without any data changes (backfilled into a 1-member crew with that SP as Lead).
+- Admin can pick 2+ SPs while creating a brand-new job; on save, the job is `Assigned`, all selected SPs appear in the Crew card, and each sees it on My Jobs / their calendar with the equal split.
+- Editing an existing job lets the admin add/remove crew members and re-assign Lead from the Job Form; the changes persist and reflect on Job Detail without a refresh.
+- From the admin calendar, opening a job's sheet lets the admin reassign multiple SPs in one action; the calendar block updates color (lead's color) and shows the `+N` chip.
+- Clearing the crew on edit reverts the job to `Created` and removes it from every SP's My Jobs.
+- Single-SP assignment still works exactly as today through any of the three entry points.
 
