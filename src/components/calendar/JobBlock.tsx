@@ -1,5 +1,6 @@
 import type { Job } from "@/data/mockData";
 import { cn } from "@/lib/utils";
+import { ScheduleDebugBadge } from "./ScheduleDebug";
 
 export type JobAppearance = {
   /** Tailwind classes for background/border/text color */
