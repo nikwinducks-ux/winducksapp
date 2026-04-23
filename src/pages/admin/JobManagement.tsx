@@ -439,6 +439,143 @@ export default function JobManagement() {
     });
   };
 
+  // Schedule handlers
+  const openScheduleSingle = (job: any) => {
+    setScheduleMode("single");
+    setScheduleTarget({
+      jobDbId: job.dbId,
+      jobNumber: job.id,
+      customerName: job.customerName,
+      scheduledDate: job.scheduledDate,
+      scheduledTime: job.scheduledTime,
+    });
+    const usePrefill = (job.urgency || "Scheduled") === "Scheduled";
+    setScheduleDate(usePrefill ? (job.scheduledDate || "") : "");
+    setScheduleTime(usePrefill ? (job.scheduledTime || "") : "");
+    setScheduleError("");
+    setScheduleOpen(true);
+  };
+
+  const openScheduleBulk = () => {
+    setScheduleMode("bulk");
+    setScheduleTarget(null);
+    setScheduleDate("");
+    setScheduleTime("");
+    setScheduleError("");
+    setScheduleOpen(true);
+  };
+
+  const runScheduleSave = async () => {
+    if (!scheduleDate || !scheduleTime) {
+      setScheduleError("Please pick both a date and a time.");
+      return;
+    }
+    setBusy(true);
+    const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+    const userEmail = (await supabase.auth.getUser()).data.user?.email ?? "";
+
+    if (scheduleMode === "single" && scheduleTarget) {
+      try {
+        const { error } = await supabase
+          .from("jobs")
+          .update({ scheduled_date: scheduleDate, scheduled_time: scheduleTime, urgency: "Scheduled" })
+          .eq("id", scheduleTarget.jobDbId);
+        if (error) throw error;
+        try {
+          await supabase.from("admin_audit_logs").insert({
+            user_id: userId, user_email: userEmail,
+            action: "job.schedule",
+            details: {
+              jobDbId: scheduleTarget.jobDbId,
+              jobNumber: scheduleTarget.jobNumber,
+              scheduledDate: scheduleDate,
+              scheduledTime: scheduleTime,
+              previousDate: scheduleTarget.scheduledDate ?? null,
+              previousTime: scheduleTarget.scheduledTime ?? null,
+            },
+          } as any);
+        } catch { /* best-effort */ }
+        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        toast({ title: "Job scheduled", description: `Scheduled for ${formatScheduleToast(scheduleDate, scheduleTime)}.` });
+        setScheduleOpen(false);
+        setScheduleTarget(null);
+      } catch (e: any) {
+        setScheduleError(e?.message ?? "Failed to schedule job.");
+      }
+    } else {
+      // Bulk
+      const targets = jobs.filter((j) => selectedIds.has(j.dbId) && !NON_SCHEDULABLE.has(j.status));
+      const skipped = selectedIds.size - targets.length;
+      let ok = 0, fail = 0;
+      for (const job of targets) {
+        try {
+          const { error } = await supabase
+            .from("jobs")
+            .update({ scheduled_date: scheduleDate, scheduled_time: scheduleTime, urgency: "Scheduled" })
+            .eq("id", job.dbId);
+          if (error) throw error;
+          ok++;
+        } catch {
+          fail++;
+        }
+      }
+      try {
+        await supabase.from("admin_audit_logs").insert({
+          user_id: userId, user_email: userEmail,
+          action: "job.bulk_schedule",
+          details: {
+            job_ids: targets.map((t) => t.dbId),
+            scheduledDate: scheduleDate,
+            scheduledTime: scheduleTime,
+            count: targets.length, ok, fail, skipped,
+          },
+        } as any);
+      } catch { /* best-effort */ }
+      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      setScheduleOpen(false);
+      clearSelection();
+      toast({
+        title: "Bulk schedule complete",
+        description: `${ok} scheduled${fail ? `, ${fail} failed` : ""}${skipped ? `, ${skipped} skipped` : ""} for ${formatScheduleToast(scheduleDate, scheduleTime)}.`,
+        variant: fail > 0 ? "destructive" : "default",
+      });
+    }
+    setBusy(false);
+  };
+
+  const runScheduleClear = async () => {
+    if (scheduleMode !== "single" || !scheduleTarget) return;
+    setBusy(true);
+    const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+    const userEmail = (await supabase.auth.getUser()).data.user?.email ?? "";
+    try {
+      const { error } = await supabase
+        .from("jobs")
+        .update({ scheduled_date: null, scheduled_time: "", urgency: "Anytime soon" })
+        .eq("id", scheduleTarget.jobDbId);
+      if (error) throw error;
+      try {
+        await supabase.from("admin_audit_logs").insert({
+          user_id: userId, user_email: userEmail,
+          action: "job.unschedule",
+          details: {
+            jobDbId: scheduleTarget.jobDbId,
+            jobNumber: scheduleTarget.jobNumber,
+            previousDate: scheduleTarget.scheduledDate ?? null,
+            previousTime: scheduleTarget.scheduledTime ?? null,
+          },
+        } as any);
+      } catch { /* best-effort */ }
+      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      toast({ title: "Schedule cleared" });
+      setScheduleOpen(false);
+      setScheduleTarget(null);
+    } catch (e: any) {
+      setScheduleError(e?.message ?? "Failed to clear schedule.");
+    }
+    setBusy(false);
+  };
+
   const deleteCount = deleteTarget?.length ?? 0;
   const requireTypeConfirm = deleteCount > 1;
   const canConfirmDelete = !busy && (!requireTypeConfirm || deleteConfirmText === "DELETE");
