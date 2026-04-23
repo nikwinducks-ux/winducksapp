@@ -23,6 +23,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { statusLabel } from "@/components/calendar/JobBlock";
+import {
+  ScheduleDebugBadge,
+  ScheduleDebugToggle,
+  isScheduleDebugEnabled,
+  setScheduleDebugEnabled,
+} from "@/components/calendar/ScheduleDebug";
 import type { Job } from "@/data/mockData";
 
 const STATUS_FILTERS = [
@@ -73,6 +79,12 @@ export default function AdminCalendar() {
   const [editDate, setEditDate] = useState("");
   const [editTime, setEditTime] = useState("");
   const [editSp, setEditSp] = useState<string>("");
+  const [debug, setDebug] = useState(() => isScheduleDebugEnabled());
+
+  function toggleDebug(next: boolean) {
+    setDebug(next);
+    setScheduleDebugEnabled(next);
+  }
 
   const scheduledJobs = useMemo(() => {
     return jobs.filter((j) => !!j.scheduledDate);
@@ -252,7 +264,19 @@ export default function AdminCalendar() {
             );
           })}
         </div>
+
+        <div className="ml-auto">
+          <ScheduleDebugToggle enabled={debug} onChange={toggleDebug} />
+        </div>
       </div>
+
+      {debug && (
+        <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-[11px] font-mono text-muted-foreground">
+          Showing raw <span className="font-semibold">scheduledDate</span> /{" "}
+          <span className="font-semibold">scheduledTime</span> for each job below.
+          Red = parse failed (job won't land at the right slot).
+        </div>
+      )}
 
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">Loading calendar...</div>
@@ -264,6 +288,7 @@ export default function AdminCalendar() {
           currentDate={currentDate}
           onJobClick={openJob}
           mode="admin"
+          showDebug={debug}
         />
       )}
 
@@ -287,6 +312,12 @@ export default function AdminCalendar() {
                   <div><span className="text-muted-foreground">Duration:</span> {selectedJob.estimatedDuration}</div>
                 </div>
 
+                {debug && (
+                  <ScheduleDebugBadge
+                    scheduledDate={selectedJob.scheduledDate}
+                    scheduledTime={selectedJob.scheduledTime}
+                  />
+                )}
                 <div className="border-t pt-4 space-y-3">
                   <h3 className="text-sm font-semibold">Reschedule</h3>
                   <div className="grid grid-cols-2 gap-2">

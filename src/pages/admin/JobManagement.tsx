@@ -22,6 +22,12 @@ import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  ScheduleDebugBadge,
+  ScheduleDebugToggle,
+  isScheduleDebugEnabled,
+  setScheduleDebugEnabled,
+} from "@/components/calendar/ScheduleDebug";
 
 const NON_BROADCASTABLE = new Set(["Assigned", "InProgress", "Completed", "Cancelled", "Archived"]);
 const NON_ASSIGNABLE = new Set(["InProgress", "Completed", "Cancelled", "Archived"]);
@@ -90,6 +96,12 @@ export default function JobManagement() {
   const [scheduleTime, setScheduleTime] = useState("");
   const [scheduleError, setScheduleError] = useState("");
 
+  // Debug panel
+  const [debug, setDebug] = useState(() => isScheduleDebugEnabled());
+  function toggleDebug(next: boolean) {
+    setDebug(next);
+    setScheduleDebugEnabled(next);
+  }
   const { data: jobs = [], isLoading } = useJobs();
   const { data: providers = [] } = useServiceProviders();
   const { data: categories = [] } = useServiceCategories();
@@ -628,7 +640,18 @@ export default function JobManagement() {
             <SelectItem value="scheduled">Scheduled Date</SelectItem>
           </SelectContent>
         </Select>
+        <div className="ml-auto">
+          <ScheduleDebugToggle enabled={debug} onChange={toggleDebug} />
+        </div>
       </div>
+
+      {debug && (
+        <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-[11px] font-mono text-muted-foreground">
+          Debug column shows raw <span className="font-semibold">scheduledDate</span> /{" "}
+          <span className="font-semibold">scheduledTime</span> from each job row.
+          Red = parse failed.
+        </div>
+      )}
 
       {selectedIds.size > 0 && (
         <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/5 px-4 py-3 shadow-sm">
@@ -798,12 +821,32 @@ export default function JobManagement() {
                           <div className="flex flex-col leading-tight">
                             <span className="text-foreground">{dateStr}</span>
                             {job.scheduledTime && <span className="text-xs">{timeStr || job.scheduledTime}</span>}
+                            {debug && (
+                              <ScheduleDebugBadge
+                                scheduledDate={job.scheduledDate}
+                                scheduledTime={job.scheduledTime}
+                              />
+                            )}
                           </div>
                         );
                       }
-                      if (urgency === "ASAP") return <span className="text-destructive font-medium">ASAP</span>;
-                      if (urgency === "Anytime soon") return <span>Flexible</span>;
-                      return <span className="italic">Not scheduled</span>;
+                      return (
+                        <div className="flex flex-col leading-tight">
+                          {urgency === "ASAP" ? (
+                            <span className="text-destructive font-medium">ASAP</span>
+                          ) : urgency === "Anytime soon" ? (
+                            <span>Flexible</span>
+                          ) : (
+                            <span className="italic">Not scheduled</span>
+                          )}
+                          {debug && (
+                            <ScheduleDebugBadge
+                              scheduledDate={job.scheduledDate}
+                              scheduledTime={job.scheduledTime}
+                            />
+                          )}
+                        </div>
+                      );
                     })()}
                   </td>
                   <td className="py-3">

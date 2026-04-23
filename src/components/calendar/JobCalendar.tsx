@@ -30,6 +30,7 @@ interface JobCalendarProps {
   onJobClick: (job: Job) => void;
   onEmptyDayClick?: (date: Date) => void;
   mode: "admin" | "sp";
+  showDebug?: boolean;
 }
 
 function spNameLookup(providers: ServiceProvider[]) {
@@ -228,6 +229,7 @@ interface DayColumnProps {
   getSpName: (id?: string) => string;
   showSp: boolean;
   compact: boolean;
+  showDebug?: boolean;
   onJobClick: (job: Job) => void;
   onEmptyDayClick?: (date: Date) => void;
   showAddAffordance: boolean;
@@ -239,6 +241,7 @@ function DayColumn({
   getSpName,
   showSp,
   compact,
+  showDebug,
   onJobClick,
   onEmptyDayClick,
   showAddAffordance,
@@ -261,6 +264,7 @@ function DayColumn({
               <JobBlock
                 job={job}
                 compact={compact}
+                showDebug={showDebug}
                 spName={showSp ? getSpName(job.assignedSpId) : undefined}
                 onClick={() => onJobClick(job)}
               />
@@ -274,6 +278,7 @@ function DayColumn({
               <JobBlock
                 job={job}
                 compact={compact}
+                showDebug={showDebug}
                 spName={showSp ? getSpName(job.assignedSpId) : undefined}
                 onClick={() => onJobClick(job)}
               />
@@ -326,6 +331,7 @@ function DayColumn({
               key={item.job.dbId}
               job={item.job}
               compact={compact}
+              showDebug={showDebug}
               spName={showSp ? getSpName(item.job.assignedSpId) : undefined}
               onClick={() => onJobClick(item.job)}
               style={{
@@ -345,7 +351,7 @@ function DayColumn({
 }
 
 // ===== Day View =====
-function DayView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode }: JobCalendarProps) {
+function DayView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug }: JobCalendarProps) {
   const getSpName = spNameLookup(providers);
   const dayJobs = jobsOnDate(jobs, currentDate);
   return (
@@ -367,6 +373,7 @@ function DayView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mo
           getSpName={getSpName}
           showSp={mode === "admin"}
           compact={false}
+          showDebug={showDebug}
           onJobClick={onJobClick}
           onEmptyDayClick={onEmptyDayClick}
           showAddAffordance={mode === "admin" && !!onEmptyDayClick}
@@ -377,7 +384,7 @@ function DayView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mo
 }
 
 // ===== Week View =====
-function WeekView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode }: JobCalendarProps) {
+function WeekView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug }: JobCalendarProps) {
   const getSpName = spNameLookup(providers);
   const start = startOfWeek(currentDate, { weekStartsOn: 1 });
   const end = endOfWeek(currentDate, { weekStartsOn: 1 });
@@ -422,6 +429,7 @@ function WeekView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, m
               getSpName={getSpName}
               showSp={mode === "admin"}
               compact
+              showDebug={showDebug}
               onJobClick={onJobClick}
               onEmptyDayClick={onEmptyDayClick}
               showAddAffordance={mode === "admin" && !!onEmptyDayClick}
@@ -434,7 +442,7 @@ function WeekView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, m
 }
 
 // ===== Month View =====
-function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode }: JobCalendarProps) {
+function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug }: JobCalendarProps) {
   const getSpName = spNameLookup(providers);
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -489,6 +497,7 @@ function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, 
                   job={job}
                   compact
                   showTime
+                  showDebug={showDebug}
                   spName={mode === "admin" ? getSpName(job.assignedSpId) : undefined}
                   onClick={() => onJobClick(job)}
                 />
