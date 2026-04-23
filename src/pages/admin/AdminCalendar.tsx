@@ -111,6 +111,7 @@ export default function AdminCalendar() {
   const { data: providers = [] } = useServiceProviders();
   const updateJob = useUpdateJob();
   const assignJob = useAssignJob();
+  const assignCrew = useAssignCrew();
   const { toast } = useToast();
   const autoFocusedInitialDateRef = useRef(false);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -125,6 +126,7 @@ export default function AdminCalendar() {
   const [editDate, setEditDate] = useState("");
   const [editTime, setEditTime] = useState("");
   const [editSp, setEditSp] = useState<string>("");
+  const [sheetCrew, setSheetCrew] = useState<CrewPickerValue[]>([]);
   const [debug, setDebug] = useState(() => isScheduleDebugEnabled());
 
   function toggleDebug(next: boolean) {
