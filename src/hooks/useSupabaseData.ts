@@ -224,7 +224,7 @@ export function useServiceProvider(id: string | undefined) {
 export function useJobs() {
   const { data: customers } = useCustomers();
   return useQuery({
-    queryKey: ["jobs", customers?.length],
+    queryKey: ["jobs"],
     queryFn: async () => {
       const { data, error } = await supabase.from("jobs").select("*").order("scheduled_date", { ascending: true });
       if (error) throw error;
