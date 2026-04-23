@@ -374,6 +374,24 @@ export default function JobForm() {
           />
         </div>
 
+        {/* Crew Assignment */}
+        <div className="metric-card space-y-4">
+          <h2 className="section-title flex items-center gap-2">
+            <Users className="h-4 w-4" /> Crew Assignment
+            <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Assign one or more SPs to this job. The first selected becomes Lead (click ★ to change).
+            {isEdit && " Clearing the crew reverts the job to Created."}
+          </p>
+          <CrewPicker
+            providers={providers}
+            value={crewMembers}
+            onChange={setCrewMembers}
+            payout={parseFloat(form.payout) || computedTotal}
+          />
+        </div>
+
         {/* Location */}
         <div className="metric-card space-y-4">
           <h2 className="section-title">Job Location</h2>
