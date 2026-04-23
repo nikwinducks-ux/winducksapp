@@ -806,7 +806,7 @@ function DayView({
 function WeekView({
   jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug,
   nearestPrevious, nearestNext, nearestPreviousLabel, nearestNextLabel, onJumpToDate,
-  dnd,
+  dnd, unavailableBlocks, onUnavailableClick, onCreateUnavailable,
 }: ViewProps) {
   const getSpName = spNameLookup(providers);
   const getSpColorFor = spColorLookup(providers);
@@ -819,7 +819,6 @@ function WeekView({
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
-      {/* Header strip aligned with time axis */}
       <div className="flex border-b bg-muted/30">
         <div className="w-14 shrink-0 border-r" />
         {days.map((d) => (
@@ -848,11 +847,13 @@ function WeekView({
         <TimeAxis />
         {days.map((d) => {
           const dayJobs = jobsOnDate(jobs, d);
+          const dayBlocks = blocksOnDate(unavailableBlocks, d);
           return (
             <DayColumn
               key={d.toISOString()}
               date={d}
               jobs={dayJobs}
+              blocks={dayBlocks}
               getSpName={getSpName}
               getSpColorFor={getSpColorFor}
               showSp={mode === "admin"}
@@ -860,9 +861,12 @@ function WeekView({
               showDebug={showDebug}
               colorMode={colorMode}
               onJobClick={onJobClick}
+              onUnavailableClick={onUnavailableClick}
+              onCreateUnavailable={onCreateUnavailable}
               onEmptyDayClick={onEmptyDayClick}
               showAddAffordance={mode === "admin" && !!onEmptyDayClick}
               dnd={dnd}
+              mode={mode}
             />
           );
         })}
