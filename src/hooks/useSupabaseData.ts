@@ -228,14 +228,14 @@ export function useJobs() {
     queryFn: async () => {
       const { data, error } = await supabase.from("jobs").select("*").order("scheduled_date", { ascending: true });
       if (error) throw error;
-      // Fetch all job_services in one query
       const jobIds = (data ?? []).map((r: any) => r.id);
       let servicesMap: Record<string, JobService[]> = {};
+      let crewMap: Record<string, { spId: string; isLead: boolean }[]> = {};
       if (jobIds.length > 0) {
-        const { data: svcData } = await supabase
-          .from("job_services")
-          .select("*")
-          .in("job_id", jobIds);
+        const [{ data: svcData }, { data: crewData }] = await Promise.all([
+          supabase.from("job_services").select("*").in("job_id", jobIds),
+          supabase.from("job_crew_members" as any).select("job_id, sp_id, is_lead, added_at").in("job_id", jobIds).order("added_at", { ascending: true }),
+        ]);
         for (const svc of (svcData ?? []) as any[]) {
           if (!servicesMap[svc.job_id]) servicesMap[svc.job_id] = [];
           servicesMap[svc.job_id].push({
@@ -248,10 +248,17 @@ export function useJobs() {
             notes: svc.notes ?? "",
           });
         }
+        for (const c of (crewData ?? []) as any[]) {
+          if (!crewMap[c.job_id]) crewMap[c.job_id] = [];
+          crewMap[c.job_id].push({ spId: c.sp_id, isLead: c.is_lead });
+        }
       }
       return (data ?? []).map((r) => {
         const job = dbToJob(r, customers ?? []);
         job.services = servicesMap[r.id] ?? [];
+        job.crew = crewMap[r.id] ?? [];
+        const n = job.crew.length || 1;
+        job.payoutShare = Math.round((job.payout / n) * 100) / 100;
         return job;
       });
     },
