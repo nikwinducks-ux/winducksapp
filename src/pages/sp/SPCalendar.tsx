@@ -255,6 +255,43 @@ export default function SPCalendar() {
         />
       )}
 
+      {!isLoading && offRangeJobs.length > 0 && (
+        <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-sm font-medium">
+              Other scheduled jobs not in this view
+              <span className="ml-2 text-muted-foreground font-normal">({offRangeJobs.length})</span>
+            </p>
+            {inRangeCount === 0 && (
+              <Button size="sm" variant="outline" onClick={() => jumpToJob(offRangeJobs[0])}>
+                Jump to next ({format(parseISO(offRangeJobs[0].scheduledDate!), "MMM d")})
+              </Button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {offRangeJobs.map((j) => (
+              <button
+                key={j.dbId}
+                onClick={() => jumpToJob(j)}
+                className="inline-flex items-center gap-1.5 rounded-full border bg-background px-2.5 py-1 text-xs hover:border-primary/50 hover:bg-accent transition-colors"
+                title={`${j.customerName} · ${j.address}`}
+              >
+                <span className="font-medium">{j.id}</span>
+                <span className="text-muted-foreground">
+                  {format(parseISO(j.scheduledDate!), "MMM d")}{j.scheduledTime ? ` · ${j.scheduledTime}` : ""}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!isLoading && myCalendarJobs.length === 0 && (
+        <div className="rounded-md border bg-card p-6 text-center text-sm text-muted-foreground">
+          No scheduled jobs or pending offers yet.
+        </div>
+      )}
+
       <UnavailableDialog
         open={dialogOpen}
         initial={dialogInitial}
