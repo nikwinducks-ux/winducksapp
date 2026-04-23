@@ -7,9 +7,10 @@ import {
 } from "date-fns";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import {
-  useJobs, useServiceProviders, useUpdateJob, useAssignJob,
+  useJobs, useServiceProviders, useUpdateJob, useAssignJob, useJobCrew, useAssignCrew,
 } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
+import { CrewPicker, type CrewPickerValue } from "@/components/admin/CrewPicker";
 import { JobCalendar, type CalendarView } from "@/components/calendar/JobCalendar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -110,6 +111,7 @@ export default function AdminCalendar() {
   const { data: providers = [] } = useServiceProviders();
   const updateJob = useUpdateJob();
   const assignJob = useAssignJob();
+  const assignCrew = useAssignCrew();
   const { toast } = useToast();
   const autoFocusedInitialDateRef = useRef(false);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -124,6 +126,7 @@ export default function AdminCalendar() {
   const [editDate, setEditDate] = useState("");
   const [editTime, setEditTime] = useState("");
   const [editSp, setEditSp] = useState<string>("");
+  const [sheetCrew, setSheetCrew] = useState<CrewPickerValue[]>([]);
   const [debug, setDebug] = useState(() => isScheduleDebugEnabled());
 
   function toggleDebug(next: boolean) {
@@ -253,6 +256,11 @@ export default function AdminCalendar() {
     setEditDate(job.scheduledDate ?? "");
     setEditTime(job.scheduledTime ?? "");
     setEditSp(job.assignedSpId ?? "unassigned");
+    const crewSeed: CrewPickerValue[] = (job.crew ?? []).map((c) => ({
+      spId: c.spId,
+      isLead: c.isLead,
+    }));
+    setSheetCrew(crewSeed);
   }
 
   function toggleStatus(id: string) {
@@ -306,16 +314,22 @@ export default function AdminCalendar() {
 
   async function reassign() {
     if (!selectedJob) return;
-    if (editSp === "unassigned" || !editSp) {
-      toast({ title: "Pick an SP", variant: "destructive" });
-      return;
+    try {
+      await assignCrew.mutateAsync({
+        jobId: selectedJob.dbId,
+        members: sheetCrew,
+        userId: user?.id ?? null,
+      });
+      toast({
+        title: sheetCrew.length === 0 ? "Crew cleared" : "Crew updated",
+        description: sheetCrew.length === 0
+          ? "Job returned to Created."
+          : `${sheetCrew.length} SP(s) assigned.`,
+      });
+      setSelectedJob(null);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
-    await assignJob.mutateAsync({
-      jobId: selectedJob.dbId,
-      spId: editSp,
-      assignedByUserId: user?.id ?? null,
-    });
-    setSelectedJob(null);
   }
 
   async function handleReschedule(job: Job, dateISO: string, timeHHMM: string | null) {
@@ -547,9 +561,14 @@ export default function AdminCalendar() {
           {selectedJob && (
             <>
               <SheetHeader>
-                <SheetTitle className="flex items-center gap-2">
+                <SheetTitle className="flex items-center gap-2 flex-wrap">
                   {selectedJob.id}
                   <Badge variant="secondary">{statusLabel(selectedJob.status)}</Badge>
+                  {(selectedJob.crew?.length ?? 0) > 1 && (
+                    <Badge variant="outline" className="text-xs">
+                      Crew ({selectedJob.crew!.length})
+                    </Badge>
+                  )}
                 </SheetTitle>
                 <SheetDescription>{selectedJob.customerName}</SheetDescription>
               </SheetHeader>
@@ -591,18 +610,17 @@ export default function AdminCalendar() {
                 </div>
 
                 <div className="border-t pt-4 space-y-3">
-                  <h3 className="text-sm font-semibold">Reassign SP</h3>
-                  <Select value={editSp} onValueChange={setEditSp}>
-                    <SelectTrigger><SelectValue placeholder="Pick an SP" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unassigned">Unassigned</SelectItem>
-                      {providers.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button size="sm" onClick={reassign} disabled={assignJob.isPending}>
-                    Assign to SP
+                  <h3 className="text-sm font-semibold">Crew Assignment</h3>
+                  <CrewPicker
+                    providers={providers}
+                    value={sheetCrew}
+                    onChange={setSheetCrew}
+                    payout={selectedJob.payout}
+                    maxHeightClass="max-h-48"
+                    helperText="Select one or more SPs. Click ★ to choose the Lead. Clearing all returns the job to Created."
+                  />
+                  <Button size="sm" onClick={reassign} disabled={assignCrew.isPending}>
+                    {assignCrew.isPending ? "Saving..." : "Save assignment"}
                   </Button>
                 </div>
 

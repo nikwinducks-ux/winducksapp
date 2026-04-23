@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useCustomers, useCreateJob, useUpdateJob, useActiveServiceCategories, useJobServices, useSaveJobServices, useJobPhotos, useSaveJobPhotos } from "@/hooks/useSupabaseData";
+import { useCustomers, useCreateJob, useUpdateJob, useActiveServiceCategories, useJobServices, useSaveJobServices, useJobPhotos, useSaveJobPhotos, useJobCrew, useAssignCrew, useServiceProviders } from "@/hooks/useSupabaseData";
+import { useAuth } from "@/contexts/AuthContext";
 import { JobPhotosUploader, type JobPhotosUploaderState } from "@/components/JobPhotosUploader";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -9,11 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Info, MapPin, Radio } from "lucide-react";
+import { ArrowLeft, Info, MapPin, Radio, Users } from "lucide-react";
 import { autofillCoords, SUPPORTED_CITIES } from "@/lib/coord-autofill";
 import { useToast } from "@/hooks/use-toast";
 import { normalizeUrgency } from "@/components/UrgencyBadge";
 import { JobServiceLineItems, type ServiceLineItem } from "@/components/JobServiceLineItems";
+import { CrewPicker, type CrewPickerValue } from "@/components/admin/CrewPicker";
 
 // Generate time options in 15-min increments
 const TIME_OPTIONS: string[] = [];
@@ -62,8 +64,10 @@ export default function JobForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const isEdit = !!id;
   const { data: customers = [] } = useCustomers();
+  const { data: providers = [] } = useServiceProviders();
   const activeCategories = useActiveServiceCategories();
   const createJob = useCreateJob();
   const updateJob = useUpdateJob();
@@ -71,9 +75,12 @@ export default function JobForm() {
   const { data: existingServices = [] } = useJobServices(id);
   const savePhotos = useSaveJobPhotos();
   const { data: existingPhotos = [] } = useJobPhotos(id);
+  const { data: existingCrew = [] } = useJobCrew(id);
+  const assignCrew = useAssignCrew();
   const [photoState, setPhotoState] = useState<JobPhotosUploaderState>({
     newFiles: [], newCaptions: [], keepIds: [], updatedCaptions: {},
   });
+  const [crewMembers, setCrewMembers] = useState<CrewPickerValue[]>([]);
 
   const [form, setForm] = useState({
     customerId: "",
@@ -141,6 +148,13 @@ export default function JobForm() {
       })));
     }
   }, [isEdit, existingServices.length]);
+
+  // Prefill crew from existing crew when editing
+  useEffect(() => {
+    if (isEdit && existingCrew.length > 0) {
+      setCrewMembers(existingCrew.map(c => ({ spId: c.spId, isLead: c.isLead })));
+    }
+  }, [isEdit, existingCrew.length]);
 
   // Auto-fill address from customer
   useEffect(() => {
@@ -238,6 +252,11 @@ export default function JobForm() {
               existing: existingPhotos,
               updatedCaptions: photoState.updatedCaptions,
             });
+            await assignCrew.mutateAsync({
+              jobId: id,
+              members: crewMembers,
+              userId: user?.id ?? null,
+            });
             navigate("/admin/jobs");
           } catch (err: any) {
             toast({ title: "Error saving job extras", description: err.message, variant: "destructive" });
@@ -286,7 +305,17 @@ export default function JobForm() {
             updatedCaptions: {},
           });
         }
-        toast({ title: "Job created", description: `Job saved with ${servicesPayload.length} service(s) and ${photoState.newFiles.length} photo(s).` });
+        if (newJob && crewMembers.length > 0) {
+          await assignCrew.mutateAsync({
+            jobId: newJob.id,
+            members: crewMembers,
+            userId: user?.id ?? null,
+          });
+        }
+        toast({
+          title: "Job created",
+          description: `Job saved with ${servicesPayload.length} service(s), ${photoState.newFiles.length} photo(s), and ${crewMembers.length} crew member(s).`,
+        });
         navigate("/admin/jobs");
       } catch (err: any) {
         toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -342,6 +371,24 @@ export default function JobForm() {
             items={serviceItems}
             onChange={setServiceItems}
             activeCategories={activeCategories}
+          />
+        </div>
+
+        {/* Crew Assignment */}
+        <div className="metric-card space-y-4">
+          <h2 className="section-title flex items-center gap-2">
+            <Users className="h-4 w-4" /> Crew Assignment
+            <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Assign one or more SPs to this job. The first selected becomes Lead (click ★ to change).
+            {isEdit && " Clearing the crew reverts the job to Created."}
+          </p>
+          <CrewPicker
+            providers={providers}
+            value={crewMembers}
+            onChange={setCrewMembers}
+            payout={parseFloat(form.payout) || computedTotal}
           />
         </div>
 
