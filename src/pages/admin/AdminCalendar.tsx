@@ -168,21 +168,38 @@ export default function AdminCalendar() {
     });
   }, [scheduledJobs, spFilter, statusFilters]);
 
-  // Jobs that match filters but fall outside the visible date range
-  const outOfViewInfo = useMemo(() => {
+  // Range diagnostics: jobs in/out of view + nearest neighbours
+  const rangeDiagnostics = useMemo(() => {
     const range = getViewRange(view, currentDate);
-    const outside = filteredJobs
+    const dated = filteredJobs
       .map((j) => ({ job: j, date: parseLocalDate(j.scheduledDate) }))
       .filter((x): x is { job: Job; date: Date } => !!x.date)
-      .filter(({ date }) => !isWithinInterval(date, { start: range.start, end: range.end }))
       .sort((a, b) => a.date.getTime() - b.date.getTime());
-    if (outside.length === 0) return null;
-    return {
-      count: outside.length,
-      earliest: outside[0].date,
-      latest: outside[outside.length - 1].date,
-    };
+
+    const inside = dated.filter(({ date }) =>
+      isWithinInterval(date, { start: range.start, end: range.end })
+    );
+    const outside = dated.filter(
+      ({ date }) => !isWithinInterval(date, { start: range.start, end: range.end })
+    );
+    const previous = [...outside]
+      .filter(({ date }) => date.getTime() < range.start.getTime())
+      .sort((a, b) => b.date.getTime() - a.date.getTime())[0];
+    const next = outside
+      .filter(({ date }) => date.getTime() > range.end.getTime())[0];
+
+    return { range, inside, outside, previous: previous ?? null, next: next ?? null };
   }, [filteredJobs, view, currentDate]);
+
+  const outOfViewInfo = rangeDiagnostics.outside.length > 0
+    ? {
+        count: rangeDiagnostics.outside.length,
+        earliest: rangeDiagnostics.outside[0].date,
+        latest: rangeDiagnostics.outside[rangeDiagnostics.outside.length - 1].date,
+        previous: rangeDiagnostics.previous,
+        next: rangeDiagnostics.next,
+      }
+    : null;
 
   // SP legend: unique SPs (and unassigned indicator) visible in the current filtered set.
   const legendEntries = useMemo(() => {
