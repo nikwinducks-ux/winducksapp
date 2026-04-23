@@ -858,6 +858,7 @@ export type Database = {
           base_address_street: string
           base_lat: number | null
           base_lng: number | null
+          calendar_color: string | null
           cancellation_rate: number
           categories: string[]
           certifications: string[]
@@ -893,6 +894,7 @@ export type Database = {
           base_address_street?: string
           base_lat?: number | null
           base_lng?: number | null
+          calendar_color?: string | null
           cancellation_rate?: number
           categories?: string[]
           certifications?: string[]
@@ -928,6 +930,7 @@ export type Database = {
           base_address_street?: string
           base_lat?: number | null
           base_lng?: number | null
+          calendar_color?: string | null
           cancellation_rate?: number
           categories?: string[]
           certifications?: string[]

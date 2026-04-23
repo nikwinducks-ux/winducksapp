@@ -1,0 +1,1 @@
+ALTER TABLE public.service_providers ADD COLUMN calendar_color text;
