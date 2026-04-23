@@ -100,6 +100,8 @@ function dbToJob(row: any, customers: Customer[]): Job {
     broadcastRadiusKm: row.broadcast_radius_km ?? 100,
     broadcastNote: row.broadcast_note ?? "",
     completedAt: row.completed_at ?? undefined,
+    crew: [],
+    payoutShare: Number(row.payout),
   };
 }
 
@@ -226,14 +228,14 @@ export function useJobs() {
     queryFn: async () => {
       const { data, error } = await supabase.from("jobs").select("*").order("scheduled_date", { ascending: true });
       if (error) throw error;
-      // Fetch all job_services in one query
       const jobIds = (data ?? []).map((r: any) => r.id);
       let servicesMap: Record<string, JobService[]> = {};
+      let crewMap: Record<string, { spId: string; isLead: boolean }[]> = {};
       if (jobIds.length > 0) {
-        const { data: svcData } = await supabase
-          .from("job_services")
-          .select("*")
-          .in("job_id", jobIds);
+        const [{ data: svcData }, { data: crewData }] = await Promise.all([
+          supabase.from("job_services").select("*").in("job_id", jobIds),
+          supabase.from("job_crew_members" as any).select("job_id, sp_id, is_lead, added_at").in("job_id", jobIds).order("added_at", { ascending: true }),
+        ]);
         for (const svc of (svcData ?? []) as any[]) {
           if (!servicesMap[svc.job_id]) servicesMap[svc.job_id] = [];
           servicesMap[svc.job_id].push({
@@ -246,10 +248,17 @@ export function useJobs() {
             notes: svc.notes ?? "",
           });
         }
+        for (const c of (crewData ?? []) as any[]) {
+          if (!crewMap[c.job_id]) crewMap[c.job_id] = [];
+          crewMap[c.job_id].push({ spId: c.sp_id, isLead: c.is_lead });
+        }
       }
       return (data ?? []).map((r) => {
         const job = dbToJob(r, customers ?? []);
         job.services = servicesMap[r.id] ?? [];
+        job.crew = crewMap[r.id] ?? [];
+        const n = job.crew.length || 1;
+        job.payoutShare = Math.round((job.payout / n) * 100) / 100;
         return job;
       });
     },
@@ -723,26 +732,48 @@ export function useAssignJob() {
   const qc = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: async ({ jobId, spId, assignedByUserId }: {
-      jobId: string; spId: string; assignedByUserId: string | null;
+    mutationFn: async ({ jobId, spId, assignedByUserId, spIds, leadSpId }: {
+      jobId: string;
+      spId?: string;
+      assignedByUserId: string | null;
+      spIds?: string[];
+      leadSpId?: string;
     }) => {
-      const { error: jobErr } = await supabase.from("jobs").update({
-        assigned_sp_id: spId,
-        status: "Assigned",
-      }).eq("id", jobId);
-      if (jobErr) throw jobErr;
+      // Support both legacy single-SP call (spId) and crew (spIds)
+      const ids = spIds && spIds.length > 0 ? spIds : (spId ? [spId] : []);
+      if (ids.length === 0) throw new Error("No SP selected");
+      const lead = leadSpId && ids.includes(leadSpId) ? leadSpId : ids[0];
 
-      const { error: assignErr } = await supabase.from("job_assignments").insert({
+      // Replace any existing crew for this job
+      const { error: delErr } = await supabase
+        .from("job_crew_members" as any)
+        .delete()
+        .eq("job_id", jobId);
+      if (delErr) throw delErr;
+
+      const rows = ids.map((sp_id) => ({
         job_id: jobId,
-        sp_id: spId,
+        sp_id,
+        is_lead: sp_id === lead,
+        added_by_user_id: assignedByUserId,
+      }));
+      const { error: insErr } = await supabase.from("job_crew_members" as any).insert(rows);
+      if (insErr) throw insErr;
+
+      // Audit each assignment
+      const auditRows = ids.map((sp_id) => ({
+        job_id: jobId,
+        sp_id,
         assigned_by_user_id: assignedByUserId,
         assignment_type: "Manual",
-      });
-      if (assignErr) console.error("Assignment audit error:", assignErr);
+      }));
+      const { error: auditErr } = await supabase.from("job_assignments").insert(auditRows);
+      if (auditErr) console.error("Assignment audit error:", auditErr);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
-      toast({ title: "SP assigned", description: "Job has been assigned." });
+      qc.invalidateQueries({ queryKey: ["job_crew", undefined] });
+      toast({ title: "Crew assigned", description: "Job crew has been updated." });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -763,11 +794,12 @@ export function useUnassignJob() {
       if (fetchErr) throw fetchErr;
       if (!jobRow.assigned_sp_id) throw new Error("Job is not assigned.");
 
-      const { error: jobErr } = await supabase.from("jobs").update({
-        assigned_sp_id: null,
-        status: "Created",
-      }).eq("id", jobDbId);
-      if (jobErr) throw jobErr;
+      // Clear all crew members; trigger will reset assigned_sp_id and status to Created
+      const { error: delErr } = await supabase
+        .from("job_crew_members" as any)
+        .delete()
+        .eq("job_id", jobDbId);
+      if (delErr) throw delErr;
 
       // Cancel any pending offers
       await supabase.from("offers")
@@ -813,12 +845,13 @@ export function useAcceptJobOffer() {
         throw new Error(`Job is no longer available (status: ${jobRow.status}).`);
       }
 
-      // 2. Update job
-      const { error: jobErr } = await supabase.from("jobs").update({
-        assigned_sp_id: spId,
-        status: "Assigned",
-      }).eq("id", jobDbId).is("assigned_sp_id", null);
-      if (jobErr) throw new Error("Failed to accept job. It may have been taken.");
+      // 2. Insert crew member (lead). Trigger updates jobs.assigned_sp_id + status.
+      const { error: crewErr } = await supabase.from("job_crew_members" as any).insert({
+        job_id: jobDbId,
+        sp_id: spId,
+        is_lead: true,
+      });
+      if (crewErr) throw new Error("Failed to accept job. It may have been taken.");
 
       // 3. Insert assignment audit
       const { error: assignErr } = await supabase.from("job_assignments").insert({
@@ -923,6 +956,104 @@ export function useUpdateJobStatus() {
     onError: (err: any) => {
       toast({ title: "Error updating status", description: err.message, variant: "destructive" });
     },
+  });
+}
+
+// ===== Job Crew =====
+
+export interface JobCrewMember {
+  id: string;
+  jobId: string;
+  spId: string;
+  isLead: boolean;
+  addedAt: string;
+}
+
+export function useJobCrew(jobId: string | undefined) {
+  return useQuery({
+    queryKey: ["job_crew", jobId],
+    queryFn: async () => {
+      if (!jobId) return [];
+      const { data, error } = await supabase
+        .from("job_crew_members" as any)
+        .select("*")
+        .eq("job_id", jobId)
+        .order("added_at", { ascending: true });
+      if (error) throw error;
+      return ((data ?? []) as any[]).map((r) => ({
+        id: r.id, jobId: r.job_id, spId: r.sp_id, isLead: r.is_lead, addedAt: r.added_at,
+      })) as JobCrewMember[];
+    },
+    enabled: !!jobId,
+  });
+}
+
+export function useAddCrewMember() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ jobId, spId, userId }: { jobId: string; spId: string; userId: string | null }) => {
+      const { error } = await supabase.from("job_crew_members" as any).insert({
+        job_id: jobId, sp_id: spId, is_lead: false, added_by_user_id: userId,
+      });
+      if (error) throw error;
+      await supabase.from("job_assignments").insert({
+        job_id: jobId, sp_id: spId, assigned_by_user_id: userId, assignment_type: "Manual",
+      });
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["job_crew", v.jobId] });
+      toast({ title: "Crew member added" });
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+}
+
+export function useRemoveCrewMember() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ jobId, spId }: { jobId: string; spId: string }) => {
+      const { error } = await supabase
+        .from("job_crew_members" as any)
+        .delete()
+        .eq("job_id", jobId)
+        .eq("sp_id", spId);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["job_crew", v.jobId] });
+      toast({ title: "Crew member removed" });
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+}
+
+export function useSetCrewLead() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ jobId, spId }: { jobId: string; spId: string }) => {
+      const { error: clearErr } = await supabase
+        .from("job_crew_members" as any)
+        .update({ is_lead: false })
+        .eq("job_id", jobId);
+      if (clearErr) throw clearErr;
+      const { error } = await supabase
+        .from("job_crew_members" as any)
+        .update({ is_lead: true })
+        .eq("job_id", jobId)
+        .eq("sp_id", spId);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["job_crew", v.jobId] });
+      toast({ title: "Lead updated" });
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 }
 

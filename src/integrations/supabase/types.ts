@@ -410,6 +410,48 @@ export type Database = {
           },
         ]
       }
+      job_crew_members: {
+        Row: {
+          added_at: string
+          added_by_user_id: string | null
+          id: string
+          is_lead: boolean
+          job_id: string
+          sp_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by_user_id?: string | null
+          id?: string
+          is_lead?: boolean
+          job_id: string
+          sp_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by_user_id?: string | null
+          id?: string
+          is_lead?: boolean
+          job_id?: string
+          sp_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_crew_members_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_crew_members_sp_id_fkey"
+            columns: ["sp_id"]
+            isOneToOne: false
+            referencedRelation: "service_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_photos: {
         Row: {
           caption: string
@@ -1109,6 +1151,10 @@ export type Database = {
         }[]
       }
       sp_eligible_for_broadcast_job: {
+        Args: { _job_id: string; _sp_id: string }
+        Returns: boolean
+      }
+      sp_on_job_crew: {
         Args: { _job_id: string; _sp_id: string }
         Returns: boolean
       }

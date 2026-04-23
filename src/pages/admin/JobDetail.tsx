@@ -47,7 +47,7 @@ export default function JobDetail() {
 
   const job = jobs.find((j) => j.dbId === id);
   const [showAssign, setShowAssign] = useState(searchParams.get("assign") === "true");
-  const [selectedSpId, setSelectedSpId] = useState("");
+  const [selectedSpIds, setSelectedSpIds] = useState<string[]>([]);
   const [showSendOffer, setShowSendOffer] = useState(false);
   const [offerSpId, setOfferSpId] = useState("");
   const [offerExpiry, setOfferExpiry] = useState(30);
@@ -78,8 +78,7 @@ export default function JobDetail() {
   // === Handlers ===
 
   const handleAssign = async () => {
-    if (!selectedSpId || !id) return;
-    // Cancel any pending offers first
+    if (selectedSpIds.length === 0 || !id) return;
     const pendingOffers = jobOffers.filter(o => o.status === "Pending");
     if (pendingOffers.length > 0) {
       await supabase.from("offers")
@@ -88,12 +87,13 @@ export default function JobDetail() {
         .eq("status", "Pending");
     }
     assignJob.mutate(
-      { jobId: job!.dbId, spId: selectedSpId, assignedByUserId: user?.id ?? null },
+      { jobId: job!.dbId, spIds: selectedSpIds, leadSpId: selectedSpIds[0], assignedByUserId: user?.id ?? null },
       {
         onSuccess: () => {
           setShowAssign(false);
+          setSelectedSpIds([]);
           refetchOffers();
-          toast({ title: "SP assigned", description: `Job assigned directly. ${pendingOffers.length} pending offer(s) cancelled.` });
+          toast({ title: "Crew assigned", description: `${selectedSpIds.length} SP(s) assigned. ${pendingOffers.length} pending offer(s) cancelled.` });
         },
       }
     );
@@ -383,30 +383,46 @@ export default function JobDetail() {
           </div>
         )}
 
-        {/* Assign SP inline form */}
+        {/* Assign Crew inline form */}
         {showAssign && canDispatch && (
           <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
             <p className="text-xs text-muted-foreground">
-              Direct assignment will cancel all {jobOffers.filter(o => o.status === "Pending").length} pending offer(s).
+              Select one or more SPs. The first selected becomes Lead. Direct assignment will cancel all {jobOffers.filter(o => o.status === "Pending").length} pending offer(s).
             </p>
             <div className="space-y-1.5">
-              <Label className="text-sm">Service Provider</Label>
-              <Select value={selectedSpId} onValueChange={setSelectedSpId}>
-                <SelectTrigger><SelectValue placeholder="Choose an SP..." /></SelectTrigger>
-                <SelectContent>
-                  {providers.filter(sp => sp.status === "Active").map(sp => (
-                    <SelectItem key={sp.id} value={sp.id}>
-                      {sp.name} — {sp.baseAddress.city} · {sp.travelRadius}km
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="text-sm">Crew Members</Label>
+              <div className="max-h-64 overflow-y-auto border rounded-md divide-y bg-background">
+                {providers.filter(sp => sp.status === "Active").map(sp => {
+                  const checked = selectedSpIds.includes(sp.id);
+                  const isLead = selectedSpIds[0] === sp.id;
+                  return (
+                    <label key={sp.id} className="flex items-center gap-3 p-2 cursor-pointer hover:bg-muted/50">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedSpIds([...selectedSpIds, sp.id]);
+                          else setSelectedSpIds(selectedSpIds.filter(x => x !== sp.id));
+                        }}
+                        className="h-4 w-4"
+                      />
+                      <span className="flex-1 text-sm">{sp.name} — {sp.baseAddress.city} · {sp.travelRadius}km</span>
+                      {isLead && <span className="text-xs text-primary font-medium">★ Lead</span>}
+                    </label>
+                  );
+                })}
+              </div>
             </div>
+            {selectedSpIds.length > 1 && (
+              <p className="text-xs text-muted-foreground">
+                Each SP will be paid ${(job.payout / selectedSpIds.length).toFixed(2)} (= ${job.payout} ÷ {selectedSpIds.length})
+              </p>
+            )}
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleAssign} disabled={!selectedSpId || assignJob.isPending}>
-                {assignJob.isPending ? "Assigning..." : "Assign Directly"}
+              <Button size="sm" onClick={handleAssign} disabled={selectedSpIds.length === 0 || assignJob.isPending}>
+                {assignJob.isPending ? "Assigning..." : `Assign ${selectedSpIds.length || ""} SP${selectedSpIds.length === 1 ? "" : "s"}`.trim()}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => { setShowAssign(false); setSelectedSpId(""); }}>Cancel</Button>
+              <Button size="sm" variant="outline" onClick={() => { setShowAssign(false); setSelectedSpIds([]); }}>Cancel</Button>
             </div>
           </div>
         )}
