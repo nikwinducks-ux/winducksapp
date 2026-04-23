@@ -57,6 +57,12 @@ interface JobCalendarProps {
   enableDnd?: boolean;
   onReschedule?: RescheduleHandler;
   onDragBlocked?: (job: Job, reason: string) => void;
+  /** Time-off blocks (rendered as striped bands). */
+  unavailableBlocks?: SpUnavailableBlock[];
+  /** Click an existing unavailable block. */
+  onUnavailableClick?: (block: SpUnavailableBlock) => void;
+  /** SP-only: drag empty grid space to create an unavailable block. */
+  onCreateUnavailable?: (date: Date, start: string, end: string) => void;
 }
 
 
