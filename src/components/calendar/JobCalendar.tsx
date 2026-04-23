@@ -320,6 +320,7 @@ interface DayColumnProps {
   onJobClick: (job: Job) => void;
   onEmptyDayClick?: (date: Date) => void;
   showAddAffordance: boolean;
+  dnd?: DndApi;
 }
 
 function DayColumn({
