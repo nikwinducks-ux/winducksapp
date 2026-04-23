@@ -227,6 +227,8 @@ export default function SPCalendar() {
         </Tabs>
       </div>
 
+      <SPVisibilityDiagnostics jobs={jobs} context="calendar" />
+
       <div className="flex items-center gap-1">
         <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
           <ChevronLeft className="h-4 w-4" />
