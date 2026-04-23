@@ -26,7 +26,7 @@ export default function SPForm() {
     name: string; email: string; phone: string; status: string;
     street: string; city: string; province: string; postalCode: string; country: string;
     lat: string; lng: string; travelRadius: string; maxJobsPerDay: string;
-    notes: string; categories: string[];
+    notes: string; categories: string[]; calendarColor: string | null;
   }>(null);
 
   const formData = form ?? (isEdit && existing ? {
@@ -39,11 +39,12 @@ export default function SPForm() {
     travelRadius: existing.travelRadius?.toString() ?? "30",
     maxJobsPerDay: existing.maxJobsPerDay?.toString() ?? "5",
     notes: existing.notes ?? "", categories: existing.serviceCategories ?? [],
+    calendarColor: existing.calendarColor ?? null,
   } : {
     name: "", email: "", phone: "", status: "Active",
     street: "", city: "", province: "AB", postalCode: "", country: "Canada",
     lat: "", lng: "", travelRadius: "30", maxJobsPerDay: "5",
-    notes: "", categories: [],
+    notes: "", categories: [], calendarColor: null,
   });
 
   if (isEdit && isLoading) return <div className="py-20 text-center text-muted-foreground">Loading...</div>;
