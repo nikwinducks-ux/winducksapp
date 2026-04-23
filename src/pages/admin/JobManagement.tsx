@@ -797,6 +797,16 @@ export default function JobManagement() {
                       <Link to={`/admin/jobs/${job.dbId}?assign=true`}>
                         <Button size="sm" variant="ghost" title="Assign SP"><UserPlus className="h-4 w-4" /></Button>
                       </Link>
+                      {!NON_SCHEDULABLE.has(job.status) && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Schedule"
+                          onClick={() => openScheduleSingle(job)}
+                        >
+                          <CalendarClock className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
