@@ -19,6 +19,7 @@ import {
 } from "@dnd-kit/core";
 import type { Job, ServiceProvider } from "@/data/mockData";
 import { JobBlock, type ColorMode } from "./JobBlock";
+import { getSpColor, type SpColor } from "./spColors";
 import { cn } from "@/lib/utils";
 import {
   useCalendarDnd,
@@ -60,6 +61,11 @@ interface JobCalendarProps {
 function spNameLookup(providers: ServiceProvider[]) {
   const map = new Map(providers.map((p) => [p.id, p.name]));
   return (id?: string) => (id ? map.get(id) ?? "Unknown SP" : "Unassigned");
+}
+
+function spColorLookup(providers: ServiceProvider[]) {
+  const map = new Map(providers.map((p) => [p.id, p.calendarColor ?? null]));
+  return (id?: string): SpColor => getSpColor(id, id ? map.get(id) ?? null : null);
 }
 
 /** Parse a Postgres `date` string ("YYYY-MM-DD") as a local date to avoid TZ shifts. */
