@@ -11,7 +11,7 @@ import {
   isToday,
 } from "date-fns";
 import type { Job, ServiceProvider } from "@/data/mockData";
-import { JobBlock } from "./JobBlock";
+import { JobBlock, type ColorMode } from "./JobBlock";
 import { cn } from "@/lib/utils";
 
 export type CalendarView = "day" | "week" | "month";
