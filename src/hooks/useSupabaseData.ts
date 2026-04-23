@@ -590,6 +590,24 @@ export function useArchiveSP() {
   });
 }
 
+export function useRestoreSP() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("service_providers").update({ status: "Active" }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["service_providers"] });
+      toast({ title: "Provider restored" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+}
+
 // ===== Job Mutations =====
 
 export function useCreateJob() {

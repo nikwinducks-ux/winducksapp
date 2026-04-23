@@ -1,18 +1,32 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useServiceProviders, useToggleSPStatus, useArchiveSP, useJobs } from "@/hooks/useSupabaseData";
+import { useServiceProviders, useToggleSPStatus, useArchiveSP, useRestoreSP, useJobs } from "@/hooks/useSupabaseData";
 import { supabase } from "@/integrations/supabase/client";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, Eye, Pencil, Archive, Ban, CheckCircle } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Search, Plus, Eye, Pencil, Archive, Ban, CheckCircle, RotateCcw } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function SPManagement() {
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<"active" | "archived">("active");
   const { data: providers = [], isLoading } = useServiceProviders();
   const toggleStatus = useToggleSPStatus();
   const archiveMutation = useArchiveSP();
+  const restoreMutation = useRestoreSP();
   const { data: jobs = [] } = useJobs();
 
   const jobCountMap = useMemo(() => {
@@ -69,13 +83,18 @@ export default function SPManagement() {
     },
   });
 
-  const filtered = providers.filter(
-    (sp) =>
-      sp.status !== "Archived" &&
-      (sp.name.toLowerCase().includes(search.toLowerCase()) ||
-        sp.baseAddress.city.toLowerCase().includes(search.toLowerCase()) ||
-        sp.serviceCategories.some((c) => c.toLowerCase().includes(search.toLowerCase())))
-  );
+  const filtered = providers.filter((sp) => {
+    const matchesView = view === "archived" ? sp.status === "Archived" : sp.status !== "Archived";
+    if (!matchesView) return false;
+    const q = search.toLowerCase();
+    return (
+      sp.name.toLowerCase().includes(q) ||
+      sp.baseAddress.city.toLowerCase().includes(q) ||
+      sp.serviceCategories.some((c) => c.toLowerCase().includes(q))
+    );
+  });
+
+  const isArchivedView = view === "archived";
 
   if (isLoading) return <div className="py-20 text-center text-muted-foreground">Loading providers...</div>;
 
@@ -84,108 +103,171 @@ export default function SPManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="page-header">Service Providers</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{filtered.length} providers</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {filtered.length} {isArchivedView ? "archived" : "active"} {filtered.length === 1 ? "provider" : "providers"}
+          </p>
         </div>
         <Link to="/admin/providers/new">
           <Button><Plus className="h-4 w-4 mr-2" />Add Service Provider</Button>
         </Link>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search name, city, category..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+      <div className="flex items-center gap-4 flex-wrap">
+        <Tabs value={view} onValueChange={(v) => setView(v as "active" | "archived")}>
+          <TabsList>
+            <TabsTrigger value="active">Active</TabsTrigger>
+            <TabsTrigger value="archived">Archived</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="relative max-w-sm flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search name, city, category..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        </div>
       </div>
 
       <div className="metric-card overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b text-left">
-              <th className="pb-3 font-medium text-muted-foreground">Name</th>
-              <th className="pb-3 font-medium text-muted-foreground">Status</th>
-              <th className="pb-3 font-medium text-muted-foreground">Login</th>
-              <th className="pb-3 font-medium text-muted-foreground">City</th>
-              <th className="pb-3 font-medium text-muted-foreground">Categories</th>
-              <th className="pb-3 font-medium text-muted-foreground">Availability</th>
-              <th className="pb-3 font-medium text-muted-foreground">Rating</th>
-              <th className="pb-3 font-medium text-muted-foreground">Active Jobs</th>
-              <th className="pb-3 font-medium text-muted-foreground">Compliance</th>
-              <th className="pb-3 font-medium text-muted-foreground">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((sp) => {
-              const login = loginMap.get(sp.id);
-              const availSummary = availMap.get(sp.id);
-              return (
-                <tr key={sp.id} className="border-b last:border-0">
-                  <td className="py-3 font-medium">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs">
-                        {sp.avatar}
+        {filtered.length === 0 ? (
+          <div className="py-16 text-center text-muted-foreground">
+            {isArchivedView ? "No archived providers" : "No providers found"}
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="pb-3 font-medium text-muted-foreground">Name</th>
+                <th className="pb-3 font-medium text-muted-foreground">Status</th>
+                <th className="pb-3 font-medium text-muted-foreground">Login</th>
+                <th className="pb-3 font-medium text-muted-foreground">City</th>
+                <th className="pb-3 font-medium text-muted-foreground">Categories</th>
+                <th className="pb-3 font-medium text-muted-foreground">Availability</th>
+                <th className="pb-3 font-medium text-muted-foreground">Rating</th>
+                <th className="pb-3 font-medium text-muted-foreground">Active Jobs</th>
+                <th className="pb-3 font-medium text-muted-foreground">Compliance</th>
+                <th className="pb-3 font-medium text-muted-foreground">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((sp) => {
+                const login = loginMap.get(sp.id);
+                const availSummary = availMap.get(sp.id);
+                return (
+                  <tr key={sp.id} className="border-b last:border-0">
+                    <td className="py-3 font-medium">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs">
+                          {sp.avatar}
+                        </div>
+                        {sp.name}
                       </div>
-                      {sp.name}
-                    </div>
-                  </td>
-                  <td className="py-3">
-                    <StatusBadge label={sp.status} variant={sp.status === "Active" ? "valid" : "error"} />
-                  </td>
-                  <td className="py-3">
-                    {login ? (
-                      <div>
-                        <p className="text-xs truncate max-w-[140px]">{login.email}</p>
-                        <StatusBadge label="Enabled" variant="valid" />
+                    </td>
+                    <td className="py-3">
+                      <StatusBadge
+                        label={sp.status}
+                        variant={sp.status === "Active" ? "valid" : sp.status === "Archived" ? "warning" : "error"}
+                      />
+                    </td>
+                    <td className="py-3">
+                      {login ? (
+                        <div>
+                          <p className="text-xs truncate max-w-[140px]">{login.email}</p>
+                          <StatusBadge label="Enabled" variant="valid" />
+                        </div>
+                      ) : (
+                        <StatusBadge label="Not Created" variant="warning" />
+                      )}
+                    </td>
+                    <td className="py-3 text-muted-foreground">{sp.baseAddress.city}</td>
+                    <td className="py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {sp.serviceCategories.map((c) => (
+                          <span key={c} className="status-badge bg-secondary text-secondary-foreground">{c}</span>
+                        ))}
                       </div>
-                    ) : (
-                      <StatusBadge label="Not Created" variant="warning" />
-                    )}
-                  </td>
-                  <td className="py-3 text-muted-foreground">{sp.baseAddress.city}</td>
-                  <td className="py-3">
-                    <div className="flex flex-wrap gap-1">
-                      {sp.serviceCategories.map((c) => (
-                        <span key={c} className="status-badge bg-secondary text-secondary-foreground">{c}</span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="py-3 text-xs text-muted-foreground max-w-[160px] truncate">
-                    {availSummary || `${sp.maxJobsPerDay}/day, ${sp.travelRadius}km`}
-                  </td>
-                  <td className="py-3">⭐ {sp.rating}</td>
-                  <td className="py-3">
-                    <span className="font-medium">{jobCountMap.get(sp.id)?.active ?? 0}</span>
-                    <span className="text-muted-foreground text-xs ml-1">/ {jobCountMap.get(sp.id)?.completed ?? 0} done</span>
-                  </td>
-                  <td className="py-3">
-                    <StatusBadge
-                      label={sp.complianceStatus}
-                      variant={sp.complianceStatus === "Valid" ? "valid" : sp.complianceStatus === "Expiring" ? "warning" : "error"}
-                    />
-                  </td>
-                  <td className="py-3">
-                    <div className="flex items-center gap-1">
-                      <Link to={`/admin/providers/${sp.id}`}>
-                        <Button size="sm" variant="ghost" title="View"><Eye className="h-4 w-4" /></Button>
-                      </Link>
-                      <Link to={`/admin/providers/${sp.id}/edit`}>
-                        <Button size="sm" variant="ghost" title="Edit"><Pencil className="h-4 w-4" /></Button>
-                      </Link>
-                      <Button
-                        size="sm" variant="ghost"
-                        title={sp.status === "Active" ? "Suspend" : "Unsuspend"}
-                        onClick={() => toggleStatus.mutate({ id: sp.id, status: sp.status === "Active" ? "Suspended" : "Active" })}
-                      >
-                        {sp.status === "Active" ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-                      </Button>
-                      <Button size="sm" variant="ghost" title="Archive" onClick={() => archiveMutation.mutate(sp.id)}>
-                        <Archive className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    </td>
+                    <td className="py-3 text-xs text-muted-foreground max-w-[160px] truncate">
+                      {availSummary || `${sp.maxJobsPerDay}/day, ${sp.travelRadius}km`}
+                    </td>
+                    <td className="py-3">⭐ {sp.rating}</td>
+                    <td className="py-3">
+                      <span className="font-medium">{jobCountMap.get(sp.id)?.active ?? 0}</span>
+                      <span className="text-muted-foreground text-xs ml-1">/ {jobCountMap.get(sp.id)?.completed ?? 0} done</span>
+                    </td>
+                    <td className="py-3">
+                      <StatusBadge
+                        label={sp.complianceStatus}
+                        variant={sp.complianceStatus === "Valid" ? "valid" : sp.complianceStatus === "Expiring" ? "warning" : "error"}
+                      />
+                    </td>
+                    <td className="py-3">
+                      <div className="flex items-center gap-1">
+                        <Link to={`/admin/providers/${sp.id}`}>
+                          <Button size="sm" variant="ghost" title="View"><Eye className="h-4 w-4" /></Button>
+                        </Link>
+                        {isArchivedView ? (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="sm" variant="ghost" title="Restore">
+                                <RotateCcw className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Restore {sp.name}?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  They will become Active and eligible for job allocation again.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => restoreMutation.mutate(sp.id)}>
+                                  Restore
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        ) : (
+                          <>
+                            <Link to={`/admin/providers/${sp.id}/edit`}>
+                              <Button size="sm" variant="ghost" title="Edit"><Pencil className="h-4 w-4" /></Button>
+                            </Link>
+                            <Button
+                              size="sm" variant="ghost"
+                              title={sp.status === "Active" ? "Suspend" : "Unsuspend"}
+                              onClick={() => toggleStatus.mutate({ id: sp.id, status: sp.status === "Active" ? "Suspended" : "Active" })}
+                            >
+                              {sp.status === "Active" ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="sm" variant="ghost" title="Archive">
+                                  <Archive className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Archive {sp.name}?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    They will be hidden from the active list and removed from job allocation. You can restore them later from the Archived tab.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => archiveMutation.mutate(sp.id)}>
+                                    Archive
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
