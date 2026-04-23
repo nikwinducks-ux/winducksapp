@@ -574,10 +574,13 @@ function EmptyRangeOverlay({
 }
 
 // ===== Day View =====
+type ViewProps = JobCalendarProps & { dnd?: DndApi };
+
 function DayView({
   jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug,
   nearestPrevious, nearestNext, nearestPreviousLabel, nearestNextLabel, onJumpToDate,
-}: JobCalendarProps) {
+  dnd,
+}: ViewProps) {
   const getSpName = spNameLookup(providers);
   const dayJobs = jobsOnDate(jobs, currentDate);
   const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
@@ -606,6 +609,7 @@ function DayView({
           onJobClick={onJobClick}
           onEmptyDayClick={onEmptyDayClick}
           showAddAffordance={mode === "admin" && !!onEmptyDayClick}
+          dnd={dnd}
         />
         {showEmpty && (
           <EmptyRangeOverlay
@@ -626,7 +630,8 @@ function DayView({
 function WeekView({
   jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug,
   nearestPrevious, nearestNext, nearestPreviousLabel, nearestNextLabel, onJumpToDate,
-}: JobCalendarProps) {
+  dnd,
+}: ViewProps) {
   const getSpName = spNameLookup(providers);
   const start = startOfWeek(currentDate, { weekStartsOn: 1 });
   const end = endOfWeek(currentDate, { weekStartsOn: 1 });
@@ -679,6 +684,7 @@ function WeekView({
               onJobClick={onJobClick}
               onEmptyDayClick={onEmptyDayClick}
               showAddAffordance={mode === "admin" && !!onEmptyDayClick}
+              dnd={dnd}
             />
           );
         })}
@@ -698,7 +704,7 @@ function WeekView({
 }
 
 // ===== Month View =====
-function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug }: JobCalendarProps) {
+function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug, dnd }: ViewProps) {
   const getSpName = spNameLookup(providers);
   const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
   const monthStart = startOfMonth(currentDate);
@@ -706,6 +712,7 @@ function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, 
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
+  const dndEnabled = !!dnd?.enabled;
 
   const weekdays = useMemo(
     () => ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
@@ -731,53 +738,99 @@ function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, 
           const visible = dayJobs.slice(0, 3);
           const overflow = dayJobs.length - visible.length;
           return (
-            <div
+            <MonthCell
               key={d.toISOString()}
-              className={cn(
-                "border-r border-b last:border-r-0 min-h-[110px] p-1 space-y-1",
-                !inMonth && "bg-muted/20",
-                isToday(d) && "bg-primary/5"
-              )}
-            >
-              <div
-                className={cn(
-                  "text-xs font-semibold px-1",
-                  !inMonth && "text-muted-foreground",
-                  isToday(d) && "text-primary"
-                )}
-              >
-                {format(d, "d")}
-              </div>
-              {visible.map((job) => (
-                <JobBlock
-                  key={job.dbId}
-                  job={job}
-                  compact
-                  showTime
-                  showDebug={showDebug}
-                  colorMode={colorMode}
-                  spName={mode === "admin" ? getSpName(job.assignedSpId) : undefined}
-                  onClick={() => onJobClick(job)}
-                />
-              ))}
-              {overflow > 0 && (
-                <div className="text-[10px] text-muted-foreground px-1">
-                  +{overflow} more
-                </div>
-              )}
-              {dayJobs.length === 0 && inMonth && mode === "admin" && onEmptyDayClick && (
-                <button
-                  type="button"
-                  onClick={() => onEmptyDayClick(d)}
-                  className="w-full text-[10px] text-muted-foreground/60 hover:text-primary py-1"
-                >
-                  +
-                </button>
-              )}
-            </div>
+              date={d}
+              inMonth={inMonth}
+              dayJobs={dayJobs}
+              visible={visible}
+              overflow={overflow}
+              showDebug={showDebug}
+              colorMode={colorMode}
+              getSpName={getSpName}
+              mode={mode}
+              onJobClick={onJobClick}
+              onEmptyDayClick={onEmptyDayClick}
+              dndEnabled={dndEnabled}
+            />
           );
         })}
       </div>
+    </div>
+  );
+}
+
+interface MonthCellProps {
+  date: Date;
+  inMonth: boolean;
+  dayJobs: Job[];
+  visible: Job[];
+  overflow: number;
+  showDebug?: boolean;
+  colorMode: ColorMode;
+  getSpName: (id?: string) => string;
+  mode: "admin" | "sp";
+  onJobClick: (job: Job) => void;
+  onEmptyDayClick?: (date: Date) => void;
+  dndEnabled: boolean;
+}
+
+function MonthCell({
+  date, inMonth, dayJobs, visible, overflow, showDebug, colorMode, getSpName,
+  mode, onJobClick, onEmptyDayClick, dndEnabled,
+}: MonthCellProps) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `month-cell:${date.toISOString()}`,
+    data: { kind: "month-cell", date },
+    disabled: !dndEnabled,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "border-r border-b last:border-r-0 min-h-[110px] p-1 space-y-1 transition-colors",
+        !inMonth && "bg-muted/20",
+        isToday(date) && "bg-primary/5",
+        isOver && "bg-primary/10 ring-2 ring-primary ring-inset"
+      )}
+    >
+      <div
+        className={cn(
+          "text-xs font-semibold px-1",
+          !inMonth && "text-muted-foreground",
+          isToday(date) && "text-primary"
+        )}
+      >
+        {format(date, "d")}
+      </div>
+      {visible.map((job) => (
+        <JobBlock
+          key={job.dbId}
+          job={job}
+          compact
+          showTime
+          showDebug={showDebug}
+          colorMode={colorMode}
+          spName={mode === "admin" ? getSpName(job.assignedSpId) : undefined}
+          onClick={() => onJobClick(job)}
+          enableDnd={dndEnabled}
+        />
+      ))}
+      {overflow > 0 && (
+        <div className="text-[10px] text-muted-foreground px-1">
+          +{overflow} more
+        </div>
+      )}
+      {dayJobs.length === 0 && inMonth && mode === "admin" && onEmptyDayClick && (
+        <button
+          type="button"
+          onClick={() => onEmptyDayClick(date)}
+          className="w-full text-[10px] text-muted-foreground/60 hover:text-primary py-1"
+        >
+          +
+        </button>
+      )}
     </div>
   );
 }
