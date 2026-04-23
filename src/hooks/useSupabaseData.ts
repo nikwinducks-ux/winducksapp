@@ -222,12 +222,19 @@ export function useServiceProvider(id: string | undefined) {
 }
 
 export function useJobs() {
-  const { data: customers } = useCustomers();
+  const { data: customers, isSuccess: customersReady, isError: customersError } = useCustomers();
   return useQuery({
     queryKey: ["jobs"],
+    // Wait for customers to resolve so customerName is correct on first paint.
+    // If customers errors out (e.g. SP RLS edge case), still run jobs so SPs aren't blocked.
+    enabled: customersReady || customersError,
     queryFn: async () => {
       const { data, error } = await supabase.from("jobs").select("*").order("scheduled_date", { ascending: true });
-      if (error) throw error;
+      if (error) {
+        console.error("[useJobs] jobs query failed", error);
+        throw error;
+      }
+      console.log("[useJobs] fetched", (data ?? []).length, "jobs");
       const jobIds = (data ?? []).map((r: any) => r.id);
       let servicesMap: Record<string, JobService[]> = {};
       let crewMap: Record<string, { spId: string; isLead: boolean }[]> = {};

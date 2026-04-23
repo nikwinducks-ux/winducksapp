@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { JobServicesSummary } from "@/components/JobServicesDisplay";
+import { SPVisibilityDiagnostics } from "@/components/sp/SPVisibilityDiagnostics";
 import { MapPin, Clock, DollarSign, Calendar, FileText, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -41,6 +42,8 @@ export default function MyJobs() {
           Logged in as <span className="font-medium text-foreground">{sp?.name ?? user?.email ?? "—"}</span> · {activeJobs.length} active, {pastJobs.length} past
         </p>
       </div>
+
+      <SPVisibilityDiagnostics jobs={jobs} context="my-jobs" />
 
       {activeJobs.length === 0 && pastJobs.length === 0 && (
         <div className="metric-card text-center py-10">

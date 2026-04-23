@@ -21,6 +21,7 @@ import UnavailableDialog, { type UnavailableDialogValue } from "@/components/cal
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { SPVisibilityDiagnostics } from "@/components/sp/SPVisibilityDiagnostics";
 import {
   Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
@@ -225,6 +226,8 @@ export default function SPCalendar() {
           </TabsList>
         </Tabs>
       </div>
+
+      <SPVisibilityDiagnostics jobs={jobs} context="calendar" />
 
       <div className="flex items-center gap-1">
         <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
