@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { statusLabel } from "@/components/calendar/JobBlock";
 import { getSpColor, getUnassignedSpColor } from "@/components/calendar/spColors";
@@ -126,6 +127,7 @@ export default function AdminCalendar() {
   const [editDate, setEditDate] = useState("");
   const [editTime, setEditTime] = useState("");
   const [editSp, setEditSp] = useState<string>("");
+  const [editInstructions, setEditInstructions] = useState("");
   const [sheetCrew, setSheetCrew] = useState<CrewPickerValue[]>([]);
   const [debug, setDebug] = useState(() => isScheduleDebugEnabled());
 
@@ -256,6 +258,7 @@ export default function AdminCalendar() {
     setEditDate(job.scheduledDate ?? "");
     setEditTime(job.scheduledTime ?? "");
     setEditSp(job.assignedSpId ?? "unassigned");
+    setEditInstructions(job.notes ?? "");
     const crewSeed: CrewPickerValue[] = (job.crew ?? []).map((c) => ({
       spId: c.spId,
       isLead: c.isLead,
@@ -310,6 +313,33 @@ export default function AdminCalendar() {
     });
     toast({ title: "Job unscheduled", description: "Removed from calendar." });
     setSelectedJob(null);
+  }
+
+  async function saveInstructions() {
+    if (!selectedJob) return;
+    const ja = selectedJob.jobAddress;
+    try {
+      await updateJob.mutateAsync({
+        id: selectedJob.dbId,
+        customerId: selectedJob.customerId,
+        serviceCategory: selectedJob.serviceCategory,
+        payout: String(selectedJob.payout),
+        street: ja.street, city: ja.city, province: ja.province,
+        postalCode: ja.postalCode, country: ja.country,
+        lat: ja.lat != null ? String(ja.lat) : "",
+        lng: ja.lng != null ? String(ja.lng) : "",
+        scheduledDate: selectedJob.scheduledDate ?? "",
+        scheduledTime: selectedJob.scheduledTime ?? "",
+        estimatedDuration: selectedJob.estimatedDuration,
+        notes: editInstructions,
+        urgency: selectedJob.urgency,
+      });
+      // Keep sheet open and reflect change locally
+      setSelectedJob({ ...selectedJob, notes: editInstructions });
+      toast({ title: "Instructions saved", description: "Crew will see the updated instructions." });
+    } catch (err: any) {
+      toast({ title: "Save failed", description: err?.message ?? "Try again.", variant: "destructive" });
+    }
   }
 
   async function reassign() {
@@ -607,6 +637,19 @@ export default function AdminCalendar() {
                       Unschedule
                     </Button>
                   </div>
+                </div>
+
+                <div className="border-t pt-4 space-y-3">
+                  <h3 className="text-sm font-semibold">Job Instructions</h3>
+                  <Textarea
+                    value={editInstructions}
+                    onChange={(e) => setEditInstructions(e.target.value)}
+                    placeholder="No instructions yet — add any access notes, gate codes, or special requirements."
+                    rows={4}
+                  />
+                  <Button size="sm" onClick={saveInstructions} disabled={updateJob.isPending}>
+                    {updateJob.isPending ? "Saving..." : "Save instructions"}
+                  </Button>
                 </div>
 
                 <div className="border-t pt-4 space-y-3">
