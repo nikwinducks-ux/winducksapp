@@ -16,7 +16,7 @@ function ScheduleText({ job }: { job: any }) {
 
 export default function MyJobs() {
   const { user } = useAuth();
-  const { data: jobs = [], isLoading } = useJobs();
+  const { data: jobs = [], isLoading, status: jobsStatus, error: jobsError } = useJobs();
   const { data: sp } = useServiceProvider(user?.spId);
 
   const myJobs = jobs.filter(
