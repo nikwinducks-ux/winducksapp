@@ -125,7 +125,13 @@ export default function SPJobDetail() {
           </div>
           <div className="flex items-center gap-3">
             <DollarSign className="h-4 w-4 text-muted-foreground" />
-            <div><p className="text-xs text-muted-foreground">Payout</p><p className="text-xl font-bold text-primary">${job.payout}</p></div>
+            <div>
+              <p className="text-xs text-muted-foreground">Payout</p>
+              <p className="text-xl font-bold text-primary">${myShare.toFixed(2)}</p>
+              {isCrew && (
+                <p className="text-xs text-muted-foreground">Your share of ${job.payout} (÷ {crew.length})</p>
+              )}
+            </div>
           </div>
           {distanceInfo !== null && distanceInfo.distanceKm !== null && (
             <div className="flex items-center gap-3">
