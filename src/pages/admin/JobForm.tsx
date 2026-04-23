@@ -252,6 +252,11 @@ export default function JobForm() {
               existing: existingPhotos,
               updatedCaptions: photoState.updatedCaptions,
             });
+            await assignCrew.mutateAsync({
+              jobId: id,
+              members: crewMembers,
+              userId: user?.id ?? null,
+            });
             navigate("/admin/jobs");
           } catch (err: any) {
             toast({ title: "Error saving job extras", description: err.message, variant: "destructive" });
@@ -300,7 +305,17 @@ export default function JobForm() {
             updatedCaptions: {},
           });
         }
-        toast({ title: "Job created", description: `Job saved with ${servicesPayload.length} service(s) and ${photoState.newFiles.length} photo(s).` });
+        if (newJob && crewMembers.length > 0) {
+          await assignCrew.mutateAsync({
+            jobId: newJob.id,
+            members: crewMembers,
+            userId: user?.id ?? null,
+          });
+        }
+        toast({
+          title: "Job created",
+          description: `Job saved with ${servicesPayload.length} service(s), ${photoState.newFiles.length} photo(s), and ${crewMembers.length} crew member(s).`,
+        });
         navigate("/admin/jobs");
       } catch (err: any) {
         toast({ title: "Error", description: err.message, variant: "destructive" });
