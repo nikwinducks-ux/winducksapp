@@ -75,9 +75,12 @@ export default function SPJobDetail() {
     );
   }
 
-  const isMyJob = job.assignedSpId === user.spId;
+  const isCrewMember = crew.some((c) => c.spId === user.spId);
+  const isMyJob = job.assignedSpId === user.spId || isCrewMember;
   const canMarkInProgress = isMyJob && ["Assigned", "Accepted"].includes(job.status);
   const canMarkCompleted = isMyJob && ["Assigned", "Accepted", "InProgress"].includes(job.status);
+  const isCrew = crew.length > 1;
+  const myShare = isCrew ? Math.round((job.payout / crew.length) * 100) / 100 : job.payout;
 
   const handleStatusUpdate = (newStatus: string) => {
     updateStatus.mutate({
