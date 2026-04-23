@@ -230,6 +230,7 @@ interface DayColumnProps {
   showSp: boolean;
   compact: boolean;
   showDebug?: boolean;
+  colorMode: ColorMode;
   onJobClick: (job: Job) => void;
   onEmptyDayClick?: (date: Date) => void;
   showAddAffordance: boolean;
@@ -242,6 +243,7 @@ function DayColumn({
   showSp,
   compact,
   showDebug,
+  colorMode,
   onJobClick,
   onEmptyDayClick,
   showAddAffordance,
