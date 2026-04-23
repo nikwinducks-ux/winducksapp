@@ -640,7 +640,18 @@ export default function JobManagement() {
             <SelectItem value="scheduled">Scheduled Date</SelectItem>
           </SelectContent>
         </Select>
+        <div className="ml-auto">
+          <ScheduleDebugToggle enabled={debug} onChange={toggleDebug} />
+        </div>
       </div>
+
+      {debug && (
+        <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-[11px] font-mono text-muted-foreground">
+          Debug column shows raw <span className="font-semibold">scheduledDate</span> /{" "}
+          <span className="font-semibold">scheduledTime</span> from each job row.
+          Red = parse failed.
+        </div>
+      )}
 
       {selectedIds.size > 0 && (
         <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/5 px-4 py-3 shadow-sm">
