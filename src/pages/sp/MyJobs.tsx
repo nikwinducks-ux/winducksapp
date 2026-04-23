@@ -17,7 +17,9 @@ export default function MyJobs() {
   const { user } = useAuth();
   const { data: jobs = [], isLoading } = useJobs();
 
-  const myJobs = jobs.filter((j) => j.assignedSpId === user?.spId);
+  const myJobs = jobs.filter(
+    (j) => j.assignedSpId === user?.spId || j.crew?.some((c) => c.spId === user?.spId)
+  );
   const activeJobs = myJobs
     .filter((j) => !["Completed", "Cancelled"].includes(j.status))
     .sort((a, b) => {
