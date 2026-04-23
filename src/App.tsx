@@ -45,6 +45,8 @@ import LaunchReadiness from "./pages/admin/LaunchReadiness";
 import OwnerSetup from "./pages/admin/OwnerSetup";
 import AdminCalendar from "./pages/admin/AdminCalendar";
 import SPCalendar from "./pages/sp/SPCalendar";
+import ReviewSubmit from "./pages/ReviewSubmit";
+import Unsubscribe from "./pages/Unsubscribe";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 
@@ -63,6 +65,8 @@ function AppRoutes() {
   if (!user) {
     return (
       <Routes>
+        <Route path="/review/:token" element={<ReviewSubmit />} />
+        <Route path="/unsubscribe" element={<Unsubscribe />} />
         <Route path="*" element={<Login />} />
       </Routes>
     );
@@ -85,6 +89,10 @@ function AppRoutes() {
   return (
     <DashboardLayout>
       <Routes>
+        {/* Public routes (also accessible while logged in) */}
+        <Route path="/review/:token" element={<ReviewSubmit />} />
+        <Route path="/unsubscribe" element={<Unsubscribe />} />
+
         {/* SP Routes — only accessible to SP role */}
         <Route path="/" element={!isAdmin ? <SPDashboard /> : <Navigate to="/admin" replace />} />
         <Route path="/jobs" element={!isAdmin ? <JobOffers /> : <Navigate to="/admin" replace />} />
