@@ -7,6 +7,8 @@ import type { Job } from "@/data/mockData";
 interface Props {
   jobs: Job[];
   context: "my-jobs" | "calendar";
+  queryState?: "idle" | "pending" | "loading" | "success" | "error";
+  queryError?: string | null;
 }
 
 /**
