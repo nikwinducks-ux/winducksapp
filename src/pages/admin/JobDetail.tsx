@@ -44,6 +44,11 @@ export default function JobDetail() {
   const { data: fairnessCtx } = useFairnessContext(activePolicy?.fairness_json?.rollingWindow ?? 30);
   const saveRun = useSaveAllocationRun();
   const { toast } = useToast();
+  const { data: crew = [] } = useJobCrew(id);
+  const addCrew = useAddCrewMember();
+  const removeCrew = useRemoveCrewMember();
+  const setLead = useSetCrewLead();
+  const [addCrewSpId, setAddCrewSpId] = useState("");
 
   const job = jobs.find((j) => j.dbId === id);
   const [showAssign, setShowAssign] = useState(searchParams.get("assign") === "true");
