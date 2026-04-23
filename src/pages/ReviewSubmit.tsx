@@ -3,18 +3,47 @@ import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Star, CheckCircle2, AlertCircle } from "lucide-react";
+import { Star, CheckCircle2, AlertCircle, Briefcase, Calendar, MapPin, Hash } from "lucide-react";
+
+const COMMENT_MAX = 1000;
+
+type ReadyData = {
+  spName: string;
+  jobNumber: string;
+  serviceSummary: string;
+  scheduledDate: string | null;
+  scheduledTime: string;
+  city: string;
+  region: string;
+  customerName: string;
+  completedAt: string | null;
+};
 
 type LoadState =
   | { kind: "loading" }
-  | { kind: "ready"; spName: string; jobNumber: string }
+  | { kind: "ready"; data: ReadyData }
   | { kind: "submitted" }
   | { kind: "error"; message: string };
 
-function StarInput({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+function StarInput({
+  label,
+  helper,
+  value,
+  onChange,
+  error,
+}: {
+  label: string;
+  helper: string;
+  value: number;
+  onChange: (v: number) => void;
+  error?: string;
+}) {
   return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium text-foreground">{label}</p>
+    <div className="space-y-1.5">
+      <div>
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        <p className="text-xs text-muted-foreground">{helper}</p>
+      </div>
       <div className="flex gap-1">
         {[1, 2, 3, 4, 5].map((n) => (
           <button
@@ -30,8 +59,25 @@ function StarInput({ label, value, onChange }: { label: string; value: number; o
           </button>
         ))}
       </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
+}
+
+function formatDate(dateStr: string | null, timeStr?: string): string {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr + "T00:00:00");
+    const formatted = d.toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    return timeStr ? `${formatted} at ${timeStr}` : formatted;
+  } catch {
+    return dateStr;
+  }
 }
 
 export default function ReviewSubmit() {
@@ -42,6 +88,8 @@ export default function ReviewSubmit() {
   const [communication, setCommunication] = useState(0);
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +104,19 @@ export default function ReviewSubmit() {
         setState({ kind: "error", message: error.message });
         return;
       }
-      const result = data as { error?: string; status?: string; sp_name?: string; job_number?: string };
+      const result = data as {
+        error?: string;
+        status?: string;
+        sp_name?: string;
+        job_number?: string;
+        service_summary?: string;
+        scheduled_date?: string | null;
+        scheduled_time?: string;
+        job_address_city?: string;
+        job_address_region?: string;
+        customer_name?: string;
+        completed_at?: string | null;
+      };
       if (result?.error) {
         setState({ kind: "error", message: result.error });
         return;
@@ -67,8 +127,17 @@ export default function ReviewSubmit() {
       }
       setState({
         kind: "ready",
-        spName: result?.sp_name ?? "your service provider",
-        jobNumber: result?.job_number ?? "",
+        data: {
+          spName: result?.sp_name ?? "your service provider",
+          jobNumber: result?.job_number ?? "",
+          serviceSummary: result?.service_summary ?? "",
+          scheduledDate: result?.scheduled_date ?? null,
+          scheduledTime: result?.scheduled_time ?? "",
+          city: result?.job_address_city ?? "",
+          region: result?.job_address_region ?? "",
+          customerName: result?.customer_name ?? "",
+          completedAt: result?.completed_at ?? null,
+        },
       });
     })();
     return () => {
@@ -76,9 +145,14 @@ export default function ReviewSubmit() {
     };
   }, [token]);
 
+  const commentTooLong = comment.length > COMMENT_MAX;
+  const allRated = onTime >= 1 && quality >= 1 && communication >= 1;
+
   const handleSubmit = async () => {
     if (!token) return;
-    if (onTime < 1 || quality < 1 || communication < 1) return;
+    setAttempted(true);
+    setSubmitError(null);
+    if (!allRated || commentTooLong) return;
     setSubmitting(true);
     const { data, error } = await supabase.rpc("submit_review", {
       _token: token,
@@ -89,12 +163,12 @@ export default function ReviewSubmit() {
     });
     setSubmitting(false);
     if (error) {
-      setState({ kind: "error", message: error.message });
+      setSubmitError(error.message);
       return;
     }
     const result = data as { error?: string; success?: boolean };
     if (result?.error) {
-      setState({ kind: "error", message: result.error });
+      setSubmitError(result.error);
       return;
     }
     setState({ kind: "submitted" });
@@ -103,9 +177,7 @@ export default function ReviewSubmit() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-lg bg-card border rounded-2xl shadow-sm p-8">
-        {state.kind === "loading" && (
-          <p className="text-center text-muted-foreground">Loading…</p>
-        )}
+        {state.kind === "loading" && <p className="text-center text-muted-foreground">Loading…</p>}
 
         {state.kind === "error" && (
           <div className="text-center space-y-3">
@@ -128,30 +200,111 @@ export default function ReviewSubmit() {
         {state.kind === "ready" && (
           <div className="space-y-6">
             <div>
-              <h1 className="text-2xl font-bold">Rate your experience</h1>
+              <h1 className="text-2xl font-bold">Rate your experience with {state.data.spName}</h1>
+              {state.data.customerName && (
+                <p className="text-sm text-muted-foreground mt-2">Hi {state.data.customerName},</p>
+              )}
               <p className="text-sm text-muted-foreground mt-1">
-                How did <strong>{state.spName}</strong> do
-                {state.jobNumber ? ` on ${state.jobNumber}` : ""}?
+                Your feedback helps us keep our service providers accountable. Thank you for taking a moment to share.
               </p>
             </div>
 
-            <StarInput label="On-time arrival" value={onTime} onChange={setOnTime} />
-            <StarInput label="Quality of work" value={quality} onChange={setQuality} />
-            <StarInput label="Communication" value={communication} onChange={setCommunication} />
+            {/* Job summary card */}
+            <div className="bg-muted/40 border rounded-lg p-4 space-y-2 text-sm">
+              {state.data.jobNumber && (
+                <div className="flex items-start gap-2">
+                  <Hash className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                  <span className="font-medium">{state.data.jobNumber}</span>
+                </div>
+              )}
+              {state.data.serviceSummary && (
+                <div className="flex items-start gap-2">
+                  <Briefcase className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                  <span>{state.data.serviceSummary}</span>
+                </div>
+              )}
+              {(state.data.scheduledDate || state.data.completedAt) && (
+                <div className="flex items-start gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                  <span>
+                    {state.data.scheduledDate
+                      ? formatDate(state.data.scheduledDate, state.data.scheduledTime)
+                      : state.data.completedAt
+                        ? `Completed ${new Date(state.data.completedAt).toLocaleDateString()}`
+                        : ""}
+                  </span>
+                </div>
+              )}
+              {(state.data.city || state.data.region) && (
+                <div className="flex items-start gap-2">
+                  <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                  <span>{[state.data.city, state.data.region].filter(Boolean).join(", ")}</span>
+                </div>
+              )}
+            </div>
 
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Comments (optional)</p>
+            <StarInput
+              label="On-time arrival"
+              helper="Did they arrive when expected?"
+              value={onTime}
+              onChange={(v) => {
+                setOnTime(v);
+                setSubmitError(null);
+              }}
+              error={attempted && onTime < 1 ? "Please rate this" : undefined}
+            />
+            <StarInput
+              label="Quality of work"
+              helper="Were you happy with the result?"
+              value={quality}
+              onChange={(v) => {
+                setQuality(v);
+                setSubmitError(null);
+              }}
+              error={attempted && quality < 1 ? "Please rate this" : undefined}
+            />
+            <StarInput
+              label="Communication"
+              helper="Were they clear and responsive?"
+              value={communication}
+              onChange={(v) => {
+                setCommunication(v);
+                setSubmitError(null);
+              }}
+              error={attempted && communication < 1 ? "Please rate this" : undefined}
+            />
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Comments (optional)</p>
+                <span
+                  className={`text-xs ${commentTooLong ? "text-destructive font-medium" : "text-muted-foreground"}`}
+                >
+                  {comment.length}/{COMMENT_MAX}
+                </span>
+              </div>
               <Textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="Anything you'd like us to know?"
                 rows={4}
+                aria-invalid={commentTooLong}
               />
+              {commentTooLong && (
+                <p className="text-xs text-destructive">Comment must be {COMMENT_MAX} characters or fewer.</p>
+              )}
             </div>
+
+            {submitError && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>{submitError}</span>
+              </div>
+            )}
 
             <Button
               onClick={handleSubmit}
-              disabled={submitting || onTime < 1 || quality < 1 || communication < 1}
+              disabled={submitting || commentTooLong}
               className="w-full"
               size="lg"
             >
