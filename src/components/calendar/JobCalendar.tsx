@@ -453,6 +453,7 @@ function WeekView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, m
 // ===== Month View =====
 function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug }: JobCalendarProps) {
   const getSpName = spNameLookup(providers);
+  const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
