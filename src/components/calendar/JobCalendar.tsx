@@ -11,7 +11,7 @@ import {
   isToday,
 } from "date-fns";
 import type { Job, ServiceProvider } from "@/data/mockData";
-import { JobBlock } from "./JobBlock";
+import { JobBlock, type ColorMode } from "./JobBlock";
 import { cn } from "@/lib/utils";
 
 export type CalendarView = "day" | "week" | "month";
@@ -230,6 +230,7 @@ interface DayColumnProps {
   showSp: boolean;
   compact: boolean;
   showDebug?: boolean;
+  colorMode: ColorMode;
   onJobClick: (job: Job) => void;
   onEmptyDayClick?: (date: Date) => void;
   showAddAffordance: boolean;
@@ -242,6 +243,7 @@ function DayColumn({
   showSp,
   compact,
   showDebug,
+  colorMode,
   onJobClick,
   onEmptyDayClick,
   showAddAffordance,
@@ -265,6 +267,7 @@ function DayColumn({
                 job={job}
                 compact={compact}
                 showDebug={showDebug}
+                colorMode={colorMode}
                 spName={showSp ? getSpName(job.assignedSpId) : undefined}
                 onClick={() => onJobClick(job)}
               />
@@ -279,6 +282,7 @@ function DayColumn({
                 job={job}
                 compact={compact}
                 showDebug={showDebug}
+                colorMode={colorMode}
                 spName={showSp ? getSpName(job.assignedSpId) : undefined}
                 onClick={() => onJobClick(job)}
               />
@@ -332,6 +336,7 @@ function DayColumn({
               job={item.job}
               compact={compact}
               showDebug={showDebug}
+              colorMode={colorMode}
               spName={showSp ? getSpName(item.job.assignedSpId) : undefined}
               onClick={() => onJobClick(item.job)}
               style={{
@@ -354,6 +359,7 @@ function DayColumn({
 function DayView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug }: JobCalendarProps) {
   const getSpName = spNameLookup(providers);
   const dayJobs = jobsOnDate(jobs, currentDate);
+  const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="border-b px-4 py-2 flex items-center justify-between">
@@ -374,6 +380,7 @@ function DayView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mo
           showSp={mode === "admin"}
           compact={false}
           showDebug={showDebug}
+          colorMode={colorMode}
           onJobClick={onJobClick}
           onEmptyDayClick={onEmptyDayClick}
           showAddAffordance={mode === "admin" && !!onEmptyDayClick}
@@ -389,6 +396,7 @@ function WeekView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, m
   const start = startOfWeek(currentDate, { weekStartsOn: 1 });
   const end = endOfWeek(currentDate, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start, end });
+  const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
@@ -430,6 +438,7 @@ function WeekView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, m
               showSp={mode === "admin"}
               compact
               showDebug={showDebug}
+              colorMode={colorMode}
               onJobClick={onJobClick}
               onEmptyDayClick={onEmptyDayClick}
               showAddAffordance={mode === "admin" && !!onEmptyDayClick}
@@ -444,6 +453,7 @@ function WeekView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, m
 // ===== Month View =====
 function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug }: JobCalendarProps) {
   const getSpName = spNameLookup(providers);
+  const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
@@ -498,6 +508,7 @@ function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, 
                   compact
                   showTime
                   showDebug={showDebug}
+                  colorMode={colorMode}
                   spName={mode === "admin" ? getSpName(job.assignedSpId) : undefined}
                   onClick={() => onJobClick(job)}
                 />

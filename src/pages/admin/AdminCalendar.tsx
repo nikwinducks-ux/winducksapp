@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { statusLabel } from "@/components/calendar/JobBlock";
+import { getSpColor, getUnassignedSpColor } from "@/components/calendar/spColors";
 import {
   ScheduleDebugBadge,
   ScheduleDebugToggle,
@@ -182,6 +183,33 @@ export default function AdminCalendar() {
       latest: outside[outside.length - 1].date,
     };
   }, [filteredJobs, view, currentDate]);
+
+  // SP legend: unique SPs (and unassigned indicator) visible in the current filtered set.
+  const legendEntries = useMemo(() => {
+    if (spFilter !== "all" && spFilter !== "unassigned") return [];
+    const seen = new Set<string>();
+    let hasUnassigned = false;
+    const entries: { id: string | null; name: string; swatch: string }[] = [];
+    for (const j of filteredJobs) {
+      if (!j.assignedSpId) {
+        hasUnassigned = true;
+        continue;
+      }
+      if (seen.has(j.assignedSpId)) continue;
+      seen.add(j.assignedSpId);
+      const provider = providers.find((p) => p.id === j.assignedSpId);
+      entries.push({
+        id: j.assignedSpId,
+        name: provider?.name ?? "Unknown SP",
+        swatch: getSpColor(j.assignedSpId).swatch,
+      });
+    }
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    if (hasUnassigned) {
+      entries.push({ id: null, name: "Unassigned", swatch: getUnassignedSpColor().swatch });
+    }
+    return entries;
+  }, [filteredJobs, providers, spFilter]);
 
   function jumpTo(date: Date) {
     setCurrentDate(date);
@@ -368,6 +396,18 @@ export default function AdminCalendar() {
               Jump to latest ({format(outOfViewInfo.latest, "MMM d, yyyy")})
             </Button>
           </div>
+        </div>
+      )}
+
+      {legendEntries.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border bg-muted/20 px-3 py-2 text-xs">
+          <span className="text-muted-foreground font-medium">SP colors:</span>
+          {legendEntries.map((e) => (
+            <span key={e.id ?? "unassigned"} className="inline-flex items-center gap-1.5">
+              <span className={`inline-block h-3 w-3 rounded-sm ${e.swatch}`} />
+              <span className="text-foreground">{e.name}</span>
+            </span>
+          ))}
         </div>
       )}
 
