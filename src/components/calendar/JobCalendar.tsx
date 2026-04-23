@@ -646,6 +646,7 @@ function WeekView({
   dnd,
 }: ViewProps) {
   const getSpName = spNameLookup(providers);
+  const getSpColorFor = spColorLookup(providers);
   const start = startOfWeek(currentDate, { weekStartsOn: 1 });
   const end = endOfWeek(currentDate, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start, end });
@@ -690,6 +691,7 @@ function WeekView({
               date={d}
               jobs={dayJobs}
               getSpName={getSpName}
+              getSpColorFor={getSpColorFor}
               showSp={mode === "admin"}
               compact
               showDebug={showDebug}
@@ -719,6 +721,7 @@ function WeekView({
 // ===== Month View =====
 function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug, dnd }: ViewProps) {
   const getSpName = spNameLookup(providers);
+  const getSpColorFor = spColorLookup(providers);
   const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -761,6 +764,7 @@ function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, 
               showDebug={showDebug}
               colorMode={colorMode}
               getSpName={getSpName}
+              getSpColorFor={getSpColorFor}
               mode={mode}
               onJobClick={onJobClick}
               onEmptyDayClick={onEmptyDayClick}
@@ -782,6 +786,7 @@ interface MonthCellProps {
   showDebug?: boolean;
   colorMode: ColorMode;
   getSpName: (id?: string) => string;
+  getSpColorFor: (id?: string) => SpColor;
   mode: "admin" | "sp";
   onJobClick: (job: Job) => void;
   onEmptyDayClick?: (date: Date) => void;
@@ -789,7 +794,7 @@ interface MonthCellProps {
 }
 
 function MonthCell({
-  date, inMonth, dayJobs, visible, overflow, showDebug, colorMode, getSpName,
+  date, inMonth, dayJobs, visible, overflow, showDebug, colorMode, getSpName, getSpColorFor,
   mode, onJobClick, onEmptyDayClick, dndEnabled,
 }: MonthCellProps) {
   const { setNodeRef, isOver } = useDroppable({
@@ -826,6 +831,7 @@ function MonthCell({
           showDebug={showDebug}
           colorMode={colorMode}
           spName={mode === "admin" ? getSpName(job.assignedSpId) : undefined}
+          spColor={getSpColorFor(job.assignedSpId)}
           onClick={() => onJobClick(job)}
           enableDnd={dndEnabled}
         />
