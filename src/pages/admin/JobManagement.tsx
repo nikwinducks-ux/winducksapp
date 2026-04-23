@@ -549,8 +549,61 @@ export default function JobManagement() {
                       </div>
                     )}
                   </td>
-                  <td className="py-3 text-muted-foreground">
-                    {job.assignedSpId ? spMap.get(job.assignedSpId) ?? "—" : "—"}
+                  <td className="py-3">
+                    {(() => {
+                      const blocked = NON_ASSIGNABLE.has(job.status);
+                      const spName = job.assignedSpId ? spMap.get(job.assignedSpId) ?? "Unknown" : "";
+                      if (job.assignedSpId) {
+                        return (
+                          <div className="flex items-center gap-1">
+                            <span className="text-foreground">{spName}</span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                              disabled={blocked}
+                              title={blocked ? `Cannot unassign (${job.status})` : `Unassign ${spName}`}
+                              onClick={() => setUnassignTarget({ jobDbId: job.dbId, jobNumber: job.id, spName })}
+                            >
+                              <UserX className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        );
+                      }
+                      if (blocked) {
+                        return <span className="text-muted-foreground">—</span>;
+                      }
+                      return (
+                        <Select
+                          value=""
+                          onValueChange={(spId) => runAssignSingle(job.dbId, spId)}
+                          disabled={assignJob.isPending}
+                        >
+                          <SelectTrigger className="h-8 w-[180px] text-xs">
+                            <SelectValue placeholder="Assign to…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {activeSps.length === 0 ? (
+                              <div className="px-3 py-2 text-xs text-muted-foreground">No active SPs</div>
+                            ) : (
+                              activeSps.map((sp) => {
+                                const matches = (sp.categories || []).includes(job.serviceCategory);
+                                return (
+                                  <SelectItem key={sp.id} value={sp.id}>
+                                    <span className="flex items-center gap-2">
+                                      <span>{sp.name}</span>
+                                      {matches && (
+                                        <span className="text-[10px] text-muted-foreground">· match</span>
+                                      )}
+                                    </span>
+                                  </SelectItem>
+                                );
+                              })
+                            )}
+                          </SelectContent>
+                        </Select>
+                      );
+                    })()}
                   </td>
                   <td className="py-3 text-muted-foreground">{job.scheduledDate}</td>
                   <td className="py-3">
