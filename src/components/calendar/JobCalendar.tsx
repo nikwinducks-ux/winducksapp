@@ -319,6 +319,7 @@ interface DayColumnProps {
   date: Date;
   jobs: Job[];
   getSpName: (id?: string) => string;
+  getSpColorFor: (id?: string) => SpColor;
   showSp: boolean;
   compact: boolean;
   showDebug?: boolean;
@@ -333,6 +334,7 @@ function DayColumn({
   date,
   jobs,
   getSpName,
+  getSpColorFor,
   showSp,
   compact,
   showDebug,
@@ -364,6 +366,7 @@ function DayColumn({
                 showDebug={showDebug}
                 colorMode={colorMode}
                 spName={showSp ? getSpName(job.assignedSpId) : undefined}
+                spColor={getSpColorFor(job.assignedSpId)}
                 onClick={() => onJobClick(job)}
                 enableDnd={dndEnabled}
               />
@@ -380,6 +383,7 @@ function DayColumn({
                 showDebug={showDebug}
                 colorMode={colorMode}
                 spName={showSp ? getSpName(job.assignedSpId) : undefined}
+                spColor={getSpColorFor(job.assignedSpId)}
                 onClick={() => onJobClick(job)}
                 enableDnd={dndEnabled}
               />
@@ -407,6 +411,7 @@ function DayColumn({
         showDebug={showDebug}
         colorMode={colorMode}
         getSpName={getSpName}
+        getSpColorFor={getSpColorFor}
         showSp={showSp}
         onJobClick={onJobClick}
         dnd={dnd}
@@ -425,6 +430,7 @@ interface DayGridDroppableProps {
   showDebug?: boolean;
   colorMode: ColorMode;
   getSpName: (id?: string) => string;
+  getSpColorFor: (id?: string) => SpColor;
   showSp: boolean;
   onJobClick: (job: Job) => void;
   dnd?: DndApi;
@@ -432,7 +438,7 @@ interface DayGridDroppableProps {
 
 function DayGridDroppable({
   date, today, showNowLine, nowTop, grid, compact, showDebug, colorMode,
-  getSpName, showSp, onJobClick, dnd,
+  getSpName, getSpColorFor, showSp, onJobClick, dnd,
 }: DayGridDroppableProps) {
   const dndEnabled = !!dnd?.enabled;
   const { setNodeRef, isOver, node } = useDroppable({
@@ -507,6 +513,7 @@ function DayGridDroppable({
             showDebug={showDebug}
             colorMode={colorMode}
             spName={showSp ? getSpName(item.job.assignedSpId) : undefined}
+            spColor={getSpColorFor(item.job.assignedSpId)}
             onClick={() => onJobClick(item.job)}
             enableDnd={dndEnabled}
             style={{
