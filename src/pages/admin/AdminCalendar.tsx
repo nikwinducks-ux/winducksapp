@@ -52,9 +52,7 @@ export default function AdminCalendar() {
   const [editSp, setEditSp] = useState<string>("");
 
   const scheduledJobs = useMemo(() => {
-    return jobs.filter(
-      (j) => j.urgency === "Scheduled" && j.scheduledDate
-    );
+    return jobs.filter((j) => !!j.scheduledDate);
   }, [jobs]);
 
   const filteredJobs = useMemo(() => {
