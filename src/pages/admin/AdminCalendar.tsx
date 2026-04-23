@@ -561,9 +561,14 @@ export default function AdminCalendar() {
           {selectedJob && (
             <>
               <SheetHeader>
-                <SheetTitle className="flex items-center gap-2">
+                <SheetTitle className="flex items-center gap-2 flex-wrap">
                   {selectedJob.id}
                   <Badge variant="secondary">{statusLabel(selectedJob.status)}</Badge>
+                  {(selectedJob.crew?.length ?? 0) > 1 && (
+                    <Badge variant="outline" className="text-xs">
+                      Crew ({selectedJob.crew!.length})
+                    </Badge>
+                  )}
                 </SheetTitle>
                 <SheetDescription>{selectedJob.customerName}</SheetDescription>
               </SheetHeader>
@@ -605,18 +610,17 @@ export default function AdminCalendar() {
                 </div>
 
                 <div className="border-t pt-4 space-y-3">
-                  <h3 className="text-sm font-semibold">Reassign SP</h3>
-                  <Select value={editSp} onValueChange={setEditSp}>
-                    <SelectTrigger><SelectValue placeholder="Pick an SP" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unassigned">Unassigned</SelectItem>
-                      {providers.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button size="sm" onClick={reassign} disabled={assignJob.isPending}>
-                    Assign to SP
+                  <h3 className="text-sm font-semibold">Crew Assignment</h3>
+                  <CrewPicker
+                    providers={providers}
+                    value={sheetCrew}
+                    onChange={setSheetCrew}
+                    payout={selectedJob.payout}
+                    maxHeightClass="max-h-48"
+                    helperText="Select one or more SPs. Click ★ to choose the Lead. Clearing all returns the job to Created."
+                  />
+                  <Button size="sm" onClick={reassign} disabled={assignCrew.isPending}>
+                    {assignCrew.isPending ? "Saving..." : "Save assignment"}
                   </Button>
                 </div>
 
