@@ -262,7 +262,6 @@ export function useJobs() {
         return job;
       });
     },
-    enabled: (customers?.length ?? 0) >= 0,
   });
 }
 
