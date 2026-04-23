@@ -1,43 +1,64 @@
 
 
-## Why JOB-1002 isn't showing — and how to fix discoverability
+## Show customer names + color-code SPs on calendar blocks
 
-### Root cause
+Replace the job-number title on every calendar block with the customer name, and tint each block based on the assigned SP so it's easy to scan who's doing what across the day/week/month.
 
-JOB-1002's `scheduled_date` in the database is **2026-02-23** (February 23), not April 23. The calendar code is correctly parsing and placing it — it just lives two months in the past relative to today (2026-04-23), so it's not visible on the current Day/Week/Month view unless the user navigates back.
+### What changes
 
-The DB also confirms the only jobs scheduled on or after today are JOB-1026 and JOB-1004 (both 2026-04-27). All other scheduled jobs (1001, 1002, 1003, 1005–1011) are in February.
+**1. `src/components/calendar/JobBlock.tsx` — title becomes customer name**
 
-So nothing is broken in the rendering pipeline. The problem is the calendar gives no hint that there are 10 scheduled jobs sitting two months back, and the auto-focus skips them.
+- The first line of every block currently shows `[time] JOB-1234`. Change it to `[time] {job.customerName}` (fall back to `"Unassigned customer"` if missing).
+- Job number is still useful — move it to a small muted line below the customer name in non-compact mode (Day / Week). In compact mode (Month chips) it's dropped to keep the chip clean.
+- Payout stays in the top-right.
 
-### What to change
+**2. SP color coding**
 
-**1. `src/pages/admin/AdminCalendar.tsx` — smarter initial focus + "jump to job" hints**
+Add a deterministic color per SP (independent of status):
 
-- **Auto-focus rule, revised**: pick the date with the *most* scheduled jobs within ±30 days of today. If none in that window, fall back to the nearest job (past or future, whichever is closer). This keeps today as the default when there's near-term activity, but doesn't strand the admin on an empty week when all data sits in another month.
-- **"Out of view" banner**: when `filteredJobs` contains scheduled jobs that fall entirely outside the currently visible date range (Day/Week/Month window), render a small inline banner above the calendar:
-  > *"12 scheduled jobs aren't in this view. [Jump to earliest] [Jump to latest]"*
-  Buttons set `currentDate` to the earliest / latest scheduled job date.
+- New helper `getSpColor(spId?: string)` in a new file `src/components/calendar/spColors.ts`. It hashes the SP UUID into one of ~10 distinct hues and returns Tailwind-friendly classes for background tint, border, and text (e.g., `bg-blue-100 border-blue-400 text-blue-900`). Unassigned jobs get a neutral gray.
+- Palette uses calm, professional hues (blue, teal, violet, amber, rose, emerald, indigo, orange, cyan, fuchsia) — all light backgrounds with darker borders to keep text legible on the white calendar canvas.
+- Same SP always gets the same color across Day/Week/Month and across sessions (hash-based, no state).
 
-**2. `src/pages/admin/JobManagement.tsx` — "Show on calendar" row action**
+**3. `JobBlock` color logic**
 
-The Schedule cell already shows the date. Add a tiny calendar icon next to scheduled dates that links to `/admin/calendar?date=YYYY-MM-DD`. Clicking it opens the calendar focused on that exact day.
+`getJobAppearance` currently colors blocks by **status** (pending = dashed primary, accepted = solid primary, in-progress = accent, completed = green, cancelled = muted). Replace this with a layered approach:
 
-**3. `src/pages/admin/AdminCalendar.tsx` — read `?date=` query param**
+- **Base color** = SP color (from `getSpColor(job.assignedSpId)`).
+- **Status overlays** are kept as visual modifiers, not full color swaps:
+  - `Created` / `Offered` → keep the dashed border + reduced opacity (still SP-tinted)
+  - `Completed` → add a subtle green left border accent + checkmark-style opacity
+  - `Cancelled` / `Expired` → grayscale + line-through (SP color suppressed, since the job is dead)
+  - `InProgress` → solid SP color with a small pulsing dot indicator
+  - `Assigned` / `Accepted` → solid SP color, no overlay
 
-On mount, if `?date=YYYY-MM-DD` is present, parse it via `parseLocalDate` and use it as `currentDate` (overriding auto-focus). This makes the new "Show on calendar" link land directly on the right day.
+This keeps status legible while making SP identity the dominant visual signal.
+
+**4. Legend in `AdminCalendar.tsx`**
+
+Add a compact, collapsible "SP colors" legend strip below the filter row (admin mode only). It lists each SP currently visible in `filteredJobs` with their color swatch + name. Hidden when SP filter is set to a single SP (redundant). Unassigned swatch shown if any unassigned jobs are visible.
+
+**5. SP portal calendar (`SPCalendar.tsx`)**
+
+In SP mode every job belongs to the same SP, so color-coding by SP is pointless. Keep status-based coloring there. Implementation: `JobBlock` accepts a new `colorMode?: "sp" | "status"` prop (default `"status"` for backward compat). `JobCalendar` passes `colorMode="sp"` only when `mode="admin"`.
 
 ### Files touched
 
-- `src/pages/admin/AdminCalendar.tsx` — revised auto-focus, query-param support, out-of-view banner
-- `src/pages/admin/JobManagement.tsx` — "Show on calendar" link icon in the Scheduled cell
+- `src/components/calendar/spColors.ts` — new helper: hash → palette entry
+- `src/components/calendar/JobBlock.tsx` — customer name as title, job number demoted, SP color base + status overlays, new `colorMode` prop
+- `src/components/calendar/JobCalendar.tsx` — thread `colorMode` through Day/Week/Month based on `mode`
+- `src/pages/admin/AdminCalendar.tsx` — render SP color legend below the filter bar
 
-No DB changes. No changes to `JobCalendar.tsx` rendering.
+No changes to `SPCalendar.tsx`, no DB changes, no changes to filters / sheet / debug behavior.
 
 ### Acceptance
 
-- Opening `/admin/calendar` today (2026-04-23) lands on a date that has actual scheduled jobs (Feb 23–27 cluster, since no jobs in the last/next 30 days)
-- A banner appears whenever there are scheduled jobs outside the current Day/Week/Month window, with one-click jump to earliest / latest
-- Clicking the new calendar icon next to JOB-1002's date in the Jobs list opens the calendar on Feb 23, 2026 with JOB-1002 visible at 1:00 PM
-- All existing filters, debug toggle, sheet, reschedule, and reassign behaviors continue to work unchanged
+- Each calendar block shows the customer name as its primary title (with optional time prefix), in Day / Week / Month
+- The job number appears as a small muted secondary line in Day and Week views; hidden in Month chips
+- Every block in admin views is tinted with a unique, stable color per SP; the same SP gets the same color across sessions and views
+- Unassigned jobs are visibly neutral (gray)
+- Pending (Created / Offered) blocks remain dashed and semi-transparent but still carry the SP tint
+- Cancelled / Expired blocks remain grayed-out with strikethrough
+- Admin calendar shows a legend mapping color swatches to SP names for SPs visible in the current view
+- SP portal calendar (`/sp/calendar`) is unchanged — still status-colored
 
