@@ -111,6 +111,7 @@ export default function AdminCalendar() {
   const assignJob = useAssignJob();
   const { toast } = useToast();
   const autoFocusedInitialDateRef = useRef(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [view, setView] = useState<CalendarView>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -133,6 +134,18 @@ export default function AdminCalendar() {
     return jobs.filter((j) => !!j.scheduledDate);
   }, [jobs]);
 
+  // ?date=YYYY-MM-DD takes precedence over auto-focus
+  useEffect(() => {
+    const dateParam = searchParams.get("date");
+    if (!dateParam) return;
+    const parsed = parseLocalDate(dateParam);
+    if (parsed) {
+      setCurrentDate(parsed);
+      setView("day");
+      autoFocusedInitialDateRef.current = true;
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     if (autoFocusedInitialDateRef.current || scheduledJobs.length === 0) return;
     setCurrentDate(getBestCalendarStartDate(scheduledJobs));
@@ -153,6 +166,26 @@ export default function AdminCalendar() {
       return true;
     });
   }, [scheduledJobs, spFilter, statusFilters]);
+
+  // Jobs that match filters but fall outside the visible date range
+  const outOfViewInfo = useMemo(() => {
+    const range = getViewRange(view, currentDate);
+    const outside = filteredJobs
+      .map((j) => ({ job: j, date: parseLocalDate(j.scheduledDate) }))
+      .filter((x): x is { job: Job; date: Date } => !!x.date)
+      .filter(({ date }) => !isWithinInterval(date, { start: range.start, end: range.end }))
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+    if (outside.length === 0) return null;
+    return {
+      count: outside.length,
+      earliest: outside[0].date,
+      latest: outside[outside.length - 1].date,
+    };
+  }, [filteredJobs, view, currentDate]);
+
+  function jumpTo(date: Date) {
+    setCurrentDate(date);
+  }
 
   function navigate(direction: -1 | 1) {
     if (view === "day") setCurrentDate((d) => (direction === 1 ? addDays(d, 1) : subDays(d, 1)));
