@@ -45,6 +45,7 @@ export default function SPJobDetail() {
   const updateStatus = useUpdateJobStatus();
 
   const job = jobs.find((j) => j.dbId === id || j.id === id);
+  const { data: crew = [] } = useJobCrew(job?.dbId);
   const currentSp = providers.find((sp) => sp.id === user?.spId);
   const isLegacy = job && activeCategories.length > 0 && !activeCategories.some((c) => c.name === job.serviceCategory);
 
