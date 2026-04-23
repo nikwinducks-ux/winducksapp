@@ -1,51 +1,38 @@
 
 
-## Assign / Unassign jobs from the Jobs page
+## Require a decline reason when an SP declines a job offer
 
-Add row-level **Assign** and **Unassign** actions, plus **bulk Assign / bulk Unassign** in the existing selection bar on `/admin/jobs`.
+The decline-with-reason flow already exists on the offer detail page (`src/pages/sp/JobOfferDetail.tsx`) — a dropdown of reasons must be picked before "Confirm Decline" enables, and the reason is saved server-side via the `decline_offer` RPC. To make it more accessible and to enforce the requirement everywhere, add an inline **Decline** button to each pending offer card on the offers list, opening a modal that requires a reason before submission.
 
 ### What changes
 
-**File edited: `src/pages/admin/JobManagement.tsx`**
+**File edited: `src/pages/sp/JobOffers.tsx`**
 
-1. **Per-row "Assign SP" control** in the existing "Assigned SP" column:
-   - If `assigned_sp_id` is empty → show an inline `Select` of active SPs ("Assign to…"). Picking one calls `useAssignJob` and the row updates to "Assigned".
-   - If a job is already assigned → show the SP name plus a small **Unassign** button (icon `UserX`). Clicking opens a confirm dialog ("Unassign {SP} from {Job#}?"). On confirm: clear `assigned_sp_id`, set status back to `Created`, cancel any pending offers for the job, and write a `job_status_events` audit row.
-   - Both actions are blocked (with a tooltip-style disabled state) for jobs in `Completed`, `InProgress`, or `Cancelled` status.
+1. Convert each pending offer card from a single `<Link>` into a card with two regions:
+   - The clickable area (still routes to the offer detail page for full review + Accept).
+   - A small action row at the bottom-right with two buttons: **View / Accept** (links to detail page) and **Decline** (opens the new modal).
+2. Add a `DeclineOfferDialog` component that:
+   - Shows the job number + customer for context.
+   - Renders a required `Select` populated from `declineReasons` (`src/data/mockData.ts`).
+   - Shows a warning banner: "Declining may affect your acceptance rate and reliability score."
+   - Disables **Confirm Decline** until a reason is selected (cannot be bypassed).
+   - On confirm, calls `useDeclineOffer().mutate({ offerId, declineReason })` and closes the modal on success. The list auto-refreshes (existing query invalidation + 10s poll).
 
-2. **Bulk actions in the selection bar** (appears when ≥1 row is selected):
-   - **Assign Selected →** opens a dialog with a single SP picker; assigns that SP to every selected eligible job (skips Completed/InProgress/Cancelled and shows a count of skipped).
-   - **Unassign Selected →** confirm dialog; unassigns every selected job that currently has an SP (skips others). Cancels pending offers and writes audit rows.
-   - Writes one `admin_audit_logs` entry per bulk run (`bulk_assign_jobs` / `bulk_unassign_jobs`).
+**File edited: `src/pages/sp/JobOfferDetail.tsx`** (small reinforcement)
 
-3. **SP picker behavior**: lists Active providers only, sorted by name, with category match shown next to each SP name (small muted text) so admins can see compatibility at a glance — purely informational, not a hard filter (admin override is allowed).
+- Keep the existing decline flow exactly as-is. No functional change — just verify the empty-string guard still blocks submit (it does: `disabled={!declineReason || declineOffer.isPending}`).
 
-**File edited: `src/hooks/useSupabaseData.ts`**
+### Why no DB / RPC changes
 
-- Add `useUnassignJob()` hook:
-  - Reads current job (status + assigned_sp_id).
-  - Sets `assigned_sp_id = null`, sets `status = 'Created'`.
-  - Updates any `Pending` offers for that job to `Cancelled`.
-  - Inserts a `job_status_events` row (`old_status → 'Created'`, `note: 'Unassigned by admin'`).
-  - Invalidates `["jobs"]` and `["offers"]`.
-
-### Eligibility rules (enforced in UI)
-
-| Current status | Assign allowed? | Unassign allowed? |
-|---|---|---|
-| Created, Offered | Yes | n/a (no SP) |
-| Assigned, Accepted | Reassign (replaces SP) | Yes |
-| InProgress | No | No |
-| Completed, Cancelled, Archived | No | No |
-
-When **reassigning** an already-assigned job, pending offers (if any) are cancelled and a fresh `job_assignments` audit row is inserted by `useAssignJob`.
+- `offers.decline_reason` column already exists.
+- `decline_offer(_offer_id, _reason)` RPC already persists the reason and validates ownership/status.
+- `declineReasons` list is already exported from `mockData.ts` and used on the detail page; reusing it keeps reasons consistent across both surfaces.
 
 ### Acceptance
 
-- From `/admin/jobs`, an admin can pick an SP from a row dropdown and the job becomes Assigned without leaving the page.
-- An assigned job shows the SP name + Unassign button; clicking + confirming reverts the job to Created and clears the SP.
-- Selecting multiple jobs and clicking **Assign Selected** assigns them all to one chosen SP in one action.
-- Selecting multiple jobs and clicking **Unassign Selected** clears the SP from all eligible ones.
-- Jobs in InProgress / Completed / Cancelled cannot be reassigned or unassigned from this page.
-- All actions write audit entries (`job_assignments`, `job_status_events`, plus `admin_audit_logs` for bulk runs).
+- On `/jobs` (SP portal), every pending offer row shows a **Decline** button alongside the existing tap-to-view behavior.
+- Clicking **Decline** opens a modal that cannot be submitted without selecting a reason from the dropdown.
+- Submitting saves the reason to `offers.decline_reason`, flips the offer to `Declined`, and removes it from the pending list.
+- The existing in-detail decline flow continues to work and also enforces a required reason.
+- No way (UI-side) to decline an offer without choosing a reason.
 
