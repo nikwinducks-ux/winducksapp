@@ -1037,6 +1037,50 @@ export type Database = {
           },
         ]
       }
+      sp_unavailable_blocks: {
+        Row: {
+          block_date: string
+          created_at: string
+          created_by_user_id: string | null
+          end_time: string
+          id: string
+          reason: string
+          sp_id: string
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          block_date: string
+          created_at?: string
+          created_by_user_id?: string | null
+          end_time: string
+          id?: string
+          reason?: string
+          sp_id: string
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          block_date?: string
+          created_at?: string
+          created_by_user_id?: string | null
+          end_time?: string
+          id?: string
+          reason?: string
+          sp_id?: string
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sp_unavailable_blocks_sp_id_fkey"
+            columns: ["sp_id"]
+            isOneToOne: false
+            referencedRelation: "service_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppressed_emails: {
         Row: {
           created_at: string
@@ -1131,6 +1175,7 @@ export type Database = {
         Args: { lat1: number; lat2: number; lng1: number; lng2: number }
         Returns: number
       }
+      hhmm_to_minutes: { Args: { _t: string }; Returns: number }
       is_admin_or_owner: { Args: { _user_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       move_to_dlq: {
@@ -1142,6 +1187,7 @@ export type Database = {
         }
         Returns: number
       }
+      parse_duration_minutes: { Args: { _d: string }; Returns: number }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
@@ -1156,6 +1202,15 @@ export type Database = {
       }
       sp_on_job_crew: {
         Args: { _job_id: string; _sp_id: string }
+        Returns: boolean
+      }
+      sp_unavailable_overlaps: {
+        Args: {
+          _date: string
+          _end_minutes: number
+          _sp_id: string
+          _start_minutes: number
+        }
         Returns: boolean
       }
       stop_broadcast: { Args: { _job_id: string }; Returns: Json }
