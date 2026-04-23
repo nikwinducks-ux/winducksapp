@@ -1,38 +1,70 @@
 
 
-## Require a decline reason when an SP declines a job offer
+## Automated SP scoring via post-job customer reviews
 
-The decline-with-reason flow already exists on the offer detail page (`src/pages/sp/JobOfferDetail.tsx`) — a dropdown of reasons must be picked before "Confirm Decline" enables, and the reason is saved server-side via the `decline_offer` RPC. To make it more accessible and to enforce the requirement everywhere, add an inline **Decline** button to each pending offer card on the offers list, opening a modal that requires a reason before submission.
+When a job is marked **Completed**, email the customer a short rating form. Their responses feed a rolling calculation that updates the SP's `rating`, `on_time_rate`, `reliability_score`, and `completion_rate` automatically — replacing today's static seeded values with real data.
 
-### What changes
+### Recommended approach
 
-**File edited: `src/pages/sp/JobOffers.tsx`**
+A 3-question review (matches your existing scoring factors), one email per completed job, public token-based form (no customer login), and a database trigger that recomputes SP metrics whenever a new review lands.
 
-1. Convert each pending offer card from a single `<Link>` into a card with two regions:
-   - The clickable area (still routes to the offer detail page for full review + Accept).
-   - A small action row at the bottom-right with two buttons: **View / Accept** (links to detail page) and **Decline** (opens the new modal).
-2. Add a `DeclineOfferDialog` component that:
-   - Shows the job number + customer for context.
-   - Renders a required `Select` populated from `declineReasons` (`src/data/mockData.ts`).
-   - Shows a warning banner: "Declining may affect your acceptance rate and reliability score."
-   - Disables **Confirm Decline** until a reason is selected (cannot be bypassed).
-   - On confirm, calls `useDeclineOffer().mutate({ offerId, declineReason })` and closes the modal on success. The list auto-refreshes (existing query invalidation + 10s poll).
+### What gets built
 
-**File edited: `src/pages/sp/JobOfferDetail.tsx`** (small reinforcement)
+**1. New table: `job_reviews`**
+- `id`, `job_id`, `sp_id`, `customer_id`, `review_token` (unique, used in email link), `submitted_at`
+- Three 1–5 star scores: `on_time_score`, `quality_score`, `communication_score`
+- `overall_rating` (computed average of the three), optional `comment` (text)
+- One review per job (`UNIQUE(job_id)`)
+- RLS: admins read all; public can read/update only the row matching their token (via SECURITY DEFINER RPCs `get_review_by_token` and `submit_review`)
 
-- Keep the existing decline flow exactly as-is. No functional change — just verify the empty-string guard still blocks submit (it does: `disabled={!declineReason || declineOffer.isPending}`).
+**2. Trigger on `jobs`: when status flips to `Completed`**
+- Inserts a `job_reviews` row with a fresh token (status `pending`)
+- Calls `pg_net` to invoke a new edge function `send-review-request-email` (same pattern as `notify_offer_push`)
 
-### Why no DB / RPC changes
+**3. New edge function: `send-review-request-email`**
+- Uses Lovable's built-in email infrastructure (no third-party signup needed)
+- Sends the customer a branded email with a link: `https://winducksapp.lovable.app/review/{token}`
+- Subject: "How did {SP name} do? — {Job #}"
 
-- `offers.decline_reason` column already exists.
-- `decline_offer(_offer_id, _reason)` RPC already persists the reason and validates ownership/status.
-- `declineReasons` list is already exported from `mockData.ts` and used on the detail page; reusing it keeps reasons consistent across both surfaces.
+**4. New public page: `/review/:token`**
+- No auth required — token is the credential
+- Three star-rating inputs (On-time arrival, Quality of work, Communication), optional comment
+- Submits via `submit_review` RPC; shows a thank-you state on success
+- Handles already-submitted / invalid token gracefully
+
+**5. Trigger on `job_reviews`: recompute SP scores on insert**
+- Pulls the SP's last 30 completed-and-reviewed jobs and updates `service_providers`:
+  - `rating` = avg(`overall_rating`)
+  - `on_time_rate` = avg(`on_time_score`) × 20 (1–5 → 0–100)
+  - `reliability_score` = weighted blend: 50% on-time + 30% quality + 20% communication, scaled to 0–100
+  - `completion_rate` = % of assigned jobs in window that ended in `Completed` (not `Cancelled`)
+
+**6. Admin visibility**
+- New "Reviews" tab on the SP detail page (`/admin/providers/:id`) listing recent reviews with stars + comments
+- Small "Review pending" / "Reviewed ⭐4.8" badge on the admin Job Detail page
+- New `MetricCard` on the Admin Dashboard: "Avg customer rating (30d)"
+
+### Email setup
+
+Lovable's built-in email system needs a verified sender domain before the first email can be sent. The setup is a one-time, guided flow — after that, all review emails send automatically with no further action.
+
+### Why this design
+
+- **Matches your existing factors**: the three review questions map directly to `on_time_rate`, `rating` (quality), and the reliability formula already used by the allocation engine
+- **No customer accounts needed**: token links keep friction near zero, which is critical for response rate
+- **Self-healing scores**: any new review immediately recomputes the SP's metrics — no cron job, no manual admin action
+- **Extends, doesn't replace**: `cancellation_rate`, `acceptance_rate`, and `avg_response_time` continue to come from offer/job-status events as they do today
 
 ### Acceptance
 
-- On `/jobs` (SP portal), every pending offer row shows a **Decline** button alongside the existing tap-to-view behavior.
-- Clicking **Decline** opens a modal that cannot be submitted without selecting a reason from the dropdown.
-- Submitting saves the reason to `offers.decline_reason`, flips the offer to `Declined`, and removes it from the pending list.
-- The existing in-detail decline flow continues to work and also enforces a required reason.
-- No way (UI-side) to decline an offer without choosing a reason.
+- Marking a job Completed sends a review email to that job's customer within ~30s
+- Customer opens the link, submits 3 stars + optional comment, sees a thank-you page
+- The SP's `rating`, `on_time_rate`, and `reliability_score` on `/admin/providers/:id` update within a second of submission
+- Admins can see all reviews (with comments) on the SP's new Reviews tab
+- A second submission attempt with the same token shows "already submitted"
+- Jobs without a customer email are skipped silently (no broken sends)
+
+### Open question before building
+
+Should the review email be sent **immediately** when status flips to Completed, or **delayed by a few hours** (so the customer has time to inspect the work)? Common choice is 2–4 hours later via a scheduled job; immediate is simpler. Let me know your preference and I'll build accordingly.
 
