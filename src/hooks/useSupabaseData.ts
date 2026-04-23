@@ -794,11 +794,12 @@ export function useUnassignJob() {
       if (fetchErr) throw fetchErr;
       if (!jobRow.assigned_sp_id) throw new Error("Job is not assigned.");
 
-      const { error: jobErr } = await supabase.from("jobs").update({
-        assigned_sp_id: null,
-        status: "Created",
-      }).eq("id", jobDbId);
-      if (jobErr) throw jobErr;
+      // Clear all crew members; trigger will reset assigned_sp_id and status to Created
+      const { error: delErr } = await supabase
+        .from("job_crew_members" as any)
+        .delete()
+        .eq("job_id", jobDbId);
+      if (delErr) throw delErr;
 
       // Cancel any pending offers
       await supabase.from("offers")
