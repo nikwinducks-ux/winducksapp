@@ -1,14 +1,93 @@
 import { useServiceProviders, useJobs, useActiveServiceCategories } from "@/hooks/useSupabaseData";
-import { useSpOffers, useAllSpOffers, useExpireStaleOffers, type Offer } from "@/hooks/useOfferData";
+import { useSpOffers, useAllSpOffers, useExpireStaleOffers, useDeclineOffer, type Offer } from "@/hooks/useOfferData";
 import { JobServicesSummary } from "@/components/JobServicesDisplay";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { Link } from "react-router-dom";
-import { MapPin, Clock, DollarSign, FileText, Timer, ChevronDown, ChevronUp, Info, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { MapPin, Clock, DollarSign, FileText, Timer, ChevronDown, ChevronUp, Info, CheckCircle, XCircle, AlertTriangle, Eye } from "lucide-react";
 import { computeProximityResult } from "@/lib/proximity";
 import { useEffect, useMemo, useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { declineReasons } from "@/data/mockData";
+
+function DeclineOfferDialog({
+  open,
+  onOpenChange,
+  offerId,
+  jobNumber,
+  customerName,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  offerId: string;
+  jobNumber: string;
+  customerName: string;
+}) {
+  const [reason, setReason] = useState("");
+  const declineOffer = useDeclineOffer();
+
+  useEffect(() => {
+    if (!open) setReason("");
+  }, [open]);
+
+  const handleConfirm = () => {
+    if (!reason) return;
+    declineOffer.mutate(
+      { offerId, declineReason: reason },
+      { onSuccess: () => onOpenChange(false) }
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Decline Offer</DialogTitle>
+          <DialogDescription>
+            {jobNumber} · {customerName}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>Declining may affect your acceptance rate and reliability score.</span>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">
+              Reason <span className="text-destructive">*</span>
+            </label>
+            <Select value={reason} onValueChange={setReason}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a reason..." />
+              </SelectTrigger>
+              <SelectContent>
+                {declineReasons.map((r) => (
+                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={declineOffer.isPending}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleConfirm}
+            disabled={!reason || declineOffer.isPending}
+          >
+            {declineOffer.isPending ? "Declining..." : "Confirm Decline"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function ScheduleText({ job }: { job: any }) {
   const urgency = job.urgency || "Scheduled";
