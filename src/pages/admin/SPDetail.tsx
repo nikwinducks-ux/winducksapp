@@ -156,6 +156,29 @@ export default function SPDetail() {
         </TabsList>
 
         <TabsContent value="profile">
+          <div className="metric-card space-y-3 mt-4">
+            <h2 className="section-title">Calendar Color</h2>
+            <p className="text-xs text-muted-foreground">Choose how this provider appears on the admin calendar. "Auto" uses an automatically assigned color.</p>
+            <SPColorPicker
+              value={sp.calendarColor ?? null}
+              disabled={updateColor.isPending}
+              onChange={(key) => {
+                updateColor.mutate(
+                  { id: sp.id, color: key },
+                  {
+                    onSuccess: () => {
+                      toast.success(
+                        key
+                          ? `Color updated. ${sp.name} will now appear in ${PALETTE_LABELS[key as PaletteKey]} on the calendar.`
+                          : `Color reset. ${sp.name} will use the auto-assigned color.`
+                      );
+                    },
+                    onError: (err: any) => toast.error(err?.message ?? "Failed to update color"),
+                  }
+                );
+              }}
+            />
+          </div>
           <div className="metric-card space-y-4 mt-4">
             <h2 className="section-title">Base Address</h2>
             <div className="grid gap-4 sm:grid-cols-2">

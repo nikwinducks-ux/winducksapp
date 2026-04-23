@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, MapPin } from "lucide-react";
 import { autofillCoords, SUPPORTED_CITIES } from "@/lib/coord-autofill";
 import { useToast } from "@/hooks/use-toast";
+import { SPColorPicker } from "@/components/admin/SPColorPicker";
+import type { PaletteKey } from "@/components/calendar/spColors";
 
 export default function SPForm() {
   const { id } = useParams();
@@ -24,7 +26,7 @@ export default function SPForm() {
     name: string; email: string; phone: string; status: string;
     street: string; city: string; province: string; postalCode: string; country: string;
     lat: string; lng: string; travelRadius: string; maxJobsPerDay: string;
-    notes: string; categories: string[];
+    notes: string; categories: string[]; calendarColor: string | null;
   }>(null);
 
   const formData = form ?? (isEdit && existing ? {
@@ -37,11 +39,12 @@ export default function SPForm() {
     travelRadius: existing.travelRadius?.toString() ?? "30",
     maxJobsPerDay: existing.maxJobsPerDay?.toString() ?? "5",
     notes: existing.notes ?? "", categories: existing.serviceCategories ?? [],
+    calendarColor: existing.calendarColor ?? null,
   } : {
     name: "", email: "", phone: "", status: "Active",
     street: "", city: "", province: "AB", postalCode: "", country: "Canada",
     lat: "", lng: "", travelRadius: "30", maxJobsPerDay: "5",
-    notes: "", categories: [],
+    notes: "", categories: [], calendarColor: null,
   });
 
   if (isEdit && isLoading) return <div className="py-20 text-center text-muted-foreground">Loading...</div>;
@@ -138,6 +141,13 @@ export default function SPForm() {
                 </button>
               ))}
             </div>
+          </div>
+          <div>
+            <Label className="mb-2 block">Calendar Color</Label>
+            <SPColorPicker
+              value={formData.calendarColor}
+              onChange={(key: PaletteKey | null) => setForm({ ...formData, calendarColor: key })}
+            />
           </div>
           <div className="space-y-1.5"><Label>Notes</Label><Textarea value={formData.notes} onChange={(e) => update("notes", e.target.value)} rows={3} /></div>
         </div>
