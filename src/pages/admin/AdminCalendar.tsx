@@ -218,7 +218,7 @@ export default function AdminCalendar() {
       entries.push({
         id: j.assignedSpId,
         name: provider?.name ?? "Unknown SP",
-        swatch: getSpColor(j.assignedSpId).swatch,
+        swatch: getSpColor(j.assignedSpId, provider?.calendarColor ?? null).swatch,
       });
     }
     entries.sort((a, b) => a.name.localeCompare(b.name));

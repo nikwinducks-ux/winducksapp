@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { useServiceProvider, useJobs, useToggleSPStatus } from "@/hooks/useSupabaseData";
+import { useServiceProvider, useJobs, useToggleSPStatus, useUpdateSPColor } from "@/hooks/useSupabaseData";
 import { formatAddress } from "@/data/mockData";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
@@ -11,6 +11,9 @@ import { ArrowLeft, MapPin, Pencil, Eye } from "lucide-react";
 import SPLoginAccess from "@/components/admin/SPLoginAccess";
 import SPAvailabilityEditor from "@/components/admin/SPAvailabilityEditor";
 import SPReviewsTab from "@/components/admin/SPReviewsTab";
+import { SPColorPicker } from "@/components/admin/SPColorPicker";
+import { PALETTE_LABELS, type PaletteKey } from "@/components/calendar/spColors";
+import { toast } from "sonner";
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -90,6 +93,7 @@ export default function SPDetail() {
   const { data: sp, isLoading } = useServiceProvider(id);
   const { data: jobs = [] } = useJobs();
   const toggleStatus = useToggleSPStatus();
+  const updateColor = useUpdateSPColor();
 
   if (isLoading) return <div className="py-20 text-center text-muted-foreground">Loading...</div>;
 
