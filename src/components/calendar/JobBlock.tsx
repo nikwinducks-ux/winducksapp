@@ -1,6 +1,9 @@
 import type { Job } from "@/data/mockData";
 import { cn } from "@/lib/utils";
 import { ScheduleDebugBadge } from "./ScheduleDebug";
+import { getSpColor } from "./spColors";
+
+export type ColorMode = "sp" | "status";
 
 export type JobAppearance = {
   /** Tailwind classes for background/border/text color */
@@ -9,6 +12,7 @@ export type JobAppearance = {
   pending: boolean;
 };
 
+/** Status-based coloring (used in SP portal). */
 export function getJobAppearance(job: Job): JobAppearance {
   switch (job.status) {
     case "Created":
@@ -45,6 +49,50 @@ export function getJobAppearance(job: Job): JobAppearance {
       return {
         pending: false,
         classes: "bg-secondary text-secondary-foreground border border-border",
+      };
+  }
+}
+
+/** SP-tinted coloring with status as visual modifier. */
+function getSpJobAppearance(job: Job): JobAppearance & { showInProgressDot?: boolean; completedAccent?: boolean } {
+  const sp = getSpColor(job.assignedSpId);
+
+  switch (job.status) {
+    case "Cancelled":
+    case "Expired":
+      // Suppress SP color entirely — job is dead.
+      return {
+        pending: false,
+        classes:
+          "bg-muted text-muted-foreground border border-border line-through opacity-60 grayscale",
+      };
+    case "Created":
+    case "Offered":
+      return {
+        pending: true,
+        classes: cn(
+          sp.soft,
+          "border-2 border-dashed opacity-75 hover:opacity-95"
+        ),
+      };
+    case "Completed":
+      return {
+        pending: false,
+        completedAccent: true,
+        classes: cn(sp.solid, "border opacity-90"),
+      };
+    case "InProgress":
+      return {
+        pending: false,
+        showInProgressDot: true,
+        classes: cn(sp.solid, "border"),
+      };
+    case "Assigned":
+    case "Accepted":
+    default:
+      return {
+        pending: false,
+        classes: cn(sp.solid, "border"),
       };
   }
 }
@@ -104,33 +152,54 @@ interface JobBlockProps {
   onClick?: () => void;
   className?: string;
   style?: React.CSSProperties;
+  /** "sp" tints by SP identity (admin), "status" colors by job status (SP portal). Default: "status". */
+  colorMode?: ColorMode;
 }
 
-export function JobBlock({ job, spName, compact, showTime, showDebug, onClick, className, style }: JobBlockProps) {
-  const appearance = getJobAppearance(job);
+export function JobBlock({
+  job,
+  spName,
+  compact,
+  showTime,
+  showDebug,
+  onClick,
+  className,
+  style,
+  colorMode = "status",
+}: JobBlockProps) {
+  const spAppearance = colorMode === "sp" ? getSpJobAppearance(job) : null;
+  const appearance = spAppearance ?? getJobAppearance(job);
   const timePrefix = showTime ? formatShortTime(job.scheduledTime) : "";
+  const customerTitle = job.customerName?.trim() || "Unassigned customer";
+  const showInProgressDot = spAppearance?.showInProgressDot;
+  const completedAccent = spAppearance?.completedAccent;
+
   return (
     <button
       type="button"
       onClick={onClick}
       style={style}
       className={cn(
-        "w-full text-left rounded-md px-2 py-1.5 text-xs transition-all shadow-sm overflow-hidden",
+        "relative w-full text-left rounded-md px-2 py-1.5 text-xs transition-all shadow-sm overflow-hidden",
         "focus:outline-none focus:ring-2 focus:ring-ring",
         appearance.classes,
+        completedAccent && "border-l-4 border-l-success",
         className
       )}
     >
       <div className="flex items-center justify-between gap-1">
-        <span className="font-semibold truncate">
-          {timePrefix && <span className="opacity-80 mr-1">{timePrefix}</span>}
-          {job.id}
+        <span className="font-semibold truncate flex items-center gap-1 min-w-0">
+          {showInProgressDot && (
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-current animate-pulse shrink-0" />
+          )}
+          {timePrefix && <span className="opacity-80 mr-0.5">{timePrefix}</span>}
+          <span className="truncate">{customerTitle}</span>
         </span>
         <span className="font-semibold shrink-0">${job.payout}</span>
       </div>
       {!compact && (
         <>
-          <div className="truncate font-medium">{job.customerName}</div>
+          <div className="truncate text-[10px] opacity-75">{job.id}</div>
           {job.scheduledTime && (
             <div className="truncate opacity-90">{job.scheduledTime}</div>
           )}
