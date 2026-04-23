@@ -334,6 +334,7 @@ function DayColumn({
   onJobClick,
   onEmptyDayClick,
   showAddAffordance,
+  dnd,
 }: DayColumnProps) {
   const { untimed, outside, grid } = useMemo(() => categorizeDayJobs(jobs), [jobs]);
   const today = isToday(date);
@@ -341,6 +342,7 @@ function DayColumn({
   const showNowLine =
     today && nowMin >= DAY_START_HOUR * 60 && nowMin < DAY_END_HOUR * 60;
   const nowTop = (nowMin - DAY_START_HOUR * 60);
+  const dndEnabled = !!dnd?.enabled;
 
   return (
     <div className="flex-1 min-w-0 border-r last:border-r-0 flex flex-col">
@@ -357,6 +359,7 @@ function DayColumn({
                 colorMode={colorMode}
                 spName={showSp ? getSpName(job.assignedSpId) : undefined}
                 onClick={() => onJobClick(job)}
+                enableDnd={dndEnabled}
               />
             </div>
           ))}
@@ -372,6 +375,7 @@ function DayColumn({
                 colorMode={colorMode}
                 spName={showSp ? getSpName(job.assignedSpId) : undefined}
                 onClick={() => onJobClick(job)}
+                enableDnd={dndEnabled}
               />
             </div>
           ))}
@@ -387,57 +391,129 @@ function DayColumn({
         </div>
       )}
 
-      {/* Hour grid */}
-      <div
-        className={cn("relative flex-1", today && "bg-primary/5")}
-        style={{ height: GRID_HEIGHT_PX }}
-      >
-        {HOURS.map((h) => (
-          <div
-            key={h}
-            className="border-t border-border/40"
-            style={{ height: HOUR_PX }}
+      <DayGridDroppable
+        date={date}
+        today={today}
+        showNowLine={showNowLine}
+        nowTop={nowTop}
+        grid={grid}
+        compact={compact}
+        showDebug={showDebug}
+        colorMode={colorMode}
+        getSpName={getSpName}
+        showSp={showSp}
+        onJobClick={onJobClick}
+        dnd={dnd}
+      />
+    </div>
+  );
+}
+
+interface DayGridDroppableProps {
+  date: Date;
+  today: boolean;
+  showNowLine: boolean;
+  nowTop: number;
+  grid: Positioned[];
+  compact: boolean;
+  showDebug?: boolean;
+  colorMode: ColorMode;
+  getSpName: (id?: string) => string;
+  showSp: boolean;
+  onJobClick: (job: Job) => void;
+  dnd?: DndApi;
+}
+
+function DayGridDroppable({
+  date, today, showNowLine, nowTop, grid, compact, showDebug, colorMode,
+  getSpName, showSp, onJobClick, dnd,
+}: DayGridDroppableProps) {
+  const dndEnabled = !!dnd?.enabled;
+  const { setNodeRef, isOver, node } = useDroppable({
+    id: `day-grid:${date.toISOString()}`,
+    data: { kind: "day-grid", date },
+    disabled: !dndEnabled,
+  });
+
+  // Live ghost label while hovering this droppable.
+  useEffect(() => {
+    if (!dndEnabled || !dnd) return;
+    if (!isOver || !dnd.activeJob) {
+      return;
+    }
+    let raf = 0;
+    const tick = () => {
+      const el = node.current;
+      const ptr = dnd.pointerRef.current;
+      if (el && ptr) {
+        const rect = el.getBoundingClientRect();
+        const yWithin = ptr.y - rect.top;
+        const snapped = yToSnappedMinutes(yWithin);
+        const dayLabel = format(date, "EEE");
+        dnd.updateGhost(`${dayLabel} ${formatGhostTime(snapped)}`);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isOver, dndEnabled, dnd, node, date]);
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "relative flex-1",
+        today && "bg-primary/5",
+        isOver && "bg-primary/10 ring-2 ring-primary ring-inset"
+      )}
+      style={{ height: GRID_HEIGHT_PX }}
+    >
+      {HOURS.map((h) => (
+        <div
+          key={h}
+          className="border-t border-border/40"
+          style={{ height: HOUR_PX }}
+        />
+      ))}
+
+      {/* Now line */}
+      {showNowLine && (
+        <div
+          className="absolute left-0 right-0 z-20 pointer-events-none"
+          style={{ top: nowTop }}
+        >
+          <div className="h-px bg-destructive/70" />
+          <div className="absolute -left-1 -top-1 h-2 w-2 rounded-full bg-destructive" />
+        </div>
+      )}
+
+      {/* Grid jobs */}
+      {grid.map((item) => {
+        const top = item.startMin - DAY_START_HOUR * 60;
+        const height = Math.max(30, item.endMin - item.startMin);
+        const widthPct = 100 / item.laneCount;
+        const leftPct = widthPct * item.lane;
+        return (
+          <JobBlock
+            key={item.job.dbId}
+            job={item.job}
+            compact={compact}
+            showDebug={showDebug}
+            colorMode={colorMode}
+            spName={showSp ? getSpName(item.job.assignedSpId) : undefined}
+            onClick={() => onJobClick(item.job)}
+            enableDnd={dndEnabled}
+            style={{
+              position: "absolute",
+              top,
+              height,
+              left: `calc(${leftPct}% + 2px)`,
+              width: `calc(${widthPct}% - 4px)`,
+            }}
+            className="z-10"
           />
-        ))}
-
-        {/* Now line */}
-        {showNowLine && (
-          <div
-            className="absolute left-0 right-0 z-20 pointer-events-none"
-            style={{ top: nowTop }}
-          >
-            <div className="h-px bg-destructive/70" />
-            <div className="absolute -left-1 -top-1 h-2 w-2 rounded-full bg-destructive" />
-          </div>
-        )}
-
-        {/* Grid jobs */}
-        {grid.map((item) => {
-          const top = item.startMin - DAY_START_HOUR * 60;
-          const height = Math.max(30, item.endMin - item.startMin);
-          const widthPct = 100 / item.laneCount;
-          const leftPct = widthPct * item.lane;
-          return (
-            <JobBlock
-              key={item.job.dbId}
-              job={item.job}
-              compact={compact}
-              showDebug={showDebug}
-              colorMode={colorMode}
-              spName={showSp ? getSpName(item.job.assignedSpId) : undefined}
-              onClick={() => onJobClick(item.job)}
-              style={{
-                position: "absolute",
-                top,
-                height,
-                left: `calc(${leftPct}% + 2px)`,
-                width: `calc(${widthPct}% - 4px)`,
-              }}
-              className="z-10"
-            />
-          );
-        })}
-      </div>
+        );
+      })}
     </div>
   );
 }
