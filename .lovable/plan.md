@@ -1,92 +1,73 @@
 
-## Why the calendar looks empty in your screenshot
 
-This is not a backend fetch failure. The database does have scheduled jobs, and the frontend is loading them.
+## Add drag-and-drop rescheduling to the calendar
 
-What the data shows:
-- There are **no scheduled jobs between Apr 20 and Apr 26, 2026**
-- The next scheduled jobs are:
-  - **JOB-1004** — Apr 27, 2026 at 09:00
-  - **JOB-1026** — Apr 27, 2026 at 10:00
-- Older scheduled jobs exist on **Feb 23–27**
-- Your screenshot is on **Week view: Apr 20–Apr 26**, so the grid is correctly empty for that range
+Let admins reschedule jobs by dragging job blocks across days and time slots, and reassign jobs by dragging them onto an SP "swimlane" header. SP portal stays read-only.
 
-That is also why turning debug on shows nothing in the grid: the current debug badge only renders **on job cards**, and there are no job cards in that visible week.
+### Behaviors
 
-## Fix the discoverability problem so the UI explains this clearly
+**1. Drag a job within Day or Week view (admin only)**
+- Grabbing any timed job block lets the admin drop it onto any 15-minute slot on any day in the visible Day/Week grid.
+- On drop: the job's `scheduledDate` and `scheduledTime` update to the drop target. Duration is preserved.
+- Untimed and "outside hours" jobs in the top strip are also draggable; dropping into the grid assigns them a time.
 
-### 1. Add a real empty-state inside the calendar grid
-Update `src/components/calendar/JobCalendar.tsx` so Day and Week views show a centered empty state when:
-- there are no jobs in the visible day/week range, and
-- there are still filtered scheduled jobs outside the current range
+**2. Drag a job across days in Month view (admin only)**
+- Admin can drag a month-cell chip onto another day cell.
+- On drop: only `scheduledDate` changes; `scheduledTime` is preserved (if untimed, stays untimed).
 
-The empty state should say:
-- “No scheduled jobs in this week”
-- “Next scheduled job: Mon Apr 27 at 9:00 AM” when available
-- buttons for:
-  - `Jump to next scheduled`
-  - `Jump to previous scheduled`
+**3. Visual feedback during drag**
+- Dragged block gets reduced opacity + ring outline.
+- Hovered drop target (day column or month cell) gets a soft `bg-primary/10` highlight.
+- A floating "ghost time" label follows the cursor in Day/Week showing the snapped target time (e.g. "Wed 1:15 PM").
+- Snap increments: 15 minutes (matches existing scheduling UX).
 
-This solves the current confusion where the grid looks broken even though it is just empty.
+**4. Optimistic UI + persistence**
+- On drop, the calendar updates immediately (optimistic React Query cache mutation on the `["jobs"]` key) and a single PATCH-style call is sent via the existing `useUpdateJob` mutation, sending the full required field set with new `scheduledDate` / `scheduledTime` and `urgency: "Scheduled"`.
+- On success: small toast "Rescheduled JOB-XXXX to {date} at {time}".
+- On failure: toast error + cache invalidation rolls back the move.
 
-### 2. Make debug useful even when there are no visible cards
-Update `src/pages/admin/AdminCalendar.tsx` so debug mode also renders a lightweight diagnostics panel above the calendar listing:
-- current visible range
-- total filtered scheduled jobs
-- jobs inside current range
-- first previous scheduled date
-- first next scheduled date
+**5. Confirmation guard for risky moves**
+- If the job's current status is `InProgress` or `Completed`, the drag is blocked with a toast "Cannot reschedule a job that has already started." (matches existing job-edit guards.)
+- If the job is `Cancelled` / `Expired`, drag is blocked silently (the block is not draggable).
+- `Created` / `Offered` / `Assigned` / `Accepted` are freely draggable.
 
-When debug is on, this should immediately explain:
-- “0 jobs in Apr 20–Apr 26”
-- “Next job is Apr 27”
+**6. SP portal**
+- `JobCalendar` receives a new `enableDnd` prop. `AdminCalendar` passes `true`, `SPCalendar` passes `false` (default). SP portal behavior is unchanged.
 
-This is the missing piece in the current debug approach.
+**7. Keyboard / accessibility**
+- Drag is mouse/touch only (HTML5 DnD via pointer events). Existing click-to-open-sheet behavior is preserved — single click still opens the reschedule/reassign sheet, providing a fully keyboard-accessible alternative.
 
-### 3. Pass “nearest scheduled job” metadata into the calendar
-In `src/pages/admin/AdminCalendar.tsx`, compute:
-- `visibleJobs`
-- `previousVisibleCandidate`
-- `nextVisibleCandidate`
+### Implementation approach
 
-Then pass those into `JobCalendar` so the empty-state CTA can jump directly to the correct date.
+Use **`@dnd-kit/core`** (already a common pattern in this stack; small, accessible, no jQuery-style hacks). It supports custom drop sensors, snap-to-grid via `modifiers`, and works cleanly with our absolute-positioned JobBlocks.
 
-### 4. Improve the top out-of-view banner copy
-Keep the existing banner, but make it more specific:
-- instead of only “11 scheduled jobs are not in this view”
-- also show “Nearest next: Apr 27, 2026” and “Nearest previous: Feb 27, 2026”
+- New file `src/components/calendar/useCalendarDnd.ts` — hook that wraps `DndContext`, exposes a `handleDragEnd(event)` that resolves drop target → `{ date, time? }` and calls a passed-in `onReschedule(job, date, time?)`.
+- `JobCalendar.tsx`:
+  - When `enableDnd` is true, wrap the whole calendar in `<DndContext>`.
+  - Day/Week grid: each `DayColumn` registers its hour grid as a droppable. The grid container listens for pointer position to compute the snapped minute (using `event.activatorEvent` + the column's bounding rect). Actual drop math happens in `handleDragEnd`.
+  - Month view: each day cell becomes a droppable; payload is just the date.
+  - `JobBlock` becomes a `useDraggable` element when `enableDnd` is true; otherwise renders unchanged. Drag handle = entire block.
+- `AdminCalendar.tsx`:
+  - Pass `enableDnd` to `JobCalendar`.
+  - Provide `onReschedule(job, dateISO, timeHHmm?)` which calls `updateJob.mutateAsync(...)` with the same field set used by `saveSchedule()` today, then surfaces a toast.
+  - Block the call up-front for InProgress/Completed jobs.
 
-That makes the message actionable at a glance.
+### Files touched
 
-### 5. Keep current rendering logic unchanged
-Do not change:
-- date parsing
-- job placement logic
-- SP color coding
-- customer-name titles
-- filters
-- sheet behavior
+- `package.json` — add `@dnd-kit/core`
+- `src/components/calendar/useCalendarDnd.ts` — new helper hook
+- `src/components/calendar/JobCalendar.tsx` — wire `DndContext`, droppables on Day/Week hour grid + Month cells, snap-to-15min math, ghost time indicator, accept new `enableDnd` and `onReschedule` props
+- `src/components/calendar/JobBlock.tsx` — make block draggable when `enableDnd`; add visual states (`isDragging`, `dragHandleProps`)
+- `src/pages/admin/AdminCalendar.tsx` — pass `enableDnd` + `onReschedule` handler; reuse existing `useUpdateJob` mutation; status guard + toasts
+- `src/pages/sp/SPCalendar.tsx` — no change (omits `enableDnd`, default `false`)
 
-Those are not the source of the empty screenshot.
+### Acceptance
 
-## Files to update
+- Admin can drag a job in Day or Week view to a new day/time; release snaps to 15-minute increments and the job persists at the new slot
+- Admin can drag a chip in Month view to a different day; date persists, time preserved
+- Drop highlights, drag opacity, and a "ghost time" label appear during drag
+- Toast confirms success; failures roll back the optimistic move
+- Jobs with status `InProgress`, `Completed`, `Cancelled`, or `Expired` cannot be dragged (blocked + explanatory toast for active states)
+- Single click still opens the existing reschedule/reassign sheet — drag does not interfere
+- SP portal calendar (`/sp/calendar`) is unchanged
 
-- `src/pages/admin/AdminCalendar.tsx`
-  - compute visible-range diagnostics
-  - compute previous/next scheduled jobs
-  - pass empty-state/debug metadata into calendar
-  - improve out-of-view banner copy
-
-- `src/components/calendar/JobCalendar.tsx`
-  - render explicit empty states in Day/Week
-  - add jump actions for nearest previous/next scheduled jobs
-  - optionally show compact debug summary when `showDebug` is on and there are no visible cards
-
-## Acceptance criteria
-
-- On the Apr 20–Apr 26 week shown in your screenshot, the calendar no longer looks mysteriously blank
-- The page clearly states that there are **0 jobs in the current week**
-- The UI shows that the **next scheduled jobs are on Apr 27**
-- A single click jumps the user to the next scheduled day/week so jobs appear immediately
-- With debug on, the screen shows range-level scheduling diagnostics even when there are no visible job cards
-- Existing job rendering still works unchanged when the selected day/week actually contains jobs
