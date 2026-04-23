@@ -16,7 +16,7 @@ function ScheduleText({ job }: { job: any }) {
 
 export default function MyJobs() {
   const { user } = useAuth();
-  const { data: jobs = [], isLoading } = useJobs();
+  const { data: jobs = [], isLoading, status: jobsStatus, error: jobsError } = useJobs();
   const { data: sp } = useServiceProvider(user?.spId);
 
   const myJobs = jobs.filter(
@@ -43,7 +43,12 @@ export default function MyJobs() {
         </p>
       </div>
 
-      <SPVisibilityDiagnostics jobs={jobs} context="my-jobs" />
+      <SPVisibilityDiagnostics
+        jobs={jobs}
+        context="my-jobs"
+        queryState={jobsStatus as any}
+        queryError={jobsError ? (jobsError as any).message ?? String(jobsError) : null}
+      />
 
       {activeJobs.length === 0 && pastJobs.length === 0 && (
         <div className="metric-card text-center py-10">

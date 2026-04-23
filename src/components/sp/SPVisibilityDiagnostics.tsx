@@ -7,6 +7,8 @@ import type { Job } from "@/data/mockData";
 interface Props {
   jobs: Job[];
   context: "my-jobs" | "calendar";
+  queryState?: "idle" | "pending" | "loading" | "success" | "error";
+  queryError?: string | null;
 }
 
 /**
@@ -15,7 +17,7 @@ interface Props {
  * match the current SP via assignment / crew. Helps localize "I can't see my
  * jobs" issues to either auth, RLS, or filter logic.
  */
-export function SPVisibilityDiagnostics({ jobs, context }: Props) {
+export function SPVisibilityDiagnostics({ jobs, context, queryState, queryError }: Props) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -37,6 +39,8 @@ export function SPVisibilityDiagnostics({ jobs, context }: Props) {
     `role:         ${user.role}\n` +
     `sp_id:        ${spId ?? "(none)"}\n` +
     `is_active:    ${user.isActive}\n` +
+    `query state:  ${queryState ?? "(unknown)"}\n` +
+    `query error:  ${queryError ?? "(none)"}\n` +
     `jobs returned by query: ${totalJobs}\n` +
     `assigned to me:         ${assignedToMe}\n` +
     `crew member on:         ${onCrew}\n` +

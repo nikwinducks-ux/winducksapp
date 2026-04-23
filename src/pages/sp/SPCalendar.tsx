@@ -39,7 +39,7 @@ export default function SPCalendar() {
   const { user } = useAuth();
   const spId = user?.spId ?? null;
 
-  const { data: jobs = [], isLoading } = useJobs();
+  const { data: jobs = [], isLoading, status: jobsStatus, error: jobsError } = useJobs();
   const { data: providers = [] } = useServiceProviders();
   const { data: spOffers = [] } = useSpOffers(spId);
   const { data: unavailableBlocks = [] } = useSpUnavailableBlocks(spId);
@@ -227,7 +227,12 @@ export default function SPCalendar() {
         </Tabs>
       </div>
 
-      <SPVisibilityDiagnostics jobs={jobs} context="calendar" />
+      <SPVisibilityDiagnostics
+        jobs={jobs}
+        context="calendar"
+        queryState={jobsStatus as any}
+        queryError={jobsError ? (jobsError as any).message ?? String(jobsError) : null}
+      />
 
       <div className="flex items-center gap-1">
         <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
