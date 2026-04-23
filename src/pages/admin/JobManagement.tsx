@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useJobs, useServiceProviders, useServiceCategories, useDeleteJob, useStopBroadcast } from "@/hooks/useSupabaseData";
+import { useJobs, useServiceProviders, useServiceCategories, useDeleteJob, useStopBroadcast, useAssignJob, useUnassignJob } from "@/hooks/useSupabaseData";
 import { useGenerateBroadcastOffers } from "@/hooks/useOfferData";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge, URGENCY_PRIORITY } from "@/components/UrgencyBadge";
@@ -17,12 +17,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Plus, Eye, Pencil, UserPlus, Trash2, Radio, X, RadioTower } from "lucide-react";
+import { Search, Plus, Eye, Pencil, UserPlus, UserX, Trash2, Radio, X, RadioTower } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 const NON_BROADCASTABLE = new Set(["Assigned", "InProgress", "Completed", "Cancelled", "Archived"]);
+const NON_ASSIGNABLE = new Set(["InProgress", "Completed", "Cancelled", "Archived"]);
+const HAS_SP_STATUSES = new Set(["Assigned", "Accepted"]);
 
 export default function JobManagement() {
   const [search, setSearch] = useState("");
@@ -43,15 +45,27 @@ export default function JobManagement() {
   const [stopBroadcastJobId, setStopBroadcastJobId] = useState<string | null>(null);
   const [bulkStopOpen, setBulkStopOpen] = useState(false);
 
+  // Assign / Unassign state
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
+  const [bulkAssignSpId, setBulkAssignSpId] = useState<string>("");
+  const [bulkUnassignOpen, setBulkUnassignOpen] = useState(false);
+  const [unassignTarget, setUnassignTarget] = useState<{ jobDbId: string; jobNumber: string; spName: string } | null>(null);
+
   const { data: jobs = [], isLoading } = useJobs();
   const { data: providers = [] } = useServiceProviders();
   const { data: categories = [] } = useServiceCategories();
   const deleteJob = useDeleteJob();
   const stopBroadcast = useStopBroadcast();
   const broadcast = useGenerateBroadcastOffers();
+  const assignJob = useAssignJob();
+  const unassignJob = useUnassignJob();
   const { toast } = useToast();
 
   const spMap = new Map(providers.map((sp) => [sp.id, sp.name]));
+  const activeSps = useMemo(
+    () => providers.filter((sp) => sp.status === "Active").sort((a, b) => a.name.localeCompare(b.name)),
+    [providers]
+  );
 
   let filtered = jobs.filter(
     (j) =>
@@ -291,6 +305,100 @@ export default function JobManagement() {
     });
   };
 
+  // Assign single (row-level)
+  const runAssignSingle = async (jobDbId: string, spId: string) => {
+    const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+    try {
+      await assignJob.mutateAsync({ jobId: jobDbId, spId, assignedByUserId: userId });
+    } catch { /* toast handled in hook */ }
+  };
+
+  // Unassign single (row-level)
+  const runUnassignSingle = async () => {
+    if (!unassignTarget) return;
+    setBusy(true);
+    const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+    try {
+      await unassignJob.mutateAsync({ jobDbId: unassignTarget.jobDbId, userId });
+    } catch { /* hook toasts */ }
+    setBusy(false);
+    setUnassignTarget(null);
+  };
+
+  // Bulk assign
+  const runBulkAssign = async () => {
+    if (!bulkAssignSpId) return;
+    const targets = jobs.filter((j) => selectedIds.has(j.dbId) && !NON_ASSIGNABLE.has(j.status));
+    const skipped = selectedIds.size - targets.length;
+    if (targets.length === 0) {
+      toast({ title: "Nothing to assign", description: "Selected jobs are all in non-assignable statuses.", variant: "destructive" });
+      setBulkAssignOpen(false);
+      return;
+    }
+    setBusy(true);
+    const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+    let ok = 0, fail = 0;
+    for (const job of targets) {
+      try {
+        await assignJob.mutateAsync({ jobId: job.dbId, spId: bulkAssignSpId, assignedByUserId: userId });
+        ok++;
+      } catch { fail++; }
+    }
+    try {
+      await supabase.from("admin_audit_logs").insert({
+        user_id: userId,
+        user_email: (await supabase.auth.getUser()).data.user?.email ?? "",
+        action: "bulk_assign_jobs",
+        details: { job_ids: targets.map((t) => t.dbId), sp_id: bulkAssignSpId, count: targets.length, ok, fail, skipped },
+      } as any);
+    } catch { /* best-effort */ }
+    setBusy(false);
+    setBulkAssignOpen(false);
+    setBulkAssignSpId("");
+    clearSelection();
+    toast({
+      title: "Bulk assign complete",
+      description: `${ok} assigned${fail ? `, ${fail} failed` : ""}${skipped ? `, ${skipped} skipped` : ""}.`,
+      variant: fail > 0 ? "destructive" : "default",
+    });
+  };
+
+  // Bulk unassign
+  const runBulkUnassign = async () => {
+    const targets = jobs.filter((j) => selectedIds.has(j.dbId) && j.assignedSpId && HAS_SP_STATUSES.has(j.status));
+    const skipped = selectedIds.size - targets.length;
+    if (targets.length === 0) {
+      toast({ title: "Nothing to unassign", description: "No selected jobs are currently assigned.", variant: "destructive" });
+      setBulkUnassignOpen(false);
+      return;
+    }
+    setBusy(true);
+    const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+    let ok = 0, fail = 0;
+    for (const job of targets) {
+      try {
+        await unassignJob.mutateAsync({ jobDbId: job.dbId, userId });
+        ok++;
+      } catch { fail++; }
+    }
+    try {
+      await supabase.from("admin_audit_logs").insert({
+        user_id: userId,
+        user_email: (await supabase.auth.getUser()).data.user?.email ?? "",
+        action: "bulk_unassign_jobs",
+        details: { job_ids: targets.map((t) => t.dbId), count: targets.length, ok, fail, skipped },
+      } as any);
+    } catch { /* best-effort */ }
+    setBusy(false);
+    setBulkUnassignOpen(false);
+    clearSelection();
+    toast({
+      title: "Bulk unassign complete",
+      description: `${ok} unassigned${fail ? `, ${fail} failed` : ""}${skipped ? `, ${skipped} skipped` : ""}.`,
+      variant: fail > 0 ? "destructive" : "default",
+    });
+  };
+
   const deleteCount = deleteTarget?.length ?? 0;
   const requireTypeConfirm = deleteCount > 1;
   const canConfirmDelete = !busy && (!requireTypeConfirm || deleteConfirmText === "DELETE");
@@ -354,6 +462,12 @@ export default function JobManagement() {
             </Button>
           </div>
           <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => { setBulkAssignSpId(""); setBulkAssignOpen(true); }}>
+              <UserPlus className="h-4 w-4 mr-2" />Assign Selected
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setBulkUnassignOpen(true)}>
+              <UserX className="h-4 w-4 mr-2" />Unassign Selected
+            </Button>
             <Button size="sm" variant="outline" onClick={() => { setStartBroadcastJobId(null); setBroadcastOpen(true); }}>
               <Radio className="h-4 w-4 mr-2" />Broadcast Selected
             </Button>
@@ -435,8 +549,61 @@ export default function JobManagement() {
                       </div>
                     )}
                   </td>
-                  <td className="py-3 text-muted-foreground">
-                    {job.assignedSpId ? spMap.get(job.assignedSpId) ?? "—" : "—"}
+                  <td className="py-3">
+                    {(() => {
+                      const blocked = NON_ASSIGNABLE.has(job.status);
+                      const spName = job.assignedSpId ? spMap.get(job.assignedSpId) ?? "Unknown" : "";
+                      if (job.assignedSpId) {
+                        return (
+                          <div className="flex items-center gap-1">
+                            <span className="text-foreground">{spName}</span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                              disabled={blocked}
+                              title={blocked ? `Cannot unassign (${job.status})` : `Unassign ${spName}`}
+                              onClick={() => setUnassignTarget({ jobDbId: job.dbId, jobNumber: job.id, spName })}
+                            >
+                              <UserX className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        );
+                      }
+                      if (blocked) {
+                        return <span className="text-muted-foreground">—</span>;
+                      }
+                      return (
+                        <Select
+                          value=""
+                          onValueChange={(spId) => runAssignSingle(job.dbId, spId)}
+                          disabled={assignJob.isPending}
+                        >
+                          <SelectTrigger className="h-8 w-[180px] text-xs">
+                            <SelectValue placeholder="Assign to…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {activeSps.length === 0 ? (
+                              <div className="px-3 py-2 text-xs text-muted-foreground">No active SPs</div>
+                            ) : (
+                              activeSps.map((sp) => {
+                                const matches = (sp.serviceCategories || []).includes(job.serviceCategory);
+                                return (
+                                  <SelectItem key={sp.id} value={sp.id}>
+                                    <span className="flex items-center gap-2">
+                                      <span>{sp.name}</span>
+                                      {matches && (
+                                        <span className="text-[10px] text-muted-foreground">· match</span>
+                                      )}
+                                    </span>
+                                  </SelectItem>
+                                );
+                              })
+                            )}
+                          </SelectContent>
+                        </Select>
+                      );
+                    })()}
                   </td>
                   <td className="py-3 text-muted-foreground">{job.scheduledDate}</td>
                   <td className="py-3">
@@ -586,6 +753,89 @@ export default function JobManagement() {
               disabled={busy}
             >
               {busy ? "Stopping…" : "Stop broadcast"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unassign single confirmation */}
+      <AlertDialog open={!!unassignTarget} onOpenChange={(o) => { if (!busy && !o) setUnassignTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Unassign {unassignTarget?.spName} from {unassignTarget?.jobNumber}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              The job will revert to Created and any pending offers will be cancelled.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); runUnassignSingle(); }}
+              disabled={busy}
+            >
+              {busy ? "Unassigning…" : "Unassign"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Assign dialog */}
+      <Dialog open={bulkAssignOpen} onOpenChange={(o) => { if (!busy) { setBulkAssignOpen(o); if (!o) setBulkAssignSpId(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign {selectedIds.size} job{selectedIds.size === 1 ? "" : "s"} to an SP</DialogTitle>
+            <DialogDescription>
+              Jobs in In Progress, Completed, Cancelled, or Archived will be skipped. Jobs already assigned will be reassigned to the selected SP.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="bulk-assign-sp">Service Provider</Label>
+            <Select value={bulkAssignSpId} onValueChange={setBulkAssignSpId}>
+              <SelectTrigger id="bulk-assign-sp"><SelectValue placeholder="Pick an SP…" /></SelectTrigger>
+              <SelectContent>
+                {activeSps.length === 0 ? (
+                  <div className="px-3 py-2 text-xs text-muted-foreground">No active SPs</div>
+                ) : (
+                  activeSps.map((sp) => (
+                    <SelectItem key={sp.id} value={sp.id}>
+                      {sp.name}
+                      <span className="ml-2 text-[11px] text-muted-foreground">
+                        {(sp.serviceCategories || []).join(", ") || "no categories"}
+                      </span>
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setBulkAssignOpen(false); setBulkAssignSpId(""); }} disabled={busy}>Cancel</Button>
+            <Button onClick={runBulkAssign} disabled={busy || !bulkAssignSpId}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              {busy ? "Assigning…" : `Assign ${selectedIds.size}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Unassign confirmation */}
+      <AlertDialog open={bulkUnassignOpen} onOpenChange={(o) => { if (!busy) setBulkUnassignOpen(o); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unassign selected jobs?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Clears the assigned SP from selected jobs (Assigned/Accepted only) and cancels any pending offers. Other statuses are skipped.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); runBulkUnassign(); }}
+              disabled={busy}
+            >
+              {busy ? "Unassigning…" : "Unassign"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
