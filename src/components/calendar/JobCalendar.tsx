@@ -39,15 +39,25 @@ function spNameLookup(providers: ServiceProvider[]) {
 
 /** Parse a Postgres `date` string ("YYYY-MM-DD") as a local date to avoid TZ shifts. */
 function parseLocalDate(s: string): Date {
-  const [y, m, d] = s.split("-").map((n) => parseInt(n, 10));
-  if (!y || !m || !d) return new Date(s);
-  return new Date(y, m - 1, d);
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!isoMatch) return new Date(Number.NaN);
+  const year = parseInt(isoMatch[1], 10);
+  const month = parseInt(isoMatch[2], 10);
+  const day = parseInt(isoMatch[3], 10);
+  return new Date(year, month - 1, day);
 }
 
 function jobsOnDate(jobs: Job[], date: Date) {
   return jobs
     .filter((j) => j.scheduledDate && isSameDay(parseLocalDate(j.scheduledDate), date))
-    .sort((a, b) => (a.scheduledTime || "").localeCompare(b.scheduledTime || ""));
+    .sort((a, b) => {
+      const aMinutes = parseTimeToMinutes(a.scheduledTime);
+      const bMinutes = parseTimeToMinutes(b.scheduledTime);
+      if (aMinutes == null && bMinutes == null) return (a.scheduledTime || "").localeCompare(b.scheduledTime || "");
+      if (aMinutes == null) return -1;
+      if (bMinutes == null) return 1;
+      return aMinutes - bMinutes;
+    });
 }
 
 function parseTimeToMinutes(value?: string): number | null {
