@@ -149,6 +149,13 @@ export default function JobForm() {
     }
   }, [isEdit, existingServices.length]);
 
+  // Prefill crew from existing crew when editing
+  useEffect(() => {
+    if (isEdit && existingCrew.length > 0) {
+      setCrewMembers(existingCrew.map(c => ({ spId: c.spId, isLead: c.isLead })));
+    }
+  }, [isEdit, existingCrew.length]);
+
   // Auto-fill address from customer
   useEffect(() => {
     if (isEdit) return;
