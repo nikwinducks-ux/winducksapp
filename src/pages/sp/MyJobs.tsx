@@ -1,4 +1,4 @@
-import { useJobs } from "@/hooks/useSupabaseData";
+import { useJobs, useServiceProvider } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
@@ -16,6 +16,7 @@ function ScheduleText({ job }: { job: any }) {
 export default function MyJobs() {
   const { user } = useAuth();
   const { data: jobs = [], isLoading } = useJobs();
+  const { data: sp } = useServiceProvider(user?.spId);
 
   const myJobs = jobs.filter(
     (j) => j.assignedSpId === user?.spId || j.crew?.some((c) => c.spId === user?.spId)
@@ -36,7 +37,9 @@ export default function MyJobs() {
     <div className="space-y-8 animate-fade-in">
       <div>
         <h1 className="page-header">My Jobs</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{activeJobs.length} active, {pastJobs.length} past</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Logged in as <span className="font-medium text-foreground">{sp?.name ?? user?.email ?? "—"}</span> · {activeJobs.length} active, {pastJobs.length} past
+        </p>
       </div>
 
       {activeJobs.length === 0 && pastJobs.length === 0 && (

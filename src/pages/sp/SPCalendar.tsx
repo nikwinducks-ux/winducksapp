@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   addDays, addMonths, addWeeks, format, startOfWeek, endOfWeek,
+  startOfMonth, endOfMonth, isWithinInterval, parseISO, compareAsc,
   subDays, subMonths, subWeeks,
 } from "date-fns";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
@@ -76,6 +77,35 @@ export default function SPCalendar() {
     if (!selectedJob) return null;
     return spOffers.find((o) => o.job_id === selectedJob.dbId) ?? null;
   }, [selectedJob, spOffers]);
+
+  // Jobs scheduled outside the current visible range — surfaced as chips so SPs
+  // never lose sight of work that's just on a different week/day/month.
+  const offRangeJobs = useMemo(() => {
+    let start: Date, end: Date;
+    if (view === "day") { start = currentDate; end = currentDate; }
+    else if (view === "week") {
+      start = startOfWeek(currentDate, { weekStartsOn: 1 });
+      end = endOfWeek(currentDate, { weekStartsOn: 1 });
+    } else {
+      start = startOfMonth(currentDate);
+      end = endOfMonth(currentDate);
+    }
+    return myCalendarJobs
+      .filter((j) => {
+        if (!j.scheduledDate) return false;
+        try {
+          const d = parseISO(j.scheduledDate);
+          return !isWithinInterval(d, { start, end });
+        } catch { return false; }
+      })
+      .sort((a, b) => compareAsc(parseISO(a.scheduledDate!), parseISO(b.scheduledDate!)));
+  }, [myCalendarJobs, view, currentDate]);
+
+  const inRangeCount = myCalendarJobs.length - offRangeJobs.length;
+
+  function jumpToJob(j: Job) {
+    if (j.scheduledDate) setCurrentDate(parseISO(j.scheduledDate));
+  }
 
   function navigate(direction: -1 | 1) {
     if (view === "day") setCurrentDate((d) => (direction === 1 ? addDays(d, 1) : subDays(d, 1)));
@@ -223,6 +253,43 @@ export default function SPCalendar() {
           onUnavailableClick={handleClickBlock}
           onCreateUnavailable={handleCreateUnavailable}
         />
+      )}
+
+      {!isLoading && offRangeJobs.length > 0 && (
+        <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-sm font-medium">
+              Other scheduled jobs not in this view
+              <span className="ml-2 text-muted-foreground font-normal">({offRangeJobs.length})</span>
+            </p>
+            {inRangeCount === 0 && (
+              <Button size="sm" variant="outline" onClick={() => jumpToJob(offRangeJobs[0])}>
+                Jump to next ({format(parseISO(offRangeJobs[0].scheduledDate!), "MMM d")})
+              </Button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {offRangeJobs.map((j) => (
+              <button
+                key={j.dbId}
+                onClick={() => jumpToJob(j)}
+                className="inline-flex items-center gap-1.5 rounded-full border bg-background px-2.5 py-1 text-xs hover:border-primary/50 hover:bg-accent transition-colors"
+                title={`${j.customerName} · ${j.address}`}
+              >
+                <span className="font-medium">{j.id}</span>
+                <span className="text-muted-foreground">
+                  {format(parseISO(j.scheduledDate!), "MMM d")}{j.scheduledTime ? ` · ${j.scheduledTime}` : ""}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!isLoading && myCalendarJobs.length === 0 && (
+        <div className="rounded-md border bg-card p-6 text-center text-sm text-muted-foreground">
+          No scheduled jobs or pending offers yet.
+        </div>
       )}
 
       <UnavailableDialog
