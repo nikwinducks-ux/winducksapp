@@ -45,15 +45,27 @@ export default function JobManagement() {
   const [stopBroadcastJobId, setStopBroadcastJobId] = useState<string | null>(null);
   const [bulkStopOpen, setBulkStopOpen] = useState(false);
 
+  // Assign / Unassign state
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
+  const [bulkAssignSpId, setBulkAssignSpId] = useState<string>("");
+  const [bulkUnassignOpen, setBulkUnassignOpen] = useState(false);
+  const [unassignTarget, setUnassignTarget] = useState<{ jobDbId: string; jobNumber: string; spName: string } | null>(null);
+
   const { data: jobs = [], isLoading } = useJobs();
   const { data: providers = [] } = useServiceProviders();
   const { data: categories = [] } = useServiceCategories();
   const deleteJob = useDeleteJob();
   const stopBroadcast = useStopBroadcast();
   const broadcast = useGenerateBroadcastOffers();
+  const assignJob = useAssignJob();
+  const unassignJob = useUnassignJob();
   const { toast } = useToast();
 
   const spMap = new Map(providers.map((sp) => [sp.id, sp.name]));
+  const activeSps = useMemo(
+    () => providers.filter((sp) => sp.status === "Active").sort((a, b) => a.name.localeCompare(b.name)),
+    [providers]
+  );
 
   let filtered = jobs.filter(
     (j) =>
