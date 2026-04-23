@@ -354,6 +354,23 @@ export default function AdminCalendar() {
         </div>
       )}
 
+      {outOfViewInfo && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+          <span className="text-foreground">
+            <span className="font-semibold">{outOfViewInfo.count}</span> scheduled job
+            {outOfViewInfo.count === 1 ? " is" : "s are"} not in this view.
+          </span>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => jumpTo(outOfViewInfo.earliest)}>
+              Jump to earliest ({format(outOfViewInfo.earliest, "MMM d, yyyy")})
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => jumpTo(outOfViewInfo.latest)}>
+              Jump to latest ({format(outOfViewInfo.latest, "MMM d, yyyy")})
+            </Button>
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">Loading calendar...</div>
       ) : (
