@@ -336,6 +336,7 @@ function DayColumn({
               job={item.job}
               compact={compact}
               showDebug={showDebug}
+              colorMode={colorMode}
               spName={showSp ? getSpName(item.job.assignedSpId) : undefined}
               onClick={() => onJobClick(item.job)}
               style={{
