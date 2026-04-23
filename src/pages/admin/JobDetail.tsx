@@ -47,7 +47,7 @@ export default function JobDetail() {
 
   const job = jobs.find((j) => j.dbId === id);
   const [showAssign, setShowAssign] = useState(searchParams.get("assign") === "true");
-  const [selectedSpId, setSelectedSpId] = useState("");
+  const [selectedSpIds, setSelectedSpIds] = useState<string[]>([]);
   const [showSendOffer, setShowSendOffer] = useState(false);
   const [offerSpId, setOfferSpId] = useState("");
   const [offerExpiry, setOfferExpiry] = useState(30);
