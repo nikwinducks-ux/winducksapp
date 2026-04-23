@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { JobServicesSummary } from "@/components/JobServicesDisplay";
+import { SPVisibilityDiagnostics } from "@/components/sp/SPVisibilityDiagnostics";
 import { MapPin, Clock, DollarSign, Calendar, FileText, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 
