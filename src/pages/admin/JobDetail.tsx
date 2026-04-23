@@ -78,8 +78,7 @@ export default function JobDetail() {
   // === Handlers ===
 
   const handleAssign = async () => {
-    if (!selectedSpId || !id) return;
-    // Cancel any pending offers first
+    if (selectedSpIds.length === 0 || !id) return;
     const pendingOffers = jobOffers.filter(o => o.status === "Pending");
     if (pendingOffers.length > 0) {
       await supabase.from("offers")
@@ -88,12 +87,13 @@ export default function JobDetail() {
         .eq("status", "Pending");
     }
     assignJob.mutate(
-      { jobId: job!.dbId, spId: selectedSpId, assignedByUserId: user?.id ?? null },
+      { jobId: job!.dbId, spIds: selectedSpIds, leadSpId: selectedSpIds[0], assignedByUserId: user?.id ?? null },
       {
         onSuccess: () => {
           setShowAssign(false);
+          setSelectedSpIds([]);
           refetchOffers();
-          toast({ title: "SP assigned", description: `Job assigned directly. ${pendingOffers.length} pending offer(s) cancelled.` });
+          toast({ title: "Crew assigned", description: `${selectedSpIds.length} SP(s) assigned. ${pendingOffers.length} pending offer(s) cancelled.` });
         },
       }
     );
