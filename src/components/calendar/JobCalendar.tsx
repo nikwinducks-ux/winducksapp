@@ -99,6 +99,23 @@ function jobsOnDate(jobs: Job[], date: Date) {
     });
 }
 
+function blocksOnDate(blocks: SpUnavailableBlock[] | undefined, date: Date): SpUnavailableBlock[] {
+  if (!blocks?.length) return [];
+  return blocks.filter((b) => isSameDay(parseLocalDate(b.date), date));
+}
+
+function dateToISO(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function hhmmToMin(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
 function parseTimeToMinutes(value?: string): number | null {
   if (!value) return null;
   const normalized = value.trim().toLowerCase().replace(/\s+/g, "");
