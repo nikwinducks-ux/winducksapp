@@ -499,7 +499,7 @@ export function useCreateSP() {
       name: string; email: string; phone: string; status: string;
       street: string; city: string; province: string; postalCode: string; country: string;
       lat: string; lng: string; travelRadius: string; maxJobsPerDay: string;
-      notes: string; categories: string[];
+      notes: string; categories: string[]; calendarColor?: string | null;
     }) => {
       const { error } = await supabase.from("service_providers").insert({
         name: form.name, email: form.email, phone: form.phone, status: form.status,
@@ -510,6 +510,7 @@ export function useCreateSP() {
         service_radius_km: parseInt(form.travelRadius) || 30,
         max_jobs_per_day: parseInt(form.maxJobsPerDay) || 5,
         notes: form.notes, categories: form.categories,
+        calendar_color: form.calendarColor ?? null,
       });
       if (error) throw error;
     },
@@ -531,7 +532,7 @@ export function useUpdateSP() {
       id: string; name: string; email: string; phone: string; status: string;
       street: string; city: string; province: string; postalCode: string; country: string;
       lat: string; lng: string; travelRadius: string; maxJobsPerDay: string;
-      notes: string; categories: string[];
+      notes: string; categories: string[]; calendarColor?: string | null;
     }) => {
       const { error } = await supabase.from("service_providers").update({
         name: form.name, email: form.email, phone: form.phone, status: form.status,
@@ -542,12 +543,33 @@ export function useUpdateSP() {
         service_radius_km: parseInt(form.travelRadius) || 30,
         max_jobs_per_day: parseInt(form.maxJobsPerDay) || 5,
         notes: form.notes, categories: form.categories,
+        calendar_color: form.calendarColor ?? null,
       }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["service_providers"] });
       toast({ title: "Provider updated", description: "Changes saved." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+}
+
+export function useUpdateSPColor() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ id, color }: { id: string; color: string | null }) => {
+      const { error } = await supabase
+        .from("service_providers")
+        .update({ calendar_color: color })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["service_providers"] });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
