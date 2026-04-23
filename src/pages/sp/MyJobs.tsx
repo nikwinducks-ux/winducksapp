@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { JobServicesSummary } from "@/components/JobServicesDisplay";
-import { MapPin, Clock, DollarSign, Calendar, FileText } from "lucide-react";
+import { MapPin, Clock, DollarSign, Calendar, FileText, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 
 function ScheduleText({ job }: { job: any }) {
