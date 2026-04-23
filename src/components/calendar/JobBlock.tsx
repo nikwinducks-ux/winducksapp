@@ -2,7 +2,7 @@ import { useDraggable } from "@dnd-kit/core";
 import type { Job } from "@/data/mockData";
 import { cn } from "@/lib/utils";
 import { ScheduleDebugBadge } from "./ScheduleDebug";
-import { getSpColor } from "./spColors";
+import { getSpColor, type SpColor } from "./spColors";
 import { isJobDraggable } from "./useCalendarDnd";
 
 export type ColorMode = "sp" | "status";
@@ -56,8 +56,8 @@ export function getJobAppearance(job: Job): JobAppearance {
 }
 
 /** SP-tinted coloring with status as visual modifier. */
-function getSpJobAppearance(job: Job): JobAppearance & { showInProgressDot?: boolean; completedAccent?: boolean } {
-  const sp = getSpColor(job.assignedSpId);
+function getSpJobAppearance(job: Job, spColor?: SpColor): JobAppearance & { showInProgressDot?: boolean; completedAccent?: boolean } {
+  const sp = spColor ?? getSpColor(job.assignedSpId);
 
   switch (job.status) {
     case "Cancelled":
@@ -158,6 +158,8 @@ interface JobBlockProps {
   colorMode?: ColorMode;
   /** When true, the block becomes draggable via @dnd-kit (admin only). */
   enableDnd?: boolean;
+  /** Optional override resolver for SP color (honors admin-picked palette). */
+  spColor?: SpColor;
 }
 
 export function JobBlock({
@@ -171,6 +173,7 @@ export function JobBlock({
   style,
   colorMode = "status",
   enableDnd = false,
+  spColor,
 }: JobBlockProps) {
   const draggable = enableDnd && isJobDraggable(job);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -178,7 +181,7 @@ export function JobBlock({
     disabled: !draggable,
   });
 
-  const spAppearance = colorMode === "sp" ? getSpJobAppearance(job) : null;
+  const spAppearance = colorMode === "sp" ? getSpJobAppearance(job, spColor) : null;
   const appearance = spAppearance ?? getJobAppearance(job);
   const timePrefix = showTime ? formatShortTime(job.scheduledTime) : "";
   const customerTitle = job.customerName?.trim() || "Unassigned customer";
