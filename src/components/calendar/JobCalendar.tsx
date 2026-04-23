@@ -396,6 +396,7 @@ function WeekView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, m
   const start = startOfWeek(currentDate, { weekStartsOn: 1 });
   const end = endOfWeek(currentDate, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start, end });
+  const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
