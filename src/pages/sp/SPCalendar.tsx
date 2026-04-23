@@ -78,6 +78,35 @@ export default function SPCalendar() {
     return spOffers.find((o) => o.job_id === selectedJob.dbId) ?? null;
   }, [selectedJob, spOffers]);
 
+  // Jobs scheduled outside the current visible range — surfaced as chips so SPs
+  // never lose sight of work that's just on a different week/day/month.
+  const offRangeJobs = useMemo(() => {
+    let start: Date, end: Date;
+    if (view === "day") { start = currentDate; end = currentDate; }
+    else if (view === "week") {
+      start = startOfWeek(currentDate, { weekStartsOn: 1 });
+      end = endOfWeek(currentDate, { weekStartsOn: 1 });
+    } else {
+      start = startOfMonth(currentDate);
+      end = endOfMonth(currentDate);
+    }
+    return myCalendarJobs
+      .filter((j) => {
+        if (!j.scheduledDate) return false;
+        try {
+          const d = parseISO(j.scheduledDate);
+          return !isWithinInterval(d, { start, end });
+        } catch { return false; }
+      })
+      .sort((a, b) => compareAsc(parseISO(a.scheduledDate!), parseISO(b.scheduledDate!)));
+  }, [myCalendarJobs, view, currentDate]);
+
+  const inRangeCount = myCalendarJobs.length - offRangeJobs.length;
+
+  function jumpToJob(j: Job) {
+    if (j.scheduledDate) setCurrentDate(parseISO(j.scheduledDate));
+  }
+
   function navigate(direction: -1 | 1) {
     if (view === "day") setCurrentDate((d) => (direction === 1 ? addDays(d, 1) : subDays(d, 1)));
     else if (view === "week") setCurrentDate((d) => (direction === 1 ? addWeeks(d, 1) : subWeeks(d, 1)));
