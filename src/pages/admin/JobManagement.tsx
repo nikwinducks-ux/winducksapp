@@ -99,6 +99,7 @@ export default function JobManagement() {
   const assignJob = useAssignJob();
   const unassignJob = useUnassignJob();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const spMap = new Map(providers.map((sp) => [sp.id, sp.name]));
   const activeSps = useMemo(
