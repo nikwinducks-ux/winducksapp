@@ -43,7 +43,12 @@ export default function MyJobs() {
         </p>
       </div>
 
-      <SPVisibilityDiagnostics jobs={jobs} context="my-jobs" />
+      <SPVisibilityDiagnostics
+        jobs={jobs}
+        context="my-jobs"
+        queryState={jobsStatus as any}
+        queryError={jobsError ? (jobsError as any).message ?? String(jobsError) : null}
+      />
 
       {activeJobs.length === 0 && pastJobs.length === 0 && (
         <div className="metric-card text-center py-10">
