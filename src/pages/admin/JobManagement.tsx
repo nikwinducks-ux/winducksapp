@@ -587,7 +587,7 @@ export default function JobManagement() {
                               <div className="px-3 py-2 text-xs text-muted-foreground">No active SPs</div>
                             ) : (
                               activeSps.map((sp) => {
-                                const matches = (sp.categories || []).includes(job.serviceCategory);
+                                const matches = (sp.serviceCategories || []).includes(job.serviceCategory);
                                 return (
                                   <SelectItem key={sp.id} value={sp.id}>
                                     <span className="flex items-center gap-2">
