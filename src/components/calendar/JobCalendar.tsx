@@ -50,11 +50,30 @@ function jobsOnDate(jobs: Job[], date: Date) {
     .sort((a, b) => (a.scheduledTime || "").localeCompare(b.scheduledTime || ""));
 }
 
-function parseTimeToMinutes(hhmm?: string): number | null {
-  if (!hhmm) return null;
-  const [h, m] = hhmm.split(":").map((n) => parseInt(n, 10));
-  if (isNaN(h)) return null;
-  return h * 60 + (isNaN(m) ? 0 : m);
+function parseTimeToMinutes(value?: string): number | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase().replace(/\s+/g, "");
+
+  const ampmMatch = normalized.match(/^(\d{1,2})(?::(\d{2}))?(am|pm)$/);
+  if (ampmMatch) {
+    let hours = parseInt(ampmMatch[1], 10);
+    const minutes = parseInt(ampmMatch[2] ?? "0", 10);
+    const period = ampmMatch[3];
+    if (hours === 12) hours = 0;
+    if (period === "pm") hours += 12;
+    return hours * 60 + minutes;
+  }
+
+  const twentyFourHourMatch = normalized.match(/^(\d{1,2})(?::(\d{2}))$/);
+  if (twentyFourHourMatch) {
+    const hours = parseInt(twentyFourHourMatch[1], 10);
+    const minutes = parseInt(twentyFourHourMatch[2] ?? "0", 10);
+    if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+      return hours * 60 + minutes;
+    }
+  }
+
+  return null;
 }
 
 function parseDurationMinutes(d?: string): number {
