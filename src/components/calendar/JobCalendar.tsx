@@ -438,6 +438,7 @@ function WeekView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, m
               showSp={mode === "admin"}
               compact
               showDebug={showDebug}
+              colorMode={colorMode}
               onJobClick={onJobClick}
               onEmptyDayClick={onEmptyDayClick}
               showAddAffordance={mode === "admin" && !!onEmptyDayClick}
