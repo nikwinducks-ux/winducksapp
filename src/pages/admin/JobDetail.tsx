@@ -18,6 +18,7 @@ import { useJobServices } from "@/hooks/useSupabaseData";
 import { JobPhotosCard } from "@/components/JobPhotosCard";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { CrewPicker } from "@/components/admin/CrewPicker";
 
 function ScheduleDisplay({ job }: { job: any }) {
   const urgency = job.urgency || "Scheduled";
@@ -392,37 +393,19 @@ export default function JobDetail() {
         {showAssign && canDispatch && (
           <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
             <p className="text-xs text-muted-foreground">
-              Select one or more SPs. The first selected becomes Lead. Direct assignment will cancel all {jobOffers.filter(o => o.status === "Pending").length} pending offer(s).
+              Select one or more SPs. The first selected becomes Lead (click ★ to change). Direct assignment will cancel all {jobOffers.filter(o => o.status === "Pending").length} pending offer(s).
             </p>
-            <div className="space-y-1.5">
-              <Label className="text-sm">Crew Members</Label>
-              <div className="max-h-64 overflow-y-auto border rounded-md divide-y bg-background">
-                {providers.filter(sp => sp.status === "Active").map(sp => {
-                  const checked = selectedSpIds.includes(sp.id);
-                  const isLead = selectedSpIds[0] === sp.id;
-                  return (
-                    <label key={sp.id} className="flex items-center gap-3 p-2 cursor-pointer hover:bg-muted/50">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          if (e.target.checked) setSelectedSpIds([...selectedSpIds, sp.id]);
-                          else setSelectedSpIds(selectedSpIds.filter(x => x !== sp.id));
-                        }}
-                        className="h-4 w-4"
-                      />
-                      <span className="flex-1 text-sm">{sp.name} — {sp.baseAddress.city} · {sp.travelRadius}km</span>
-                      {isLead && <span className="text-xs text-primary font-medium">★ Lead</span>}
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-            {selectedSpIds.length > 1 && (
-              <p className="text-xs text-muted-foreground">
-                Each SP will be paid ${(job.payout / selectedSpIds.length).toFixed(2)} (= ${job.payout} ÷ {selectedSpIds.length})
-              </p>
-            )}
+            <CrewPicker
+              providers={providers}
+              value={selectedSpIds.map((spId, i) => ({ spId, isLead: i === 0 }))}
+              onChange={(next) => {
+                // Keep order — lead first
+                const lead = next.find((m) => m.isLead);
+                const others = next.filter((m) => !m.isLead);
+                setSelectedSpIds(lead ? [lead.spId, ...others.map((o) => o.spId)] : others.map((o) => o.spId));
+              }}
+              payout={job.payout}
+            />
             <div className="flex gap-2">
               <Button size="sm" onClick={handleAssign} disabled={selectedSpIds.length === 0 || assignJob.isPending}>
                 {assignJob.isPending ? "Assigning..." : `Assign ${selectedSpIds.length || ""} SP${selectedSpIds.length === 1 ? "" : "s"}`.trim()}
