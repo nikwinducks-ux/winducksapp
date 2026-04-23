@@ -1,34 +1,51 @@
 
 
-## Wire up Web Push triggers via SQL (no manual webhook setup needed)
+## Assign / Unassign jobs from the Jobs page
 
-Replace the manual "create two webhooks in the dashboard" step with a database migration that does the same thing using Postgres triggers + `pg_net`. This is the standard Supabase pattern and works inside Lovable Cloud without needing dashboard access.
+Add row-level **Assign** and **Unassign** actions, plus **bulk Assign / bulk Unassign** in the existing selection bar on `/admin/jobs`.
 
-### What gets created
+### What changes
 
-A single migration that:
+**File edited: `src/pages/admin/JobManagement.tsx`**
 
-1. Enables the `pg_net` extension (if not already on) for async HTTP calls from Postgres.
-2. Creates a `SECURITY DEFINER` function `public.notify_offer_push()` that POSTs the offer row payload (in the same shape the edge function already expects: `{ type, table, record, old_record }`) to the `send-offer-push` edge function URL, using the service-role key in the `Authorization` header.
-3. Creates two triggers on `public.offers`:
-   - `offers_push_insert` — `AFTER INSERT` → fires for every new offer (function filters to `status = 'Pending'`).
-   - `offers_push_update` — `AFTER UPDATE OF status` → fires when status flips (function filters to auto-accept transitions).
-4. Stores the edge function URL and service-role key inside the function body (pulled from `current_setting`) so no extra config is required.
+1. **Per-row "Assign SP" control** in the existing "Assigned SP" column:
+   - If `assigned_sp_id` is empty → show an inline `Select` of active SPs ("Assign to…"). Picking one calls `useAssignJob` and the row updates to "Assigned".
+   - If a job is already assigned → show the SP name plus a small **Unassign** button (icon `UserX`). Clicking opens a confirm dialog ("Unassign {SP} from {Job#}?"). On confirm: clear `assigned_sp_id`, set status back to `Created`, cancel any pending offers for the job, and write a `job_status_events` audit row.
+   - Both actions are blocked (with a tooltip-style disabled state) for jobs in `Completed`, `InProgress`, or `Cancelled` status.
 
-### Why this works
+2. **Bulk actions in the selection bar** (appears when ≥1 row is selected):
+   - **Assign Selected →** opens a dialog with a single SP picker; assigns that SP to every selected eligible job (skips Completed/InProgress/Cancelled and shows a count of skipped).
+   - **Unassign Selected →** confirm dialog; unassigns every selected job that currently has an SP (skips others). Cancels pending offers and writes audit rows.
+   - Writes one `admin_audit_logs` entry per bulk run (`bulk_assign_jobs` / `bulk_unassign_jobs`).
 
-The `send-offer-push` edge function already parses the standard Supabase webhook payload format (`type`, `record`, `old_record`). The trigger function builds that exact JSON shape, so no edge function changes are needed.
+3. **SP picker behavior**: lists Active providers only, sorted by name, with category match shown next to each SP name (small muted text) so admins can see compatibility at a glance — purely informational, not a hard filter (admin override is allowed).
 
-### Files
+**File edited: `src/hooks/useSupabaseData.ts`**
 
-- **New migration**: enables `pg_net`, creates `notify_offer_push()`, creates two triggers on `public.offers`.
+- Add `useUnassignJob()` hook:
+  - Reads current job (status + assigned_sp_id).
+  - Sets `assigned_sp_id = null`, sets `status = 'Created'`.
+  - Updates any `Pending` offers for that job to `Cancelled`.
+  - Inserts a `job_status_events` row (`old_status → 'Created'`, `note: 'Unassigned by admin'`).
+  - Invalidates `["jobs"]` and `["offers"]`.
 
-No frontend changes. No edge function changes. No dashboard clicks.
+### Eligibility rules (enforced in UI)
+
+| Current status | Assign allowed? | Unassign allowed? |
+|---|---|---|
+| Created, Offered | Yes | n/a (no SP) |
+| Assigned, Accepted | Reassign (replaces SP) | Yes |
+| InProgress | No | No |
+| Completed, Cancelled, Archived | No | No |
+
+When **reassigning** an already-assigned job, pending offers (if any) are cancelled and a fresh `job_assignments` audit row is inserted by `useAssignJob`.
 
 ### Acceptance
 
-- Inserting a new pending offer (e.g., admin generates an offer) results in `send-offer-push` being invoked within ~1s.
-- An offer transitioning to `Accepted` with `acceptance_source = 'AutoAccept'` invokes `send-offer-push`.
-- SPs with active push subscriptions receive an OS-level notification on the published domain.
-- No manual webhook configuration is required in any dashboard.
+- From `/admin/jobs`, an admin can pick an SP from a row dropdown and the job becomes Assigned without leaving the page.
+- An assigned job shows the SP name + Unassign button; clicking + confirming reverts the job to Created and clears the SP.
+- Selecting multiple jobs and clicking **Assign Selected** assigns them all to one chosen SP in one action.
+- Selecting multiple jobs and clicking **Unassign Selected** clears the SP from all eligible ones.
+- Jobs in InProgress / Completed / Cancelled cannot be reassigned or unassigned from this page.
+- All actions write audit entries (`job_assignments`, `job_status_events`, plus `admin_audit_logs` for bulk runs).
 
