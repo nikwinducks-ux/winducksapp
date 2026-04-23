@@ -305,7 +305,100 @@ export default function JobManagement() {
     });
   };
 
-  const deleteCount = deleteTarget?.length ?? 0;
+  // Assign single (row-level)
+  const runAssignSingle = async (jobDbId: string, spId: string) => {
+    const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+    try {
+      await assignJob.mutateAsync({ jobId: jobDbId, spId, assignedByUserId: userId });
+    } catch { /* toast handled in hook */ }
+  };
+
+  // Unassign single (row-level)
+  const runUnassignSingle = async () => {
+    if (!unassignTarget) return;
+    setBusy(true);
+    const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+    try {
+      await unassignJob.mutateAsync({ jobDbId: unassignTarget.jobDbId, userId });
+    } catch { /* hook toasts */ }
+    setBusy(false);
+    setUnassignTarget(null);
+  };
+
+  // Bulk assign
+  const runBulkAssign = async () => {
+    if (!bulkAssignSpId) return;
+    const targets = jobs.filter((j) => selectedIds.has(j.dbId) && !NON_ASSIGNABLE.has(j.status));
+    const skipped = selectedIds.size - targets.length;
+    if (targets.length === 0) {
+      toast({ title: "Nothing to assign", description: "Selected jobs are all in non-assignable statuses.", variant: "destructive" });
+      setBulkAssignOpen(false);
+      return;
+    }
+    setBusy(true);
+    const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+    let ok = 0, fail = 0;
+    for (const job of targets) {
+      try {
+        await assignJob.mutateAsync({ jobId: job.dbId, spId: bulkAssignSpId, assignedByUserId: userId });
+        ok++;
+      } catch { fail++; }
+    }
+    try {
+      await supabase.from("admin_audit_logs").insert({
+        user_id: userId,
+        user_email: (await supabase.auth.getUser()).data.user?.email ?? "",
+        action: "bulk_assign_jobs",
+        details: { job_ids: targets.map((t) => t.dbId), sp_id: bulkAssignSpId, count: targets.length, ok, fail, skipped },
+      } as any);
+    } catch { /* best-effort */ }
+    setBusy(false);
+    setBulkAssignOpen(false);
+    setBulkAssignSpId("");
+    clearSelection();
+    toast({
+      title: "Bulk assign complete",
+      description: `${ok} assigned${fail ? `, ${fail} failed` : ""}${skipped ? `, ${skipped} skipped` : ""}.`,
+      variant: fail > 0 ? "destructive" : "default",
+    });
+  };
+
+  // Bulk unassign
+  const runBulkUnassign = async () => {
+    const targets = jobs.filter((j) => selectedIds.has(j.dbId) && j.assignedSpId && HAS_SP_STATUSES.has(j.status));
+    const skipped = selectedIds.size - targets.length;
+    if (targets.length === 0) {
+      toast({ title: "Nothing to unassign", description: "No selected jobs are currently assigned.", variant: "destructive" });
+      setBulkUnassignOpen(false);
+      return;
+    }
+    setBusy(true);
+    const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+    let ok = 0, fail = 0;
+    for (const job of targets) {
+      try {
+        await unassignJob.mutateAsync({ jobDbId: job.dbId, userId });
+        ok++;
+      } catch { fail++; }
+    }
+    try {
+      await supabase.from("admin_audit_logs").insert({
+        user_id: userId,
+        user_email: (await supabase.auth.getUser()).data.user?.email ?? "",
+        action: "bulk_unassign_jobs",
+        details: { job_ids: targets.map((t) => t.dbId), count: targets.length, ok, fail, skipped },
+      } as any);
+    } catch { /* best-effort */ }
+    setBusy(false);
+    setBulkUnassignOpen(false);
+    clearSelection();
+    toast({
+      title: "Bulk unassign complete",
+      description: `${ok} unassigned${fail ? `, ${fail} failed` : ""}${skipped ? `, ${skipped} skipped` : ""}.`,
+      variant: fail > 0 ? "destructive" : "default",
+    });
+  };
+
   const requireTypeConfirm = deleteCount > 1;
   const canConfirmDelete = !busy && (!requireTypeConfirm || deleteConfirmText === "DELETE");
 
