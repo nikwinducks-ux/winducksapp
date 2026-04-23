@@ -71,11 +71,16 @@ function dbToSP(row: any): ServiceProvider {
 
 function dbToJob(row: any, customers: Customer[]): Job {
   const cust = customers.find((c) => c.id === row.customer_id);
+  // If customers haven't loaded yet (or RLS hides the row), fall back to the
+  // job's own city so SPs see a useful label instead of "Unknown".
+  const fallbackName = row.customer_id
+    ? (row.job_address_city ? `Customer · ${row.job_address_city}` : "Loading…")
+    : "—";
   return {
     id: row.job_number || row.id,
     dbId: row.id,
     customerId: row.customer_id ?? "",
-    customerName: cust?.name ?? "Unknown",
+    customerName: cust?.name ?? fallbackName,
     address: `${row.job_address_street}, ${row.job_address_city}`,
     jobAddress: {
       street: row.job_address_street,
