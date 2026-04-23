@@ -58,7 +58,7 @@ describe("SPCalendar — Job Instructions visibility", () => {
   });
 
   it("hides the panel when notes are whitespace-only", () => {
-    const { container } = render(<InstructionsPanel notes="   \n  \t " />);
+    const { container } = render(<InstructionsPanel notes={"   \n  \t "} />);
     expect(container.firstChild).toBeNull();
   });
 
