@@ -318,6 +318,49 @@ export default function AdminCalendar() {
     setSelectedJob(null);
   }
 
+  async function handleReschedule(job: Job, dateISO: string, timeHHMM: string | null) {
+    if (job.status === "InProgress" || job.status === "Completed") {
+      toast({
+        title: "Cannot reschedule",
+        description: "Cannot reschedule a job that has already started.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const ja = job.jobAddress;
+    try {
+      await updateJob.mutateAsync({
+        id: job.dbId,
+        customerId: job.customerId,
+        serviceCategory: job.serviceCategory,
+        payout: String(job.payout),
+        street: ja.street, city: ja.city, province: ja.province,
+        postalCode: ja.postalCode, country: ja.country,
+        lat: ja.lat != null ? String(ja.lat) : "",
+        lng: ja.lng != null ? String(ja.lng) : "",
+        scheduledDate: dateISO,
+        scheduledTime: timeHHMM ?? "",
+        estimatedDuration: job.estimatedDuration,
+        notes: job.notes ?? "",
+        urgency: "Scheduled",
+      });
+      toast({
+        title: "Rescheduled",
+        description: `${job.id} → ${dateISO}${timeHHMM ? ` at ${timeHHMM}` : ""}`,
+      });
+    } catch (err) {
+      toast({
+        title: "Reschedule failed",
+        description: err instanceof Error ? err.message : "Try again.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function handleDragBlocked(_job: Job, reason: string) {
+    toast({ title: "Cannot reschedule", description: reason, variant: "destructive" });
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -493,6 +536,9 @@ export default function AdminCalendar() {
               : null
           }
           onJumpToDate={jumpTo}
+          enableDnd
+          onReschedule={handleReschedule}
+          onDragBlocked={handleDragBlocked}
         />
       )}
 

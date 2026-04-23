@@ -10,9 +10,22 @@ import {
   isSameMonth,
   isToday,
 } from "date-fns";
+import {
+  DndContext,
+  PointerSensor,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import type { Job, ServiceProvider } from "@/data/mockData";
 import { JobBlock, type ColorMode } from "./JobBlock";
 import { cn } from "@/lib/utils";
+import {
+  useCalendarDnd,
+  formatGhostTime,
+  yToSnappedMinutes,
+  type RescheduleHandler,
+} from "./useCalendarDnd";
 
 export type CalendarView = "day" | "week" | "month";
 
@@ -37,7 +50,12 @@ interface JobCalendarProps {
   nearestPreviousLabel?: string | null;
   nearestNextLabel?: string | null;
   onJumpToDate?: (date: Date) => void;
+  /** Enables drag-and-drop rescheduling (admin only). */
+  enableDnd?: boolean;
+  onReschedule?: RescheduleHandler;
+  onDragBlocked?: (job: Job, reason: string) => void;
 }
+
 
 function spNameLookup(providers: ServiceProvider[]) {
   const map = new Map(providers.map((p) => [p.id, p.name]));
@@ -188,9 +206,71 @@ function categorizeDayJobs(jobs: Job[]): {
 }
 
 export function JobCalendar(props: JobCalendarProps) {
-  if (props.view === "day") return <DayView {...props} />;
-  if (props.view === "week") return <WeekView {...props} />;
-  return <MonthView {...props} />;
+  const dnd = useCalendarDnd({
+    enabled: !!props.enableDnd && !!props.onReschedule,
+    jobs: props.jobs,
+    onReschedule: props.onReschedule ?? (() => {}),
+    onBlocked: props.onDragBlocked,
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const inner =
+    props.view === "day" ? (
+      <DayView {...props} dnd={dnd} />
+    ) : props.view === "week" ? (
+      <WeekView {...props} dnd={dnd} />
+    ) : (
+      <MonthView {...props} dnd={dnd} />
+    );
+
+  if (!dnd.enabled) return inner;
+
+  return (
+    <DndContext
+      sensors={sensors}
+      onDragStart={dnd.handleDragStart}
+      onDragEnd={dnd.handleDragEnd}
+      onDragCancel={dnd.handleDragCancel}
+    >
+      {inner}
+      {dnd.activeJob && dnd.ghostLabel && (
+        <GhostTimeBadge label={dnd.ghostLabel} pointerRef={dnd.pointerRef} />
+      )}
+    </DndContext>
+  );
+}
+
+type DndApi = ReturnType<typeof useCalendarDnd>;
+
+function GhostTimeBadge({
+  label,
+  pointerRef,
+}: {
+  label: string;
+  pointerRef: React.MutableRefObject<{ x: number; y: number } | null>;
+}) {
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(pointerRef.current);
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      if (pointerRef.current) setPos({ ...pointerRef.current });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [pointerRef]);
+  if (!pos) return null;
+  return (
+    <div
+      className="pointer-events-none fixed z-50 rounded-md bg-foreground text-background px-2 py-1 text-xs font-medium shadow-lg"
+      style={{ left: pos.x + 14, top: pos.y + 14 }}
+    >
+      {label}
+    </div>
+  );
 }
 
 // ===== Now line hook =====
@@ -240,6 +320,7 @@ interface DayColumnProps {
   onJobClick: (job: Job) => void;
   onEmptyDayClick?: (date: Date) => void;
   showAddAffordance: boolean;
+  dnd?: DndApi;
 }
 
 function DayColumn({
@@ -253,6 +334,7 @@ function DayColumn({
   onJobClick,
   onEmptyDayClick,
   showAddAffordance,
+  dnd,
 }: DayColumnProps) {
   const { untimed, outside, grid } = useMemo(() => categorizeDayJobs(jobs), [jobs]);
   const today = isToday(date);
@@ -260,6 +342,7 @@ function DayColumn({
   const showNowLine =
     today && nowMin >= DAY_START_HOUR * 60 && nowMin < DAY_END_HOUR * 60;
   const nowTop = (nowMin - DAY_START_HOUR * 60);
+  const dndEnabled = !!dnd?.enabled;
 
   return (
     <div className="flex-1 min-w-0 border-r last:border-r-0 flex flex-col">
@@ -276,6 +359,7 @@ function DayColumn({
                 colorMode={colorMode}
                 spName={showSp ? getSpName(job.assignedSpId) : undefined}
                 onClick={() => onJobClick(job)}
+                enableDnd={dndEnabled}
               />
             </div>
           ))}
@@ -291,6 +375,7 @@ function DayColumn({
                 colorMode={colorMode}
                 spName={showSp ? getSpName(job.assignedSpId) : undefined}
                 onClick={() => onJobClick(job)}
+                enableDnd={dndEnabled}
               />
             </div>
           ))}
@@ -306,57 +391,129 @@ function DayColumn({
         </div>
       )}
 
-      {/* Hour grid */}
-      <div
-        className={cn("relative flex-1", today && "bg-primary/5")}
-        style={{ height: GRID_HEIGHT_PX }}
-      >
-        {HOURS.map((h) => (
-          <div
-            key={h}
-            className="border-t border-border/40"
-            style={{ height: HOUR_PX }}
+      <DayGridDroppable
+        date={date}
+        today={today}
+        showNowLine={showNowLine}
+        nowTop={nowTop}
+        grid={grid}
+        compact={compact}
+        showDebug={showDebug}
+        colorMode={colorMode}
+        getSpName={getSpName}
+        showSp={showSp}
+        onJobClick={onJobClick}
+        dnd={dnd}
+      />
+    </div>
+  );
+}
+
+interface DayGridDroppableProps {
+  date: Date;
+  today: boolean;
+  showNowLine: boolean;
+  nowTop: number;
+  grid: Positioned[];
+  compact: boolean;
+  showDebug?: boolean;
+  colorMode: ColorMode;
+  getSpName: (id?: string) => string;
+  showSp: boolean;
+  onJobClick: (job: Job) => void;
+  dnd?: DndApi;
+}
+
+function DayGridDroppable({
+  date, today, showNowLine, nowTop, grid, compact, showDebug, colorMode,
+  getSpName, showSp, onJobClick, dnd,
+}: DayGridDroppableProps) {
+  const dndEnabled = !!dnd?.enabled;
+  const { setNodeRef, isOver, node } = useDroppable({
+    id: `day-grid:${date.toISOString()}`,
+    data: { kind: "day-grid", date },
+    disabled: !dndEnabled,
+  });
+
+  // Live ghost label while hovering this droppable.
+  useEffect(() => {
+    if (!dndEnabled || !dnd) return;
+    if (!isOver || !dnd.activeJob) {
+      return;
+    }
+    let raf = 0;
+    const tick = () => {
+      const el = node.current;
+      const ptr = dnd.pointerRef.current;
+      if (el && ptr) {
+        const rect = el.getBoundingClientRect();
+        const yWithin = ptr.y - rect.top;
+        const snapped = yToSnappedMinutes(yWithin);
+        const dayLabel = format(date, "EEE");
+        dnd.updateGhost(`${dayLabel} ${formatGhostTime(snapped)}`);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isOver, dndEnabled, dnd, node, date]);
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "relative flex-1",
+        today && "bg-primary/5",
+        isOver && "bg-primary/10 ring-2 ring-primary ring-inset"
+      )}
+      style={{ height: GRID_HEIGHT_PX }}
+    >
+      {HOURS.map((h) => (
+        <div
+          key={h}
+          className="border-t border-border/40"
+          style={{ height: HOUR_PX }}
+        />
+      ))}
+
+      {/* Now line */}
+      {showNowLine && (
+        <div
+          className="absolute left-0 right-0 z-20 pointer-events-none"
+          style={{ top: nowTop }}
+        >
+          <div className="h-px bg-destructive/70" />
+          <div className="absolute -left-1 -top-1 h-2 w-2 rounded-full bg-destructive" />
+        </div>
+      )}
+
+      {/* Grid jobs */}
+      {grid.map((item) => {
+        const top = item.startMin - DAY_START_HOUR * 60;
+        const height = Math.max(30, item.endMin - item.startMin);
+        const widthPct = 100 / item.laneCount;
+        const leftPct = widthPct * item.lane;
+        return (
+          <JobBlock
+            key={item.job.dbId}
+            job={item.job}
+            compact={compact}
+            showDebug={showDebug}
+            colorMode={colorMode}
+            spName={showSp ? getSpName(item.job.assignedSpId) : undefined}
+            onClick={() => onJobClick(item.job)}
+            enableDnd={dndEnabled}
+            style={{
+              position: "absolute",
+              top,
+              height,
+              left: `calc(${leftPct}% + 2px)`,
+              width: `calc(${widthPct}% - 4px)`,
+            }}
+            className="z-10"
           />
-        ))}
-
-        {/* Now line */}
-        {showNowLine && (
-          <div
-            className="absolute left-0 right-0 z-20 pointer-events-none"
-            style={{ top: nowTop }}
-          >
-            <div className="h-px bg-destructive/70" />
-            <div className="absolute -left-1 -top-1 h-2 w-2 rounded-full bg-destructive" />
-          </div>
-        )}
-
-        {/* Grid jobs */}
-        {grid.map((item) => {
-          const top = item.startMin - DAY_START_HOUR * 60;
-          const height = Math.max(30, item.endMin - item.startMin);
-          const widthPct = 100 / item.laneCount;
-          const leftPct = widthPct * item.lane;
-          return (
-            <JobBlock
-              key={item.job.dbId}
-              job={item.job}
-              compact={compact}
-              showDebug={showDebug}
-              colorMode={colorMode}
-              spName={showSp ? getSpName(item.job.assignedSpId) : undefined}
-              onClick={() => onJobClick(item.job)}
-              style={{
-                position: "absolute",
-                top,
-                height,
-                left: `calc(${leftPct}% + 2px)`,
-                width: `calc(${widthPct}% - 4px)`,
-              }}
-              className="z-10"
-            />
-          );
-        })}
-      </div>
+        );
+      })}
     </div>
   );
 }
@@ -417,10 +574,13 @@ function EmptyRangeOverlay({
 }
 
 // ===== Day View =====
+type ViewProps = JobCalendarProps & { dnd?: DndApi };
+
 function DayView({
   jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug,
   nearestPrevious, nearestNext, nearestPreviousLabel, nearestNextLabel, onJumpToDate,
-}: JobCalendarProps) {
+  dnd,
+}: ViewProps) {
   const getSpName = spNameLookup(providers);
   const dayJobs = jobsOnDate(jobs, currentDate);
   const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
@@ -449,6 +609,7 @@ function DayView({
           onJobClick={onJobClick}
           onEmptyDayClick={onEmptyDayClick}
           showAddAffordance={mode === "admin" && !!onEmptyDayClick}
+          dnd={dnd}
         />
         {showEmpty && (
           <EmptyRangeOverlay
@@ -469,7 +630,8 @@ function DayView({
 function WeekView({
   jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug,
   nearestPrevious, nearestNext, nearestPreviousLabel, nearestNextLabel, onJumpToDate,
-}: JobCalendarProps) {
+  dnd,
+}: ViewProps) {
   const getSpName = spNameLookup(providers);
   const start = startOfWeek(currentDate, { weekStartsOn: 1 });
   const end = endOfWeek(currentDate, { weekStartsOn: 1 });
@@ -522,6 +684,7 @@ function WeekView({
               onJobClick={onJobClick}
               onEmptyDayClick={onEmptyDayClick}
               showAddAffordance={mode === "admin" && !!onEmptyDayClick}
+              dnd={dnd}
             />
           );
         })}
@@ -541,7 +704,7 @@ function WeekView({
 }
 
 // ===== Month View =====
-function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug }: JobCalendarProps) {
+function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug, dnd }: ViewProps) {
   const getSpName = spNameLookup(providers);
   const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
   const monthStart = startOfMonth(currentDate);
@@ -549,6 +712,7 @@ function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, 
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
+  const dndEnabled = !!dnd?.enabled;
 
   const weekdays = useMemo(
     () => ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
@@ -574,53 +738,99 @@ function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, 
           const visible = dayJobs.slice(0, 3);
           const overflow = dayJobs.length - visible.length;
           return (
-            <div
+            <MonthCell
               key={d.toISOString()}
-              className={cn(
-                "border-r border-b last:border-r-0 min-h-[110px] p-1 space-y-1",
-                !inMonth && "bg-muted/20",
-                isToday(d) && "bg-primary/5"
-              )}
-            >
-              <div
-                className={cn(
-                  "text-xs font-semibold px-1",
-                  !inMonth && "text-muted-foreground",
-                  isToday(d) && "text-primary"
-                )}
-              >
-                {format(d, "d")}
-              </div>
-              {visible.map((job) => (
-                <JobBlock
-                  key={job.dbId}
-                  job={job}
-                  compact
-                  showTime
-                  showDebug={showDebug}
-                  colorMode={colorMode}
-                  spName={mode === "admin" ? getSpName(job.assignedSpId) : undefined}
-                  onClick={() => onJobClick(job)}
-                />
-              ))}
-              {overflow > 0 && (
-                <div className="text-[10px] text-muted-foreground px-1">
-                  +{overflow} more
-                </div>
-              )}
-              {dayJobs.length === 0 && inMonth && mode === "admin" && onEmptyDayClick && (
-                <button
-                  type="button"
-                  onClick={() => onEmptyDayClick(d)}
-                  className="w-full text-[10px] text-muted-foreground/60 hover:text-primary py-1"
-                >
-                  +
-                </button>
-              )}
-            </div>
+              date={d}
+              inMonth={inMonth}
+              dayJobs={dayJobs}
+              visible={visible}
+              overflow={overflow}
+              showDebug={showDebug}
+              colorMode={colorMode}
+              getSpName={getSpName}
+              mode={mode}
+              onJobClick={onJobClick}
+              onEmptyDayClick={onEmptyDayClick}
+              dndEnabled={dndEnabled}
+            />
           );
         })}
       </div>
+    </div>
+  );
+}
+
+interface MonthCellProps {
+  date: Date;
+  inMonth: boolean;
+  dayJobs: Job[];
+  visible: Job[];
+  overflow: number;
+  showDebug?: boolean;
+  colorMode: ColorMode;
+  getSpName: (id?: string) => string;
+  mode: "admin" | "sp";
+  onJobClick: (job: Job) => void;
+  onEmptyDayClick?: (date: Date) => void;
+  dndEnabled: boolean;
+}
+
+function MonthCell({
+  date, inMonth, dayJobs, visible, overflow, showDebug, colorMode, getSpName,
+  mode, onJobClick, onEmptyDayClick, dndEnabled,
+}: MonthCellProps) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `month-cell:${date.toISOString()}`,
+    data: { kind: "month-cell", date },
+    disabled: !dndEnabled,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "border-r border-b last:border-r-0 min-h-[110px] p-1 space-y-1 transition-colors",
+        !inMonth && "bg-muted/20",
+        isToday(date) && "bg-primary/5",
+        isOver && "bg-primary/10 ring-2 ring-primary ring-inset"
+      )}
+    >
+      <div
+        className={cn(
+          "text-xs font-semibold px-1",
+          !inMonth && "text-muted-foreground",
+          isToday(date) && "text-primary"
+        )}
+      >
+        {format(date, "d")}
+      </div>
+      {visible.map((job) => (
+        <JobBlock
+          key={job.dbId}
+          job={job}
+          compact
+          showTime
+          showDebug={showDebug}
+          colorMode={colorMode}
+          spName={mode === "admin" ? getSpName(job.assignedSpId) : undefined}
+          onClick={() => onJobClick(job)}
+          enableDnd={dndEnabled}
+        />
+      ))}
+      {overflow > 0 && (
+        <div className="text-[10px] text-muted-foreground px-1">
+          +{overflow} more
+        </div>
+      )}
+      {dayJobs.length === 0 && inMonth && mode === "admin" && onEmptyDayClick && (
+        <button
+          type="button"
+          onClick={() => onEmptyDayClick(date)}
+          className="w-full text-[10px] text-muted-foreground/60 hover:text-primary py-1"
+        >
+          +
+        </button>
+      )}
     </div>
   );
 }
