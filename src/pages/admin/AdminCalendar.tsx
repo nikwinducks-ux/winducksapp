@@ -536,6 +536,9 @@ export default function AdminCalendar() {
               : null
           }
           onJumpToDate={jumpTo}
+          enableDnd
+          onReschedule={handleReschedule}
+          onDragBlocked={handleDragBlocked}
         />
       )}
 
