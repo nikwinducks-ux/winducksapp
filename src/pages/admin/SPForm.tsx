@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, MapPin } from "lucide-react";
 import { autofillCoords, SUPPORTED_CITIES } from "@/lib/coord-autofill";
 import { useToast } from "@/hooks/use-toast";
+import { SPColorPicker } from "@/components/admin/SPColorPicker";
+import type { PaletteKey } from "@/components/calendar/spColors";
 
 export default function SPForm() {
   const { id } = useParams();
