@@ -89,6 +89,8 @@ export interface Job {
   broadcastNote?: string;
   services?: JobService[];
   completedAt?: string;
+  crew?: { spId: string; isLead: boolean }[];
+  payoutShare?: number;
 }
 
 export interface AllocationScores {
