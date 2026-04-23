@@ -156,6 +156,8 @@ interface JobBlockProps {
   style?: React.CSSProperties;
   /** "sp" tints by SP identity (admin), "status" colors by job status (SP portal). Default: "status". */
   colorMode?: ColorMode;
+  /** When true, the block becomes draggable via @dnd-kit (admin only). */
+  enableDnd?: boolean;
 }
 
 export function JobBlock({
@@ -168,7 +170,14 @@ export function JobBlock({
   className,
   style,
   colorMode = "status",
+  enableDnd = false,
 }: JobBlockProps) {
+  const draggable = enableDnd && isJobDraggable(job);
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: job.dbId,
+    disabled: !draggable,
+  });
+
   const spAppearance = colorMode === "sp" ? getSpJobAppearance(job) : null;
   const appearance = spAppearance ?? getJobAppearance(job);
   const timePrefix = showTime ? formatShortTime(job.scheduledTime) : "";
@@ -178,14 +187,19 @@ export function JobBlock({
 
   return (
     <button
+      ref={draggable ? setNodeRef : undefined}
       type="button"
       onClick={onClick}
       style={style}
+      {...(draggable ? attributes : {})}
+      {...(draggable ? listeners : {})}
       className={cn(
         "relative w-full text-left rounded-md px-2 py-1.5 text-xs transition-all shadow-sm overflow-hidden",
         "focus:outline-none focus:ring-2 focus:ring-ring",
         appearance.classes,
         completedAccent && "border-l-4 border-l-success",
+        draggable && "cursor-grab active:cursor-grabbing",
+        isDragging && "opacity-40 ring-2 ring-primary",
         className
       )}
     >
@@ -222,3 +236,4 @@ export function JobBlock({
     </button>
   );
 }
+
