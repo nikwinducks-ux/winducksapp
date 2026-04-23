@@ -343,6 +343,7 @@ function TimeAxis() {
 interface DayColumnProps {
   date: Date;
   jobs: Job[];
+  blocks: SpUnavailableBlock[];
   getSpName: (id?: string) => string;
   getSpColorFor: (id?: string) => SpColor;
   showSp: boolean;
@@ -350,14 +351,18 @@ interface DayColumnProps {
   showDebug?: boolean;
   colorMode: ColorMode;
   onJobClick: (job: Job) => void;
+  onUnavailableClick?: (block: SpUnavailableBlock) => void;
+  onCreateUnavailable?: (date: Date, start: string, end: string) => void;
   onEmptyDayClick?: (date: Date) => void;
   showAddAffordance: boolean;
   dnd?: DndApi;
+  mode: "admin" | "sp";
 }
 
 function DayColumn({
   date,
   jobs,
+  blocks,
   getSpName,
   getSpColorFor,
   showSp,
@@ -365,9 +370,12 @@ function DayColumn({
   showDebug,
   colorMode,
   onJobClick,
+  onUnavailableClick,
+  onCreateUnavailable,
   onEmptyDayClick,
   showAddAffordance,
   dnd,
+  mode,
 }: DayColumnProps) {
   const { untimed, outside, grid } = useMemo(() => categorizeDayJobs(jobs), [jobs]);
   const today = isToday(date);
@@ -432,6 +440,7 @@ function DayColumn({
         showNowLine={showNowLine}
         nowTop={nowTop}
         grid={grid}
+        blocks={blocks}
         compact={compact}
         showDebug={showDebug}
         colorMode={colorMode}
@@ -439,7 +448,10 @@ function DayColumn({
         getSpColorFor={getSpColorFor}
         showSp={showSp}
         onJobClick={onJobClick}
+        onUnavailableClick={onUnavailableClick}
+        onCreateUnavailable={onCreateUnavailable}
         dnd={dnd}
+        mode={mode}
       />
     </div>
   );
@@ -451,6 +463,7 @@ interface DayGridDroppableProps {
   showNowLine: boolean;
   nowTop: number;
   grid: Positioned[];
+  blocks: SpUnavailableBlock[];
   compact: boolean;
   showDebug?: boolean;
   colorMode: ColorMode;
@@ -458,12 +471,15 @@ interface DayGridDroppableProps {
   getSpColorFor: (id?: string) => SpColor;
   showSp: boolean;
   onJobClick: (job: Job) => void;
+  onUnavailableClick?: (block: SpUnavailableBlock) => void;
+  onCreateUnavailable?: (date: Date, start: string, end: string) => void;
   dnd?: DndApi;
+  mode: "admin" | "sp";
 }
 
 function DayGridDroppable({
-  date, today, showNowLine, nowTop, grid, compact, showDebug, colorMode,
-  getSpName, getSpColorFor, showSp, onJobClick, dnd,
+  date, today, showNowLine, nowTop, grid, blocks, compact, showDebug, colorMode,
+  getSpName, getSpColorFor, showSp, onJobClick, onUnavailableClick, onCreateUnavailable, dnd, mode,
 }: DayGridDroppableProps) {
   const dndEnabled = !!dnd?.enabled;
   const { setNodeRef, isOver, node } = useDroppable({
@@ -495,13 +511,63 @@ function DayGridDroppable({
     return () => cancelAnimationFrame(raf);
   }, [isOver, dndEnabled, dnd, node, date]);
 
+  // Drag-to-create unavailable (SP-only)
+  const createEnabled = !!onCreateUnavailable;
+  const containerRef = node; // dnd-kit ref; we also attach our own
+  const [drag, setDrag] = useState<{ startMin: number; endMin: number } | null>(null);
+  const dragStateRef = useRef<{ startMin: number; endMin: number; startY: number } | null>(null);
+
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (!createEnabled) return;
+    if (e.button !== 0) return;
+    // Ignore if click originated on a job block / interactive child
+    const target = e.target as HTMLElement;
+    if (target.closest("[data-jobblock]")) return;
+    if (target.closest("[data-unavailable-block]")) return;
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const start = yToSnappedMinutes(y);
+    dragStateRef.current = { startMin: start, endMin: start + 15, startY: y };
+    setDrag({ startMin: start, endMin: start + 15 });
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+  }
+
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!createEnabled || !dragStateRef.current) return;
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const cur = yToSnappedMinutes(y);
+    const s = dragStateRef.current.startMin;
+    const startMin = Math.min(s, cur);
+    const endMin = Math.max(s + 15, cur + 15);
+    setDrag({ startMin, endMin });
+  }
+
+  function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (!createEnabled || !dragStateRef.current) return;
+    const d = drag;
+    dragStateRef.current = null;
+    setDrag(null);
+    try {
+      (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId);
+    } catch {}
+    if (d && d.endMin - d.startMin >= 15) {
+      onCreateUnavailable?.(date, minutesToHHMM(d.startMin), minutesToHHMM(d.endMin));
+    }
+  }
+
   return (
     <div
       ref={setNodeRef}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={() => { dragStateRef.current = null; setDrag(null); }}
       className={cn(
         "relative flex-1",
         today && "bg-primary/5",
-        isOver && "bg-primary/10 ring-2 ring-primary ring-inset"
+        isOver && "bg-primary/10 ring-2 ring-primary ring-inset",
+        createEnabled && "cursor-crosshair"
       )}
       style={{ height: GRID_HEIGHT_PX }}
     >
@@ -512,6 +578,65 @@ function DayGridDroppable({
           style={{ height: HOUR_PX }}
         />
       ))}
+
+      {/* Unavailable blocks (under jobs) */}
+      {blocks.map((b) => {
+        const sm = hhmmToMin(b.start);
+        const em = hhmmToMin(b.end);
+        const top = Math.max(0, sm - DAY_START_HOUR * 60);
+        const height = Math.max(15, Math.min(GRID_HEIGHT_PX - top, em - sm));
+        const tint = mode === "admin" && b.spColor ? b.spColor : "hsl(var(--muted-foreground))";
+        const label = mode === "admin" && b.spName ? `${b.spName} — Unavailable` : "Unavailable";
+        return (
+          <button
+            type="button"
+            key={b.id}
+            data-unavailable-block
+            onClick={(e) => {
+              e.stopPropagation();
+              onUnavailableClick?.(b);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="absolute left-0.5 right-0.5 z-[5] rounded-md border border-dashed text-left overflow-hidden hover:opacity-90 transition-opacity"
+            style={{
+              top,
+              height,
+              backgroundColor: `color-mix(in hsl, ${tint} 18%, transparent)`,
+              borderColor: `color-mix(in hsl, ${tint} 55%, transparent)`,
+              backgroundImage:
+                "repeating-linear-gradient(135deg, hsl(var(--muted-foreground) / 0.10) 0 6px, transparent 6px 12px)",
+            }}
+            title={b.reason || label}
+          >
+            <div className="px-1.5 py-0.5 text-[10px] font-semibold text-foreground/80 truncate">
+              {label}
+            </div>
+            {b.reason && height > 28 && (
+              <div className="px-1.5 text-[10px] text-muted-foreground truncate">
+                {b.reason}
+              </div>
+            )}
+          </button>
+        );
+      })}
+
+      {/* In-progress drag overlay */}
+      {drag && (
+        <div
+          className="absolute left-0.5 right-0.5 z-[6] rounded-md border border-foreground/40 pointer-events-none"
+          style={{
+            top: drag.startMin - DAY_START_HOUR * 60,
+            height: drag.endMin - drag.startMin,
+            backgroundColor: "hsl(var(--muted-foreground) / 0.18)",
+            backgroundImage:
+              "repeating-linear-gradient(135deg, hsl(var(--muted-foreground) / 0.18) 0 6px, transparent 6px 12px)",
+          }}
+        >
+          <div className="px-1.5 py-0.5 text-[10px] font-semibold text-foreground">
+            Unavailable · {formatGhostTime(drag.startMin)} – {formatGhostTime(drag.endMin)}
+          </div>
+        </div>
+      )}
 
       {/* Now line */}
       {showNowLine && (
@@ -531,16 +656,9 @@ function DayGridDroppable({
         const widthPct = 100 / item.laneCount;
         const leftPct = widthPct * item.lane;
         return (
-          <JobBlock
+          <div
             key={item.job.dbId}
-            job={item.job}
-            compact={compact}
-            showDebug={showDebug}
-            colorMode={colorMode}
-            spName={showSp ? getSpName(item.job.assignedSpId) : undefined}
-            spColor={getSpColorFor(item.job.assignedSpId)}
-            onClick={() => onJobClick(item.job)}
-            enableDnd={dndEnabled}
+            data-jobblock
             style={{
               position: "absolute",
               top,
@@ -549,7 +667,20 @@ function DayGridDroppable({
               width: `calc(${widthPct}% - 4px)`,
             }}
             className="z-10"
-          />
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <JobBlock
+              job={item.job}
+              compact={compact}
+              showDebug={showDebug}
+              colorMode={colorMode}
+              spName={showSp ? getSpName(item.job.assignedSpId) : undefined}
+              spColor={getSpColorFor(item.job.assignedSpId)}
+              onClick={() => onJobClick(item.job)}
+              enableDnd={dndEnabled}
+              style={{ height: "100%", width: "100%" }}
+            />
+          </div>
         );
       })}
     </div>
