@@ -1,14 +1,93 @@
 import { useServiceProviders, useJobs, useActiveServiceCategories } from "@/hooks/useSupabaseData";
-import { useSpOffers, useAllSpOffers, useExpireStaleOffers, type Offer } from "@/hooks/useOfferData";
+import { useSpOffers, useAllSpOffers, useExpireStaleOffers, useDeclineOffer, type Offer } from "@/hooks/useOfferData";
 import { JobServicesSummary } from "@/components/JobServicesDisplay";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { Link } from "react-router-dom";
-import { MapPin, Clock, DollarSign, FileText, Timer, ChevronDown, ChevronUp, Info, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { MapPin, Clock, DollarSign, FileText, Timer, ChevronDown, ChevronUp, Info, CheckCircle, XCircle, AlertTriangle, Eye } from "lucide-react";
 import { computeProximityResult } from "@/lib/proximity";
 import { useEffect, useMemo, useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { declineReasons } from "@/data/mockData";
+
+function DeclineOfferDialog({
+  open,
+  onOpenChange,
+  offerId,
+  jobNumber,
+  customerName,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  offerId: string;
+  jobNumber: string;
+  customerName: string;
+}) {
+  const [reason, setReason] = useState("");
+  const declineOffer = useDeclineOffer();
+
+  useEffect(() => {
+    if (!open) setReason("");
+  }, [open]);
+
+  const handleConfirm = () => {
+    if (!reason) return;
+    declineOffer.mutate(
+      { offerId, declineReason: reason },
+      { onSuccess: () => onOpenChange(false) }
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Decline Offer</DialogTitle>
+          <DialogDescription>
+            {jobNumber} · {customerName}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>Declining may affect your acceptance rate and reliability score.</span>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">
+              Reason <span className="text-destructive">*</span>
+            </label>
+            <Select value={reason} onValueChange={setReason}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a reason..." />
+              </SelectTrigger>
+              <SelectContent>
+                {declineReasons.map((r) => (
+                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={declineOffer.isPending}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleConfirm}
+            disabled={!reason || declineOffer.isPending}
+          >
+            {declineOffer.isPending ? "Declining..." : "Confirm Decline"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function ScheduleText({ job }: { job: any }) {
   const urgency = job.urgency || "Scheduled";
@@ -134,6 +213,8 @@ export default function JobOffers() {
 
   const currentSp = serviceProviders.find(sp => sp.id === spId);
 
+  const [declineTarget, setDeclineTarget] = useState<{ offerId: string; jobNumber: string; customerName: string } | null>(null);
+
   // Expire stale offers
   useEffect(() => {
     expireStale.mutate();
@@ -202,8 +283,8 @@ export default function JobOffers() {
             {offerJobs.map(({ offer, job }) => {
               const minutesLeft = Math.max(0, Math.round((new Date(offer.expires_at).getTime() - Date.now()) / 60000));
               return (
-                <Link key={offer.id} to={`/jobs/${job.dbId}?offer=${offer.id}`} className="metric-card flex items-center gap-4 hover:border-primary/30 transition-colors">
-                  <div className="flex-1 min-w-0">
+                <div key={offer.id} className="metric-card flex flex-col sm:flex-row sm:items-center gap-4 hover:border-primary/30 transition-colors">
+                  <Link to={`/jobs/${job.dbId}?offer=${offer.id}`} className="flex-1 min-w-0 block">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold truncate">{job.customerName}</p>
                       <StatusBadge label={
@@ -231,11 +312,25 @@ export default function JobOffers() {
                         <span className="truncate">{job.notes.slice(0, 120)}{job.notes.length > 120 ? "..." : ""}</span>
                       </p>
                     )}
-                  </div>
-                  <div className="text-right shrink-0">
+                  </Link>
+                  <div className="flex sm:flex-col items-end gap-2 shrink-0">
                     <p className="text-xl font-bold text-primary flex items-center gap-1"><DollarSign className="h-4 w-4" />{job.payout}</p>
+                    <div className="flex gap-2">
+                      <Button asChild size="sm" variant="outline">
+                        <Link to={`/jobs/${job.dbId}?offer=${offer.id}`}>
+                          <Eye className="h-3.5 w-3.5 mr-1" /> View
+                        </Link>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => setDeclineTarget({ offerId: offer.id, jobNumber: job.id, customerName: job.customerName })}
+                      >
+                        Decline
+                      </Button>
+                    </div>
                   </div>
-                </Link>
+                </div>
               );
             })}
           </div>
@@ -270,6 +365,16 @@ export default function JobOffers() {
           )}
         </div>
       </div>
+
+      {declineTarget && (
+        <DeclineOfferDialog
+          open={!!declineTarget}
+          onOpenChange={(o) => { if (!o) setDeclineTarget(null); }}
+          offerId={declineTarget.offerId}
+          jobNumber={declineTarget.jobNumber}
+          customerName={declineTarget.customerName}
+        />
+      )}
     </div>
   );
 }
