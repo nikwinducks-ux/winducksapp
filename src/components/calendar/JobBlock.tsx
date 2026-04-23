@@ -67,15 +67,31 @@ export function statusLabel(status: string): string {
   }
 }
 
-export function formatShortTime(hhmm?: string): string {
-  if (!hhmm) return "";
-  const [hStr, mStr] = hhmm.split(":");
-  const h = parseInt(hStr, 10);
-  const m = parseInt(mStr ?? "0", 10);
-  if (isNaN(h)) return "";
-  const period = h >= 12 ? "p" : "a";
-  const hour12 = h % 12 === 0 ? 12 : h % 12;
-  return m === 0 ? `${hour12}${period}` : `${hour12}:${String(m).padStart(2, "0")}${period}`;
+export function formatShortTime(value?: string): string {
+  if (!value) return "";
+  const normalized = value.trim().toLowerCase().replace(/\s+/g, "");
+
+  const ampmMatch = normalized.match(/^(\d{1,2})(?::(\d{2}))?(am|pm)$/);
+  if (ampmMatch) {
+    let hours = parseInt(ampmMatch[1], 10);
+    const minutes = parseInt(ampmMatch[2] ?? "0", 10);
+    const period = ampmMatch[3] === "pm" ? "p" : "a";
+    if (hours === 0) hours = 12;
+    if (hours > 12) hours = hours % 12 || 12;
+    return minutes === 0 ? `${hours}${period}` : `${hours}:${String(minutes).padStart(2, "0")}${period}`;
+  }
+
+  const twentyFourHourMatch = normalized.match(/^(\d{1,2})(?::(\d{2}))$/);
+  if (twentyFourHourMatch) {
+    let hours = parseInt(twentyFourHourMatch[1], 10);
+    const minutes = parseInt(twentyFourHourMatch[2] ?? "0", 10);
+    if (isNaN(hours) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return "";
+    const period = hours >= 12 ? "p" : "a";
+    const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+    return minutes === 0 ? `${hour12}${period}` : `${hour12}:${String(minutes).padStart(2, "0")}${period}`;
+  }
+
+  return value;
 }
 
 interface JobBlockProps {

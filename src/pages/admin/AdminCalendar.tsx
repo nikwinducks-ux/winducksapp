@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   addDays, addMonths, addWeeks, format, startOfWeek, endOfWeek,
@@ -32,6 +32,28 @@ const STATUS_FILTERS = [
   { id: "Completed", label: "Completed", matches: ["Completed"] },
 ] as const;
 
+function parseLocalDate(value?: string) {
+  if (!value) return null;
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
+function getBestCalendarStartDate(jobs: Job[]) {
+  const today = new Date();
+  const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  const datedJobs = jobs
+    .map((job) => parseLocalDate(job.scheduledDate))
+    .filter((date): date is Date => !!date && !Number.isNaN(date.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  if (datedJobs.length === 0) return todayLocal;
+
+  const upcoming = datedJobs.find((date) => date.getTime() >= todayLocal.getTime());
+  return upcoming ?? datedJobs[datedJobs.length - 1];
+}
+
 export default function AdminCalendar() {
   const { user } = useAuth();
   const { data: jobs = [], isLoading } = useJobs();
@@ -39,6 +61,7 @@ export default function AdminCalendar() {
   const updateJob = useUpdateJob();
   const assignJob = useAssignJob();
   const { toast } = useToast();
+  const autoFocusedInitialDateRef = useRef(false);
 
   const [view, setView] = useState<CalendarView>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -55,15 +78,19 @@ export default function AdminCalendar() {
     return jobs.filter((j) => !!j.scheduledDate);
   }, [jobs]);
 
+  useEffect(() => {
+    if (autoFocusedInitialDateRef.current || scheduledJobs.length === 0) return;
+    setCurrentDate(getBestCalendarStartDate(scheduledJobs));
+    autoFocusedInitialDateRef.current = true;
+  }, [scheduledJobs]);
+
   const filteredJobs = useMemo(() => {
     return scheduledJobs.filter((j) => {
-      // SP filter
       if (spFilter === "unassigned") {
         if (j.assignedSpId) return false;
       } else if (spFilter !== "all") {
         if (j.assignedSpId !== spFilter) return false;
       }
-      // Status filter
       const allowed = statusFilters.flatMap(
         (id) => STATUS_FILTERS.find((s) => s.id === id)?.matches ?? []
       );
