@@ -1,56 +1,68 @@
 
 
-## Quick-schedule a job from the Jobs list
+## Time-aware Day & Week calendar views
 
-Today, to set or change a job's scheduled date/time, an admin must open the job's full edit form. Add an inline "Schedule" action on each job row that opens a small dialog with just date + time pickers and saves immediately.
+Today the Day and Week views just stack jobs as a vertical list per day, sorted by `scheduledTime`. There's no visible time axis, so a 8:00 AM job and a 3:00 PM job look identical in spacing. Month view shows date cells but jobs don't render their time. This update adds a real time grid to Day/Week and shows the time on Month chips, while keeping the existing filters, click behavior, and SP-mode rendering.
 
 ### What changes
 
-**1. Row action — `src/pages/admin/JobManagement.tsx`**
+**1. `src/components/calendar/JobCalendar.tsx` — Day & Week become a time grid**
 
-Add a new **calendar icon button** in the per-row action group (next to View / Edit / Assign / Broadcast / Delete). Tooltip: "Schedule".
+Replace the current list-style `DayView` and `WeekView` with an hour-grid layout:
 
-- Visible for all rows except `Completed`, `Cancelled`, `Archived`.
-- Clicking opens a new `Schedule` dialog pre-filled with the job's existing `scheduledDate` and `scheduledTime` (or empty if `urgency` is ASAP / Anytime soon).
+- Time axis on the left: hours from **6 AM to 9 PM** (configurable constants `DAY_START_HOUR = 6`, `DAY_END_HOUR = 21`), with 1-hour rows. Each hour row is `60px` tall (so 1 minute = 1px, easy math for absolute positioning).
+- Each day column renders horizontal hour gridlines + a relative-positioned container.
+- Each scheduled job becomes an **absolutely positioned `JobBlock`** inside its day column:
+  - `top` = `(hour - DAY_START_HOUR) * 60 + minutes` px
+  - `height` = parsed `estimatedDuration` in minutes (default 60 if unparseable), min 30px
+  - Width 100% of the column with small inset padding
+- Jobs **before 6 AM or after 9 PM** are pinned in a small "Outside hours" strip at the top of the day column (still clickable, with their time shown).
+- Jobs with **no `scheduledTime`** go into an "All-day / Unscheduled time" strip at the top of each day column.
+- A faint "now" line is drawn on today's column when the current time is within the visible window.
 
-**2. New dialog — Schedule job**
+Overlap handling (simple, good enough for this app's volume):
+- Group jobs whose intervals overlap; split the column width evenly across the group (e.g., two overlapping jobs each take 50%, side by side). No fancy lane packing beyond that.
 
-Compact dialog showing:
-- Job number + customer name (read-only header)
-- **Date** input (`type="date"`)
-- **Time** select with 15-minute increments (reuse the `TIME_OPTIONS` pattern from `JobForm.tsx`, formatted 12h)
-- Helper note: "Setting a date/time will mark this job as Scheduled."
-- Buttons: **Cancel**, **Clear schedule** (only if job currently has a date), **Save**
+Click and styling reuse the existing `JobBlock` component (compact mode in week, full in day).
 
-**3. Save behavior**
+**2. Month view — show time on each chip**
 
-On Save:
-- Require both date and time. Show inline validation if missing.
-- Call `supabase.from("jobs").update({ scheduled_date, scheduled_time, urgency: "Scheduled" }).eq("id", jobDbId)` then invalidate the `jobs` query.
-- Insert an `admin_audit_logs` entry: `action: "job.schedule"`, `details: { jobDbId, jobNumber, scheduledDate, scheduledTime, previousDate, previousTime }` (matches existing audit pattern in this file).
-- Toast: "Job scheduled for {Mon, Apr 28 · 2:00 PM}".
+`MonthView` already renders up to 3 `JobBlock`s per day in compact mode. Compact `JobBlock` currently hides time. Add a tiny time prefix on the compact block (e.g., `"9:00a · JOB-0123"`) so the Month view communicates timing at a glance. This is done by passing a new optional `showTime` prop to `JobBlock` and rendering a formatted 12h short time (e.g., `9a`, `2:30p`) next to the job number when present. Day/Week blocks keep their existing layout.
 
-On **Clear schedule**:
-- Update with `scheduled_date: null, scheduled_time: ""`, set `urgency: "Anytime soon"`.
-- Audit `action: "job.unschedule"`.
-- Toast: "Schedule cleared".
+**3. `src/components/calendar/JobBlock.tsx` — small additions**
 
-**4. Bulk action (light)**
+- New optional `showTime?: boolean` prop. When true and `job.scheduledTime` exists, prepend a short time (e.g., `9:00a`) to the job number line in compact mode.
+- Add a small `formatShortTime(hhmm: string)` helper inside the file.
+- No behavior change for existing call sites that don't pass `showTime`.
 
-In the existing sticky "selected" bar, add a **Schedule** button that opens the same dialog in bulk mode — applies the same date/time to all selected jobs (excluding non-schedulable statuses, with a count summary). Reuses the same save path in a loop with a single toast at the end.
+**4. Ensure all scheduled jobs render correctly across views**
+
+Audit and fix the data path so a job appears in Day/Week/Month if and only if it has a `scheduled_date`:
+
+- `AdminCalendar.tsx` already filters to `!!j.scheduledDate` (correct).
+- `SPCalendar.tsx` filter (`scheduled + (assigned to me OR has pending offer)`) is left as-is.
+- In `JobCalendar.tsx`, `jobsOnDate` currently compares `new Date(j.scheduledDate)` with `isSameDay`. `scheduled_date` is a Postgres `date` (no time) — `new Date("2026-04-28")` parses as UTC midnight, which can shift to the previous day in negative-UTC timezones (e.g., MDT). Replace with a **local-date parse** helper (`parseLocalDate("YYYY-MM-DD")` → `new Date(y, m-1, d)`) so jobs land on the correct calendar day regardless of timezone. Apply everywhere `j.scheduledDate` is converted to a `Date` in the calendar component.
+
+**5. Minor polish**
+
+- Day view header keeps its summary; the body becomes the time grid (scrollable if needed, max-height ~`70vh`).
+- Week view header (existing weekday strip) is unchanged; the grid below is replaced.
+- "Add" / "Schedule a job" affordances for empty days remain in admin mode — placed in the unscheduled strip area instead of full-cell click target.
 
 ### Files touched
 
-- `src/pages/admin/JobManagement.tsx` — new dialog component inline, row icon button, bulk button, save handlers, audit logging
+- `src/components/calendar/JobCalendar.tsx` — rewrite Day & Week as hour-grid, add timezone-safe date parsing, wire `showTime` for Month chips
+- `src/components/calendar/JobBlock.tsx` — add `showTime` prop + `formatShortTime` helper
 
-No DB migration. No new RPC. The `jobs` table already has `scheduled_date`, `scheduled_time`, `urgency`, and existing admin RLS allows the update.
+No DB migration. No changes to filters, mutations, or `AdminCalendar.tsx` / `SPCalendar.tsx` logic.
 
 ### Acceptance
 
-- Each schedulable job row shows a calendar icon; clicking opens a Schedule dialog with current values prefilled
-- Saving with valid date+time updates the job, flips urgency to Scheduled, refreshes the list, and shows a confirmation toast
-- "Clear schedule" removes the date/time and flips urgency to Anytime soon
-- Bulk Schedule applies the chosen slot to all selected schedulable jobs and reports `n scheduled, m skipped`
-- Completed/Cancelled/Archived jobs do not show the Schedule action
-- Every schedule/unschedule writes an entry to `admin_audit_logs`
+- Day view shows an hour grid (6 AM–9 PM) with each scheduled job positioned at its real start time and sized by `estimatedDuration`
+- Week view shows the same hour grid across 7 day columns; jobs appear in the correct day **and** the correct time slot
+- Two jobs that overlap in time render side-by-side in the same column without obscuring each other
+- Jobs outside 6 AM–9 PM, or without a `scheduledTime`, appear in a small strip at the top of their day column and remain clickable
+- Month view chips show a short time prefix (e.g., `9a JOB-0123`) for jobs that have a `scheduledTime`
+- A job scheduled for 2026-04-28 appears on April 28 in all three views, regardless of the viewer's timezone (no off-by-one day)
+- All existing filters (SP, status), click-to-open sheet, reschedule, and reassign behaviors continue to work unchanged
 
