@@ -31,6 +31,12 @@ interface JobCalendarProps {
   onEmptyDayClick?: (date: Date) => void;
   mode: "admin" | "sp";
   showDebug?: boolean;
+  /** Nearest scheduled job date OUTSIDE the visible range, for empty-state jumps. */
+  nearestPrevious?: Date | null;
+  nearestNext?: Date | null;
+  nearestPreviousLabel?: string | null;
+  nearestNextLabel?: string | null;
+  onJumpToDate?: (date: Date) => void;
 }
 
 function spNameLookup(providers: ServiceProvider[]) {
