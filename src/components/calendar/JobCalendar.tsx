@@ -267,6 +267,7 @@ function DayColumn({
                 job={job}
                 compact={compact}
                 showDebug={showDebug}
+                colorMode={colorMode}
                 spName={showSp ? getSpName(job.assignedSpId) : undefined}
                 onClick={() => onJobClick(job)}
               />
@@ -281,6 +282,7 @@ function DayColumn({
                 job={job}
                 compact={compact}
                 showDebug={showDebug}
+                colorMode={colorMode}
                 spName={showSp ? getSpName(job.assignedSpId) : undefined}
                 onClick={() => onJobClick(job)}
               />
