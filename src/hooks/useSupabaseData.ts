@@ -1057,6 +1057,104 @@ export function useSetCrewLead() {
   });
 }
 
+/**
+ * Diff-based crew assignment. Reads existing crew, computes insert/delete/lead-update,
+ * applies in a batch, and cancels pending offers when first members are added.
+ */
+export function useAssignCrew() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ jobId, members, userId }: {
+      jobId: string;
+      members: { spId: string; isLead: boolean }[];
+      userId: string | null;
+    }) => {
+      // Fetch existing crew
+      const { data: existingRaw, error: fetchErr } = await supabase
+        .from("job_crew_members" as any)
+        .select("id, sp_id, is_lead")
+        .eq("job_id", jobId);
+      if (fetchErr) throw fetchErr;
+      const existing = (existingRaw ?? []) as any[];
+
+      const incomingIds = new Set(members.map((m) => m.spId));
+      const existingIds = new Set(existing.map((r) => r.sp_id));
+
+      const toInsert = members.filter((m) => !existingIds.has(m.spId));
+      const toDelete = existing.filter((r) => !incomingIds.has(r.sp_id));
+
+      // Determine lead — prefer flagged, else first incoming member
+      const desiredLead =
+        members.find((m) => m.isLead)?.spId ?? members[0]?.spId ?? null;
+
+      // Cancel pending offers when transitioning from empty -> non-empty
+      const wasEmpty = existing.length === 0;
+      if (wasEmpty && members.length > 0) {
+        await supabase
+          .from("offers")
+          .update({ status: "Cancelled", responded_at: new Date().toISOString() } as any)
+          .eq("job_id", jobId)
+          .eq("status", "Pending");
+      }
+
+      // Delete removed members
+      if (toDelete.length > 0) {
+        const { error: delErr } = await supabase
+          .from("job_crew_members" as any)
+          .delete()
+          .in("id", toDelete.map((r) => r.id));
+        if (delErr) throw delErr;
+      }
+
+      // Insert new members
+      if (toInsert.length > 0) {
+        const rows = toInsert.map((m) => ({
+          job_id: jobId,
+          sp_id: m.spId,
+          is_lead: m.spId === desiredLead,
+          added_by_user_id: userId,
+        }));
+        const { error: insErr } = await supabase
+          .from("job_crew_members" as any)
+          .insert(rows);
+        if (insErr) throw insErr;
+
+        // Audit
+        const auditRows = toInsert.map((m) => ({
+          job_id: jobId,
+          sp_id: m.spId,
+          assigned_by_user_id: userId,
+          assignment_type: "Manual",
+        }));
+        await supabase.from("job_assignments").insert(auditRows);
+      }
+
+      // Sync lead flag for any kept rows whose lead status changed
+      if (desiredLead && members.length > 0) {
+        // Clear all leads for this job, then set the desired one
+        await supabase
+          .from("job_crew_members" as any)
+          .update({ is_lead: false })
+          .eq("job_id", jobId);
+        await supabase
+          .from("job_crew_members" as any)
+          .update({ is_lead: true })
+          .eq("job_id", jobId)
+          .eq("sp_id", desiredLead);
+      }
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["job_crew", v.jobId] });
+      qc.invalidateQueries({ queryKey: ["offers"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Crew save failed", description: err.message, variant: "destructive" });
+    },
+  });
+}
+
 // ===== Seeding =====
 
 export function useSeedData() {
