@@ -1,10 +1,10 @@
 import { useParams, Link } from "react-router-dom";
 import { JobServicesDisplay } from "@/components/JobServicesDisplay";
-import { useJobs, useServiceProviders, useActiveServiceCategories, useUpdateJobStatus, useServiceCategories } from "@/hooks/useSupabaseData";
+import { useJobs, useServiceProviders, useActiveServiceCategories, useUpdateJobStatus, useServiceCategories, useJobCrew } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, FileText, Briefcase } from "lucide-react";
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, FileText, Briefcase, Users, Star } from "lucide-react";
 import { useMemo } from "react";
 import { computeProximityResult, DISTANCE_SOURCE_LABELS } from "@/lib/proximity";
 import { JobPhotosCard } from "@/components/JobPhotosCard";
