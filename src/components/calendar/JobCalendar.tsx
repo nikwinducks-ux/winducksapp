@@ -206,9 +206,71 @@ function categorizeDayJobs(jobs: Job[]): {
 }
 
 export function JobCalendar(props: JobCalendarProps) {
-  if (props.view === "day") return <DayView {...props} />;
-  if (props.view === "week") return <WeekView {...props} />;
-  return <MonthView {...props} />;
+  const dnd = useCalendarDnd({
+    enabled: !!props.enableDnd && !!props.onReschedule,
+    jobs: props.jobs,
+    onReschedule: props.onReschedule ?? (() => {}),
+    onBlocked: props.onDragBlocked,
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const inner =
+    props.view === "day" ? (
+      <DayView {...props} dnd={dnd} />
+    ) : props.view === "week" ? (
+      <WeekView {...props} dnd={dnd} />
+    ) : (
+      <MonthView {...props} dnd={dnd} />
+    );
+
+  if (!dnd.enabled) return inner;
+
+  return (
+    <DndContext
+      sensors={sensors}
+      onDragStart={dnd.handleDragStart}
+      onDragEnd={dnd.handleDragEnd}
+      onDragCancel={dnd.handleDragCancel}
+    >
+      {inner}
+      {dnd.activeJob && dnd.ghostLabel && (
+        <GhostTimeBadge label={dnd.ghostLabel} pointerRef={dnd.pointerRef} />
+      )}
+    </DndContext>
+  );
+}
+
+type DndApi = ReturnType<typeof useCalendarDnd>;
+
+function GhostTimeBadge({
+  label,
+  pointerRef,
+}: {
+  label: string;
+  pointerRef: React.MutableRefObject<{ x: number; y: number } | null>;
+}) {
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(pointerRef.current);
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      if (pointerRef.current) setPos({ ...pointerRef.current });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [pointerRef]);
+  if (!pos) return null;
+  return (
+    <div
+      className="pointer-events-none fixed z-50 rounded-md bg-foreground text-background px-2 py-1 text-xs font-medium shadow-lg"
+      style={{ left: pos.x + 14, top: pos.y + 14 }}
+    >
+      {label}
+    </div>
+  );
 }
 
 // ===== Now line hook =====
