@@ -1030,6 +1030,68 @@ export default function JobManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Schedule dialog (single or bulk) */}
+      <Dialog open={scheduleOpen} onOpenChange={(o) => { if (!busy) { setScheduleOpen(o); if (!o) { setScheduleTarget(null); setScheduleError(""); } } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {scheduleMode === "single"
+                ? `Schedule ${scheduleTarget?.jobNumber ?? "job"}`
+                : `Schedule ${selectedIds.size} job${selectedIds.size === 1 ? "" : "s"}`}
+            </DialogTitle>
+            <DialogDescription>
+              {scheduleMode === "single" && scheduleTarget?.customerName
+                ? `Customer: ${scheduleTarget.customerName}`
+                : "Applies the same date and time to all selected jobs. Completed, Cancelled, and Archived jobs are skipped."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="schedule-date">Date</Label>
+              <Input
+                id="schedule-date"
+                type="date"
+                value={scheduleDate}
+                onChange={(e) => { setScheduleDate(e.target.value); setScheduleError(""); }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="schedule-time">Time</Label>
+              <Select value={scheduleTime} onValueChange={(v) => { setScheduleTime(v); setScheduleError(""); }}>
+                <SelectTrigger id="schedule-time"><SelectValue placeholder="Pick a time" /></SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {TIME_OPTIONS.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Setting a date/time will mark this job as Scheduled.
+            </p>
+            {scheduleError && (
+              <p className="text-xs text-destructive">{scheduleError}</p>
+            )}
+          </div>
+          <DialogFooter className="sm:justify-between">
+            <div>
+              {scheduleMode === "single" && scheduleTarget?.scheduledDate && (
+                <Button variant="ghost" onClick={runScheduleClear} disabled={busy} className="text-destructive hover:text-destructive">
+                  Clear schedule
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setScheduleOpen(false)} disabled={busy}>Cancel</Button>
+              <Button onClick={runScheduleSave} disabled={busy}>
+                <CalendarClock className="h-4 w-4 mr-2" />
+                {busy ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
