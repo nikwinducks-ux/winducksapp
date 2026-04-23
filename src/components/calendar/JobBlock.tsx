@@ -100,12 +100,13 @@ interface JobBlockProps {
   spName?: string;
   compact?: boolean;
   showTime?: boolean;
+  showDebug?: boolean;
   onClick?: () => void;
   className?: string;
   style?: React.CSSProperties;
 }
 
-export function JobBlock({ job, spName, compact, showTime, onClick, className, style }: JobBlockProps) {
+export function JobBlock({ job, spName, compact, showTime, showDebug, onClick, className, style }: JobBlockProps) {
   const appearance = getJobAppearance(job);
   const timePrefix = showTime ? formatShortTime(job.scheduledTime) : "";
   return (
@@ -140,6 +141,12 @@ export function JobBlock({ job, spName, compact, showTime, onClick, className, s
             </div>
           )}
         </>
+      )}
+      {showDebug && (
+        <ScheduleDebugBadge
+          scheduledDate={job.scheduledDate}
+          scheduledTime={job.scheduledTime}
+        />
       )}
     </button>
   );
