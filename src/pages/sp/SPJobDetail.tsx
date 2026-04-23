@@ -1,10 +1,10 @@
 import { useParams, Link } from "react-router-dom";
 import { JobServicesDisplay } from "@/components/JobServicesDisplay";
-import { useJobs, useServiceProviders, useActiveServiceCategories, useUpdateJobStatus, useServiceCategories } from "@/hooks/useSupabaseData";
+import { useJobs, useServiceProviders, useActiveServiceCategories, useUpdateJobStatus, useServiceCategories, useJobCrew } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, FileText, Briefcase } from "lucide-react";
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, FileText, Briefcase, Users, Star } from "lucide-react";
 import { useMemo } from "react";
 import { computeProximityResult, DISTANCE_SOURCE_LABELS } from "@/lib/proximity";
 import { JobPhotosCard } from "@/components/JobPhotosCard";
@@ -45,6 +45,7 @@ export default function SPJobDetail() {
   const updateStatus = useUpdateJobStatus();
 
   const job = jobs.find((j) => j.dbId === id || j.id === id);
+  const { data: crew = [] } = useJobCrew(job?.dbId);
   const currentSp = providers.find((sp) => sp.id === user?.spId);
   const isLegacy = job && activeCategories.length > 0 && !activeCategories.some((c) => c.name === job.serviceCategory);
 
@@ -74,9 +75,12 @@ export default function SPJobDetail() {
     );
   }
 
-  const isMyJob = job.assignedSpId === user.spId;
+  const isCrewMember = crew.some((c) => c.spId === user.spId);
+  const isMyJob = job.assignedSpId === user.spId || isCrewMember;
   const canMarkInProgress = isMyJob && ["Assigned", "Accepted"].includes(job.status);
   const canMarkCompleted = isMyJob && ["Assigned", "Accepted", "InProgress"].includes(job.status);
+  const isCrew = crew.length > 1;
+  const myShare = isCrew ? Math.round((job.payout / crew.length) * 100) / 100 : job.payout;
 
   const handleStatusUpdate = (newStatus: string) => {
     updateStatus.mutate({
@@ -121,7 +125,13 @@ export default function SPJobDetail() {
           </div>
           <div className="flex items-center gap-3">
             <DollarSign className="h-4 w-4 text-muted-foreground" />
-            <div><p className="text-xs text-muted-foreground">Payout</p><p className="text-xl font-bold text-primary">${job.payout}</p></div>
+            <div>
+              <p className="text-xs text-muted-foreground">Payout</p>
+              <p className="text-xl font-bold text-primary">${myShare.toFixed(2)}</p>
+              {isCrew && (
+                <p className="text-xs text-muted-foreground">Your share of ${job.payout} (÷ {crew.length})</p>
+              )}
+            </div>
           </div>
           {distanceInfo !== null && distanceInfo.distanceKm !== null && (
             <div className="flex items-center gap-3">
@@ -157,6 +167,36 @@ export default function SPJobDetail() {
         <div className="metric-card space-y-3">
           <h2 className="section-title flex items-center gap-2"><FileText className="h-4 w-4" />Job Notes</h2>
           <p className="text-sm whitespace-pre-wrap">{job.notes}</p>
+        </div>
+      )}
+
+      {/* Crew */}
+      {crew.length > 1 && (
+        <div className="metric-card space-y-3">
+          <h2 className="section-title flex items-center gap-2"><Users className="h-4 w-4" />Crew ({crew.length})</h2>
+          <div className="space-y-2">
+            {crew.map((m) => {
+              const sp = providers.find((p) => p.id === m.spId);
+              const isYou = m.spId === user.spId;
+              return (
+                <div key={m.id} className="flex items-center gap-3 rounded-md border p-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                    {sp?.avatar ?? "?"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {sp?.name ?? "Unknown SP"} {isYou && <span className="text-xs text-muted-foreground">(you)</span>}
+                    </p>
+                  </div>
+                  {m.isLead && (
+                    <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
+                      <Star className="h-3 w-3 fill-current" /> Lead
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

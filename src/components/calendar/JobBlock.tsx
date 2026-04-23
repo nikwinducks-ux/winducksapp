@@ -213,6 +213,11 @@ export function JobBlock({
           )}
           {timePrefix && <span className="opacity-80 mr-0.5">{timePrefix}</span>}
           <span className="truncate">{customerTitle}</span>
+          {job.crew && job.crew.length > 1 && (
+            <span className="ml-1 shrink-0 rounded-sm bg-current/20 px-1 text-[9px] font-bold leading-tight">
+              +{job.crew.length - 1}
+            </span>
+          )}
         </span>
         <span className="font-semibold shrink-0">${job.payout}</span>
       </div>

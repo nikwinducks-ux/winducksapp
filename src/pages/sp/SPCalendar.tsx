@@ -40,11 +40,12 @@ export default function SPCalendar() {
     [spOffers]
   );
 
-  // Filter: scheduled + (assigned to me OR I have a pending offer)
+  // Filter: scheduled + (assigned to me OR on crew OR I have a pending offer)
   const myCalendarJobs = useMemo(() => {
     return jobs.filter((j) => {
       if (j.urgency !== "Scheduled" || !j.scheduledDate) return false;
       if (j.assignedSpId === spId) return true;
+      if (j.crew?.some((c) => c.spId === spId)) return true;
       if (pendingOfferJobIds.has(j.dbId)) return true;
       return false;
     });
