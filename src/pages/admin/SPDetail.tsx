@@ -164,7 +164,7 @@ export default function SPDetail() {
               disabled={updateColor.isPending}
               onChange={(key) => {
                 updateColor.mutate(
-                  { id: sp.id, calendarColor: key },
+                  { id: sp.id, color: key },
                   {
                     onSuccess: () => {
                       toast.success(
