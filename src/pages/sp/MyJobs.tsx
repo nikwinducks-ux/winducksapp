@@ -1,4 +1,4 @@
-import { useJobs } from "@/hooks/useSupabaseData";
+import { useJobs, useServiceProvider } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
