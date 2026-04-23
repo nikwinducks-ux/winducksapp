@@ -17,14 +17,45 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Plus, Eye, Pencil, UserPlus, UserX, Trash2, Radio, X, RadioTower } from "lucide-react";
+import { Search, Plus, Eye, Pencil, UserPlus, UserX, Trash2, Radio, X, RadioTower, CalendarClock } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 const NON_BROADCASTABLE = new Set(["Assigned", "InProgress", "Completed", "Cancelled", "Archived"]);
 const NON_ASSIGNABLE = new Set(["InProgress", "Completed", "Cancelled", "Archived"]);
 const HAS_SP_STATUSES = new Set(["Assigned", "Accepted"]);
+const NON_SCHEDULABLE = new Set(["Completed", "Cancelled", "Archived"]);
+
+// 15-min increments, formatted 12h
+const TIME_OPTIONS: { value: string; label: string }[] = (() => {
+  const out: { value: string; label: string }[] = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const hh = String(h).padStart(2, "0");
+      const mm = String(m).padStart(2, "0");
+      const value = `${hh}:${mm}`;
+      const period = h < 12 ? "AM" : "PM";
+      const h12 = ((h + 11) % 12) + 1;
+      out.push({ value, label: `${h12}:${mm} ${period}` });
+    }
+  }
+  return out;
+})();
+
+function formatScheduleToast(date: string, time: string) {
+  try {
+    const [y, m, d] = date.split("-").map(Number);
+    const [hh, mm] = time.split(":").map(Number);
+    const dt = new Date(y, (m || 1) - 1, d || 1, hh || 0, mm || 0);
+    const dateStr = dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    const timeLabel = TIME_OPTIONS.find((t) => t.value === time)?.label ?? time;
+    return `${dateStr} · ${timeLabel}`;
+  } catch {
+    return `${date} ${time}`;
+  }
+}
 
 export default function JobManagement() {
   const [search, setSearch] = useState("");
