@@ -43,6 +43,8 @@ export default function MyJobs() {
         </p>
       </div>
 
+      <SPVisibilityDiagnostics jobs={jobs} context="my-jobs" />
+
       {activeJobs.length === 0 && pastJobs.length === 0 && (
         <div className="metric-card text-center py-10">
           <p className="text-muted-foreground">No jobs assigned to you yet.</p>
