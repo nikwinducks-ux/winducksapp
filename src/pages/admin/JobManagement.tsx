@@ -17,14 +17,45 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Plus, Eye, Pencil, UserPlus, UserX, Trash2, Radio, X, RadioTower } from "lucide-react";
+import { Search, Plus, Eye, Pencil, UserPlus, UserX, Trash2, Radio, X, RadioTower, CalendarClock } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 const NON_BROADCASTABLE = new Set(["Assigned", "InProgress", "Completed", "Cancelled", "Archived"]);
 const NON_ASSIGNABLE = new Set(["InProgress", "Completed", "Cancelled", "Archived"]);
 const HAS_SP_STATUSES = new Set(["Assigned", "Accepted"]);
+const NON_SCHEDULABLE = new Set(["Completed", "Cancelled", "Archived"]);
+
+// 15-min increments, formatted 12h
+const TIME_OPTIONS: { value: string; label: string }[] = (() => {
+  const out: { value: string; label: string }[] = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const hh = String(h).padStart(2, "0");
+      const mm = String(m).padStart(2, "0");
+      const value = `${hh}:${mm}`;
+      const period = h < 12 ? "AM" : "PM";
+      const h12 = ((h + 11) % 12) + 1;
+      out.push({ value, label: `${h12}:${mm} ${period}` });
+    }
+  }
+  return out;
+})();
+
+function formatScheduleToast(date: string, time: string) {
+  try {
+    const [y, m, d] = date.split("-").map(Number);
+    const [hh, mm] = time.split(":").map(Number);
+    const dt = new Date(y, (m || 1) - 1, d || 1, hh || 0, mm || 0);
+    const dateStr = dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    const timeLabel = TIME_OPTIONS.find((t) => t.value === time)?.label ?? time;
+    return `${dateStr} · ${timeLabel}`;
+  } catch {
+    return `${date} ${time}`;
+  }
+}
 
 export default function JobManagement() {
   const [search, setSearch] = useState("");
@@ -51,6 +82,14 @@ export default function JobManagement() {
   const [bulkUnassignOpen, setBulkUnassignOpen] = useState(false);
   const [unassignTarget, setUnassignTarget] = useState<{ jobDbId: string; jobNumber: string; spName: string } | null>(null);
 
+  // Schedule dialog state
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleMode, setScheduleMode] = useState<"single" | "bulk">("single");
+  const [scheduleTarget, setScheduleTarget] = useState<{ jobDbId: string; jobNumber: string; customerName: string; scheduledDate?: string; scheduledTime?: string } | null>(null);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [scheduleError, setScheduleError] = useState("");
+
   const { data: jobs = [], isLoading } = useJobs();
   const { data: providers = [] } = useServiceProviders();
   const { data: categories = [] } = useServiceCategories();
@@ -60,6 +99,7 @@ export default function JobManagement() {
   const assignJob = useAssignJob();
   const unassignJob = useUnassignJob();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const spMap = new Map(providers.map((sp) => [sp.id, sp.name]));
   const activeSps = useMemo(
@@ -399,6 +439,143 @@ export default function JobManagement() {
     });
   };
 
+  // Schedule handlers
+  const openScheduleSingle = (job: any) => {
+    setScheduleMode("single");
+    setScheduleTarget({
+      jobDbId: job.dbId,
+      jobNumber: job.id,
+      customerName: job.customerName,
+      scheduledDate: job.scheduledDate,
+      scheduledTime: job.scheduledTime,
+    });
+    const usePrefill = (job.urgency || "Scheduled") === "Scheduled";
+    setScheduleDate(usePrefill ? (job.scheduledDate || "") : "");
+    setScheduleTime(usePrefill ? (job.scheduledTime || "") : "");
+    setScheduleError("");
+    setScheduleOpen(true);
+  };
+
+  const openScheduleBulk = () => {
+    setScheduleMode("bulk");
+    setScheduleTarget(null);
+    setScheduleDate("");
+    setScheduleTime("");
+    setScheduleError("");
+    setScheduleOpen(true);
+  };
+
+  const runScheduleSave = async () => {
+    if (!scheduleDate || !scheduleTime) {
+      setScheduleError("Please pick both a date and a time.");
+      return;
+    }
+    setBusy(true);
+    const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+    const userEmail = (await supabase.auth.getUser()).data.user?.email ?? "";
+
+    if (scheduleMode === "single" && scheduleTarget) {
+      try {
+        const { error } = await supabase
+          .from("jobs")
+          .update({ scheduled_date: scheduleDate, scheduled_time: scheduleTime, urgency: "Scheduled" })
+          .eq("id", scheduleTarget.jobDbId);
+        if (error) throw error;
+        try {
+          await supabase.from("admin_audit_logs").insert({
+            user_id: userId, user_email: userEmail,
+            action: "job.schedule",
+            details: {
+              jobDbId: scheduleTarget.jobDbId,
+              jobNumber: scheduleTarget.jobNumber,
+              scheduledDate: scheduleDate,
+              scheduledTime: scheduleTime,
+              previousDate: scheduleTarget.scheduledDate ?? null,
+              previousTime: scheduleTarget.scheduledTime ?? null,
+            },
+          } as any);
+        } catch { /* best-effort */ }
+        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        toast({ title: "Job scheduled", description: `Scheduled for ${formatScheduleToast(scheduleDate, scheduleTime)}.` });
+        setScheduleOpen(false);
+        setScheduleTarget(null);
+      } catch (e: any) {
+        setScheduleError(e?.message ?? "Failed to schedule job.");
+      }
+    } else {
+      // Bulk
+      const targets = jobs.filter((j) => selectedIds.has(j.dbId) && !NON_SCHEDULABLE.has(j.status));
+      const skipped = selectedIds.size - targets.length;
+      let ok = 0, fail = 0;
+      for (const job of targets) {
+        try {
+          const { error } = await supabase
+            .from("jobs")
+            .update({ scheduled_date: scheduleDate, scheduled_time: scheduleTime, urgency: "Scheduled" })
+            .eq("id", job.dbId);
+          if (error) throw error;
+          ok++;
+        } catch {
+          fail++;
+        }
+      }
+      try {
+        await supabase.from("admin_audit_logs").insert({
+          user_id: userId, user_email: userEmail,
+          action: "job.bulk_schedule",
+          details: {
+            job_ids: targets.map((t) => t.dbId),
+            scheduledDate: scheduleDate,
+            scheduledTime: scheduleTime,
+            count: targets.length, ok, fail, skipped,
+          },
+        } as any);
+      } catch { /* best-effort */ }
+      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      setScheduleOpen(false);
+      clearSelection();
+      toast({
+        title: "Bulk schedule complete",
+        description: `${ok} scheduled${fail ? `, ${fail} failed` : ""}${skipped ? `, ${skipped} skipped` : ""} for ${formatScheduleToast(scheduleDate, scheduleTime)}.`,
+        variant: fail > 0 ? "destructive" : "default",
+      });
+    }
+    setBusy(false);
+  };
+
+  const runScheduleClear = async () => {
+    if (scheduleMode !== "single" || !scheduleTarget) return;
+    setBusy(true);
+    const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+    const userEmail = (await supabase.auth.getUser()).data.user?.email ?? "";
+    try {
+      const { error } = await supabase
+        .from("jobs")
+        .update({ scheduled_date: null, scheduled_time: "", urgency: "Anytime soon" })
+        .eq("id", scheduleTarget.jobDbId);
+      if (error) throw error;
+      try {
+        await supabase.from("admin_audit_logs").insert({
+          user_id: userId, user_email: userEmail,
+          action: "job.unschedule",
+          details: {
+            jobDbId: scheduleTarget.jobDbId,
+            jobNumber: scheduleTarget.jobNumber,
+            previousDate: scheduleTarget.scheduledDate ?? null,
+            previousTime: scheduleTarget.scheduledTime ?? null,
+          },
+        } as any);
+      } catch { /* best-effort */ }
+      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      toast({ title: "Schedule cleared" });
+      setScheduleOpen(false);
+      setScheduleTarget(null);
+    } catch (e: any) {
+      setScheduleError(e?.message ?? "Failed to clear schedule.");
+    }
+    setBusy(false);
+  };
+
   const deleteCount = deleteTarget?.length ?? 0;
   const requireTypeConfirm = deleteCount > 1;
   const canConfirmDelete = !busy && (!requireTypeConfirm || deleteConfirmText === "DELETE");
@@ -467,6 +644,9 @@ export default function JobManagement() {
             </Button>
             <Button size="sm" variant="outline" onClick={() => setBulkUnassignOpen(true)}>
               <UserX className="h-4 w-4 mr-2" />Unassign Selected
+            </Button>
+            <Button size="sm" variant="outline" onClick={openScheduleBulk}>
+              <CalendarClock className="h-4 w-4 mr-2" />Schedule Selected
             </Button>
             <Button size="sm" variant="outline" onClick={() => { setStartBroadcastJobId(null); setBroadcastOpen(true); }}>
               <Radio className="h-4 w-4 mr-2" />Broadcast Selected
@@ -617,6 +797,16 @@ export default function JobManagement() {
                       <Link to={`/admin/jobs/${job.dbId}?assign=true`}>
                         <Button size="sm" variant="ghost" title="Assign SP"><UserPlus className="h-4 w-4" /></Button>
                       </Link>
+                      {!NON_SCHEDULABLE.has(job.status) && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Schedule"
+                          onClick={() => openScheduleSingle(job)}
+                        >
+                          <CalendarClock className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -840,6 +1030,68 @@ export default function JobManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Schedule dialog (single or bulk) */}
+      <Dialog open={scheduleOpen} onOpenChange={(o) => { if (!busy) { setScheduleOpen(o); if (!o) { setScheduleTarget(null); setScheduleError(""); } } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {scheduleMode === "single"
+                ? `Schedule ${scheduleTarget?.jobNumber ?? "job"}`
+                : `Schedule ${selectedIds.size} job${selectedIds.size === 1 ? "" : "s"}`}
+            </DialogTitle>
+            <DialogDescription>
+              {scheduleMode === "single" && scheduleTarget?.customerName
+                ? `Customer: ${scheduleTarget.customerName}`
+                : "Applies the same date and time to all selected jobs. Completed, Cancelled, and Archived jobs are skipped."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="schedule-date">Date</Label>
+              <Input
+                id="schedule-date"
+                type="date"
+                value={scheduleDate}
+                onChange={(e) => { setScheduleDate(e.target.value); setScheduleError(""); }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="schedule-time">Time</Label>
+              <Select value={scheduleTime} onValueChange={(v) => { setScheduleTime(v); setScheduleError(""); }}>
+                <SelectTrigger id="schedule-time"><SelectValue placeholder="Pick a time" /></SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {TIME_OPTIONS.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Setting a date/time will mark this job as Scheduled.
+            </p>
+            {scheduleError && (
+              <p className="text-xs text-destructive">{scheduleError}</p>
+            )}
+          </div>
+          <DialogFooter className="sm:justify-between">
+            <div>
+              {scheduleMode === "single" && scheduleTarget?.scheduledDate && (
+                <Button variant="ghost" onClick={runScheduleClear} disabled={busy} className="text-destructive hover:text-destructive">
+                  Clear schedule
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setScheduleOpen(false)} disabled={busy}>Cancel</Button>
+              <Button onClick={runScheduleSave} disabled={busy}>
+                <CalendarClock className="h-4 w-4 mr-2" />
+                {busy ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
