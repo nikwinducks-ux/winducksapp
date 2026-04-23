@@ -312,6 +312,12 @@ export default function AdminCalendar() {
                   <div><span className="text-muted-foreground">Duration:</span> {selectedJob.estimatedDuration}</div>
                 </div>
 
+                {debug && (
+                  <ScheduleDebugBadge
+                    scheduledDate={selectedJob.scheduledDate}
+                    scheduledTime={selectedJob.scheduledTime}
+                  />
+                )}
                 <div className="border-t pt-4 space-y-3">
                   <h3 className="text-sm font-semibold">Reschedule</h3>
                   <div className="grid grid-cols-2 gap-2">
