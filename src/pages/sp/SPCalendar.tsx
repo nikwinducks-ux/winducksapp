@@ -39,7 +39,7 @@ export default function SPCalendar() {
   const { user } = useAuth();
   const spId = user?.spId ?? null;
 
-  const { data: jobs = [], isLoading } = useJobs();
+  const { data: jobs = [], isLoading, status: jobsStatus, error: jobsError } = useJobs();
   const { data: providers = [] } = useServiceProviders();
   const { data: spOffers = [] } = useSpOffers(spId);
   const { data: unavailableBlocks = [] } = useSpUnavailableBlocks(spId);
