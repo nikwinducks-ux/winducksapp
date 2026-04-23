@@ -501,11 +501,11 @@ export default function JobForm() {
         </div>
 
         <div className="metric-card space-y-4">
-          <h2 className="section-title">Notes</h2>
+          <h2 className="section-title">Job Instructions</h2>
           <Textarea
             value={form.notes}
             onChange={(e) => update("notes", e.target.value)}
-            placeholder="Add any special instructions, access notes, or details for the SP..."
+            placeholder="Add instructions for the crew — access codes, gate locations, parking, special requirements, etc."
             rows={4}
           />
         </div>

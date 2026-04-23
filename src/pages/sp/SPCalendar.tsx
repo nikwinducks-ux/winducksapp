@@ -184,6 +184,15 @@ export default function SPCalendar() {
                   <div><span className="text-muted-foreground">Duration:</span> {selectedJob.estimatedDuration}</div>
                 </div>
 
+                {selectedJob.notes && selectedJob.notes.trim() && (
+                  <div className="border-t pt-4 space-y-2">
+                    <h3 className="text-sm font-semibold">Job Instructions</h3>
+                    <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">
+                      {selectedJob.notes}
+                    </div>
+                  </div>
+                )}
+
                 <div className="border-t pt-4 space-y-2">
                   {isPendingOffer && selectedOffer && (
                     <div className="flex gap-2">
