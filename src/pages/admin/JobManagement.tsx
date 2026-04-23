@@ -399,6 +399,7 @@ export default function JobManagement() {
     });
   };
 
+  const deleteCount = deleteTarget?.length ?? 0;
   const requireTypeConfirm = deleteCount > 1;
   const canConfirmDelete = !busy && (!requireTypeConfirm || deleteConfirmText === "DELETE");
 
