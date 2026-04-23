@@ -7,8 +7,16 @@ import {
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { useJobs, useServiceProviders, useUpdateJobStatus } from "@/hooks/useSupabaseData";
 import { useSpOffers, useAcceptOffer, useDeclineOffer } from "@/hooks/useOfferData";
+import {
+  useSpUnavailableBlocks,
+  useCreateSpUnavailable,
+  useUpdateSpUnavailable,
+  useDeleteSpUnavailable,
+  type SpUnavailableBlock,
+} from "@/hooks/useSpUnavailable";
 import { useAuth } from "@/contexts/AuthContext";
 import { JobCalendar, type CalendarView } from "@/components/calendar/JobCalendar";
+import UnavailableDialog, { type UnavailableDialogValue } from "@/components/calendar/UnavailableDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +26,13 @@ import {
 import { statusLabel } from "@/components/calendar/JobBlock";
 import type { Job } from "@/data/mockData";
 
+function dateToISO(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export default function SPCalendar() {
   const { user } = useAuth();
   const spId = user?.spId ?? null;
@@ -25,14 +40,20 @@ export default function SPCalendar() {
   const { data: jobs = [], isLoading } = useJobs();
   const { data: providers = [] } = useServiceProviders();
   const { data: spOffers = [] } = useSpOffers(spId);
+  const { data: unavailableBlocks = [] } = useSpUnavailableBlocks(spId);
 
   const acceptOffer = useAcceptOffer();
   const declineOffer = useDeclineOffer();
   const updateStatus = useUpdateJobStatus();
+  const createBlock = useCreateSpUnavailable();
+  const updateBlock = useUpdateSpUnavailable();
+  const deleteBlock = useDeleteSpUnavailable();
 
   const [view, setView] = useState<CalendarView>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogInitial, setDialogInitial] = useState<UnavailableDialogValue | null>(null);
 
   // Pending-offer job ids for this SP
   const pendingOfferJobIds = useMemo(
@@ -106,6 +127,44 @@ export default function SPCalendar() {
     setSelectedJob(null);
   }
 
+  function handleCreateUnavailable(date: Date, start: string, end: string) {
+    setDialogInitial({ date: dateToISO(date), start, end, reason: "" });
+    setDialogOpen(true);
+  }
+
+  function handleClickBlock(block: SpUnavailableBlock) {
+    setDialogInitial({
+      id: block.id,
+      date: block.date,
+      start: block.start,
+      end: block.end,
+      reason: block.reason,
+    });
+    setDialogOpen(true);
+  }
+
+  async function handleDialogSave(v: UnavailableDialogValue) {
+    if (!spId) return;
+    if (v.id) {
+      await updateBlock.mutateAsync({
+        id: v.id, spId, date: v.date, start: v.start, end: v.end, reason: v.reason,
+      });
+    } else {
+      await createBlock.mutateAsync({
+        spId, date: v.date, start: v.start, end: v.end, reason: v.reason,
+      });
+    }
+    setDialogOpen(false);
+    setDialogInitial(null);
+  }
+
+  async function handleDialogDelete(id: string) {
+    if (!spId) return;
+    await deleteBlock.mutateAsync({ id, spId });
+    setDialogOpen(false);
+    setDialogInitial(null);
+  }
+
   if (!spId) {
     return (
       <div className="rounded-lg border bg-card p-8 text-center">
@@ -125,7 +184,7 @@ export default function SPCalendar() {
         <div>
           <h1 className="text-2xl font-bold">My Calendar</h1>
           <p className="text-sm text-muted-foreground">
-            Your scheduled jobs and pending offers.
+            Your scheduled jobs and pending offers. Drag empty time to mark yourself unavailable.
           </p>
         </div>
         <Tabs value={view} onValueChange={(v) => setView(v as CalendarView)}>
@@ -160,8 +219,21 @@ export default function SPCalendar() {
           currentDate={currentDate}
           onJobClick={setSelectedJob}
           mode="sp"
+          unavailableBlocks={unavailableBlocks}
+          onUnavailableClick={handleClickBlock}
+          onCreateUnavailable={handleCreateUnavailable}
         />
       )}
+
+      <UnavailableDialog
+        open={dialogOpen}
+        initial={dialogInitial}
+        onClose={() => { setDialogOpen(false); setDialogInitial(null); }}
+        onSave={handleDialogSave}
+        onDelete={handleDialogDelete}
+        saving={createBlock.isPending || updateBlock.isPending}
+        deleting={deleteBlock.isPending}
+      />
 
       <Sheet open={!!selectedJob} onOpenChange={(o) => !o && setSelectedJob(null)}>
         <SheetContent className="overflow-y-auto">

@@ -48,6 +48,14 @@ export interface FairnessContext {
   lastAssignedAt: Record<string, string>;
 }
 
+/** Pre-fetched unavailable block (one row from sp_unavailable_blocks). */
+export interface UnavailableBlockLite {
+  spId: string;
+  date: string;   // YYYY-MM-DD
+  start: string;  // HH:MM
+  end: string;    // HH:MM
+}
+
 export interface CandidateResult {
   sp: ServiceProvider;
   distKm: number | null;
@@ -69,10 +77,70 @@ export interface CandidateResult {
   exclusionReason: string | null;
 }
 
+// ===== Helpers =====
+
+function hhmmToMin(t: string | undefined | null): number | null {
+  if (!t) return null;
+  const m = t.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+}
+
+function parseDurationMinutes(d?: string): number {
+  if (!d) return 60;
+  const re = /(\d+(?:\.\d+)?)\s*(h|hr|hrs|hour|hours|m|min|mins|minute|minutes)?/gi;
+  let total = 0;
+  let matched = false;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(d)) !== null) {
+    matched = true;
+    const val = parseFloat(match[1]);
+    const unit = (match[2] ?? "").toLowerCase();
+    if (unit.startsWith("h")) total += val * 60;
+    else total += val;
+  }
+  if (!matched || total <= 0) return 60;
+  return Math.max(15, Math.round(total));
+}
+
+/** Build a lookup map keyed by sp_id for fast overlap checks. */
+export function buildUnavailableMap(
+  blocks: UnavailableBlockLite[]
+): Map<string, UnavailableBlockLite[]> {
+  const m = new Map<string, UnavailableBlockLite[]>();
+  for (const b of blocks) {
+    const arr = m.get(b.spId) ?? [];
+    arr.push(b);
+    m.set(b.spId, arr);
+  }
+  return m;
+}
+
+function jobOverlapsAnyBlock(
+  job: Job,
+  spId: string,
+  unavailableMap: Map<string, UnavailableBlockLite[]> | undefined
+): boolean {
+  if (!unavailableMap) return false;
+  if (!job.scheduledDate || !job.scheduledTime) return false;
+  const startMin = hhmmToMin(job.scheduledTime);
+  if (startMin == null) return false;
+  const dur = parseDurationMinutes(job.estimatedDuration);
+  const endMin = startMin + dur;
+  const blocks = unavailableMap.get(spId);
+  if (!blocks?.length) return false;
+  return blocks.some((b) => {
+    if (b.date !== job.scheduledDate) return false;
+    const bs = hhmmToMin(b.start);
+    const be = hhmmToMin(b.end);
+    if (bs == null || be == null) return false;
+    return bs < endMin && be > startMin;
+  });
+}
+
 // ===== Deterministic factor scoring =====
 
 function computeAvailability(sp: ServiceProvider): number {
-  // Based on acceptance rate (0-100 already)
   return sp.acceptanceRate;
 }
 
@@ -82,7 +150,6 @@ function computeProximityFactor(sp: ServiceProvider, job: Job): { score: number;
 }
 
 function computeCompetency(sp: ServiceProvider, job: Job): number {
-  // Multi-service: SP must match ALL service categories
   const categories = job.services && job.services.length > 0
     ? job.services.map(s => s.service_category)
     : [job.serviceCategory];
@@ -95,12 +162,11 @@ function computeCompetency(sp: ServiceProvider, job: Job): number {
 }
 
 function computeJobHistory(sp: ServiceProvider): number {
-  // Normalize total jobs completed: 0 jobs = 0, 500+ = 100
   return Math.min(Math.round((sp.totalJobsCompleted / 500) * 100), 100);
 }
 
 function computeCustomerRating(sp: ServiceProvider): number {
-  return Math.round(sp.rating * 20); // 5.0 -> 100
+  return Math.round(sp.rating * 20);
 }
 
 function computeReliability(sp: ServiceProvider): number {
@@ -108,17 +174,15 @@ function computeReliability(sp: ServiceProvider): number {
 }
 
 function computeResponsiveness(sp: ServiceProvider): number {
-  // Parse avg response time like "4 min" -> lower = better
   const match = sp.avgResponseTime.match(/(\d+)/);
   const minutes = match ? parseInt(match[1]) : 15;
-  // 0 min = 100, 15+ min = 0
   return Math.max(0, Math.min(100, Math.round(100 - (minutes / 15) * 100)));
 }
 
 function computeSafetyCompliance(sp: ServiceProvider): number {
   if (sp.complianceStatus === "Valid") return 100;
   if (sp.complianceStatus === "Expiring") return 60;
-  return 0; // Suspended
+  return 0;
 }
 
 // ===== Fairness adjustment =====
@@ -132,31 +196,26 @@ function computeFairnessAdjustment(
   const totalJobs = fairnessCtx.totalJobsInWindow || 1;
   const eligibleCount = fairnessCtx.eligibleSpCount || 1;
 
-  // Target share per SP
   const targetShare = 1 / eligibleCount;
   const actualShare = spJobs / totalJobs;
   const maxShare = fairnessConfig.maxSharePercent / 100;
 
   let adjustment = 0;
 
-  // Penalize if above target
   if (actualShare > targetShare) {
     const overRatio = (actualShare - targetShare) / targetShare;
-    adjustment -= Math.round(overRatio * 15); // up to -15
+    adjustment -= Math.round(overRatio * 15);
   }
 
-  // Boost if below target
   if (actualShare < targetShare && totalJobs > 0) {
     const underRatio = (targetShare - actualShare) / targetShare;
     adjustment += Math.round(underRatio * fairnessConfig.minDistributionBoost);
   }
 
-  // Extra penalty if above max share cap
   if (actualShare > maxShare) {
     adjustment -= 10;
   }
 
-  // New SP boost
   if (sp.joinedDate) {
     const joinedMs = new Date(sp.joinedDate).getTime();
     const nowMs = Date.now();
@@ -176,14 +235,13 @@ function checkEligibility(
   job: Job,
   fairnessConfig: FairnessConfig,
   fairnessCtx: FairnessContext,
-  distKm: number | null
+  distKm: number | null,
+  unavailableMap?: Map<string, UnavailableBlockLite[]>
 ): { eligible: boolean; reason: string | null } {
-  // Suspended
   if (sp.status === "Suspended" || sp.status === "Archived") {
     return { eligible: false, reason: "Suspended/Archived" };
   }
 
-  // Category mismatch — must match ALL service categories
   const categories = job.services && job.services.length > 0
     ? job.services.map(s => s.service_category)
     : [job.serviceCategory];
@@ -194,18 +252,20 @@ function checkEligibility(
     return { eligible: false, reason: "Category mismatch" };
   }
 
-  // Hard system distance cap — always enforced
   if (distKm !== null && distKm > MAX_SYSTEM_DISTANCE_KM) {
     return { eligible: false, reason: `Distance > ${MAX_SYSTEM_DISTANCE_KM}km (${distKm}km)` };
   }
 
-  // SP travel radius — must be within MIN(sp.travelRadius, MAX_SYSTEM_DISTANCE_KM)
   const effectiveRadius = Math.min(sp.travelRadius, MAX_SYSTEM_DISTANCE_KM);
   if (distKm !== null && distKm > effectiveRadius) {
     return { eligible: false, reason: `Outside radius (${distKm}km > ${effectiveRadius}km)` };
   }
 
-  // Cooldown
+  // Time off block check (hard exclusion when job has scheduled date+time)
+  if (jobOverlapsAnyBlock(job, sp.id, unavailableMap)) {
+    return { eligible: false, reason: "Time off blocked" };
+  }
+
   const lastAssigned = fairnessCtx.lastAssignedAt[sp.id];
   if (lastAssigned && fairnessConfig.cooldownHours > 0) {
     const hoursSince = (Date.now() - new Date(lastAssigned).getTime()) / (1000 * 60 * 60);
@@ -214,7 +274,6 @@ function checkEligibility(
     }
   }
 
-  // Max share cap exclusion
   const spJobs = fairnessCtx.jobCountsInWindow[sp.id] ?? 0;
   const totalJobs = fairnessCtx.totalJobsInWindow || 1;
   const actualShare = spJobs / totalJobs;
@@ -233,7 +292,8 @@ export function runAllocation(
   serviceProviders: ServiceProvider[],
   weights: AllocationWeights,
   fairnessConfig: FairnessConfig,
-  fairnessCtx: FairnessContext
+  fairnessCtx: FairnessContext,
+  unavailableMap?: Map<string, UnavailableBlockLite[]>
 ): CandidateResult[] {
   const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0) || 1;
 
@@ -251,9 +311,8 @@ export function runAllocation(
       safetyCompliance: computeSafetyCompliance(sp),
     };
 
-    const { eligible, reason } = checkEligibility(sp, job, fairnessConfig, fairnessCtx, distKm);
+    const { eligible, reason } = checkEligibility(sp, job, fairnessConfig, fairnessCtx, distKm, unavailableMap);
 
-    // Weighted score (excluding fairness weight which applies to adjustment)
     const factorWeightMap: Record<string, number> = {
       availability: weights.availability,
       proximity: weights.proximity,
@@ -277,7 +336,6 @@ export function runAllocation(
       ? computeFairnessAdjustment(sp, fairnessConfig, fairnessCtx)
       : 0;
 
-    // Final score applies fairness weight
     const fairnessWeightFraction = weights.fairness / totalWeight;
     const baseWeightFraction = 1 - fairnessWeightFraction;
     const finalScore = Math.round(
@@ -297,7 +355,6 @@ export function runAllocation(
     };
   });
 
-  // Sort: eligible first by finalScore desc, then excluded
   candidates.sort((a, b) => {
     if (a.eligibilityStatus !== b.eligibilityStatus) {
       return a.eligibilityStatus === "Eligible" ? -1 : 1;
@@ -305,7 +362,6 @@ export function runAllocation(
     return b.finalScore - a.finalScore;
   });
 
-  // Assign ranks (only eligible get real ranks)
   let rank = 1;
   candidates.forEach((c) => {
     if (c.eligibilityStatus === "Eligible") {
@@ -337,7 +393,6 @@ export function explainTopCandidate(
     { factor: "Safety/Compliance", score: candidate.factorScores.safetyCompliance, weight: weights.safetyCompliance },
   ];
 
-  // Sort by weighted contribution
   contributions.sort((a, b) => (b.score * b.weight) - (a.score * a.weight));
 
   const top5 = contributions.slice(0, 5);
