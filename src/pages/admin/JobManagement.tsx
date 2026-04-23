@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useJobs, useServiceProviders, useServiceCategories, useDeleteJob, useStopBroadcast } from "@/hooks/useSupabaseData";
+import { useJobs, useServiceProviders, useServiceCategories, useDeleteJob, useStopBroadcast, useAssignJob, useUnassignJob } from "@/hooks/useSupabaseData";
 import { useGenerateBroadcastOffers } from "@/hooks/useOfferData";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge, URGENCY_PRIORITY } from "@/components/UrgencyBadge";
@@ -17,12 +17,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Plus, Eye, Pencil, UserPlus, Trash2, Radio, X, RadioTower } from "lucide-react";
+import { Search, Plus, Eye, Pencil, UserPlus, UserX, Trash2, Radio, X, RadioTower } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 const NON_BROADCASTABLE = new Set(["Assigned", "InProgress", "Completed", "Cancelled", "Archived"]);
+const NON_ASSIGNABLE = new Set(["InProgress", "Completed", "Cancelled", "Archived"]);
+const HAS_SP_STATUSES = new Set(["Assigned", "Accepted"]);
 
 export default function JobManagement() {
   const [search, setSearch] = useState("");
