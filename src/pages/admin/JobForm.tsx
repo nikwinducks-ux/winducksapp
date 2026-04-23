@@ -64,8 +64,10 @@ export default function JobForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const isEdit = !!id;
   const { data: customers = [] } = useCustomers();
+  const { data: providers = [] } = useServiceProviders();
   const activeCategories = useActiveServiceCategories();
   const createJob = useCreateJob();
   const updateJob = useUpdateJob();
@@ -73,9 +75,12 @@ export default function JobForm() {
   const { data: existingServices = [] } = useJobServices(id);
   const savePhotos = useSaveJobPhotos();
   const { data: existingPhotos = [] } = useJobPhotos(id);
+  const { data: existingCrew = [] } = useJobCrew(id);
+  const assignCrew = useAssignCrew();
   const [photoState, setPhotoState] = useState<JobPhotosUploaderState>({
     newFiles: [], newCaptions: [], keepIds: [], updatedCaptions: {},
   });
+  const [crewMembers, setCrewMembers] = useState<CrewPickerValue[]>([]);
 
   const [form, setForm] = useState({
     customerId: "",
