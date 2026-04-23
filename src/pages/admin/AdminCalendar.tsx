@@ -57,8 +57,50 @@ function getBestCalendarStartDate(jobs: Job[]) {
 
   if (datedJobs.length === 0) return todayLocal;
 
-  const upcoming = datedJobs.find((date) => date.getTime() >= todayLocal.getTime());
-  return upcoming ?? datedJobs[datedJobs.length - 1];
+  // Within ±30 days of today, pick the date with the most jobs
+  const windowMs = 30 * 24 * 60 * 60 * 1000;
+  const inWindow = datedJobs.filter(
+    (d) => Math.abs(d.getTime() - todayLocal.getTime()) <= windowMs
+  );
+  if (inWindow.length > 0) {
+    const counts = new Map<number, number>();
+    for (const d of inWindow) {
+      counts.set(d.getTime(), (counts.get(d.getTime()) ?? 0) + 1);
+    }
+    let best = inWindow[0];
+    let bestCount = 0;
+    for (const [t, c] of counts) {
+      if (c > bestCount) {
+        bestCount = c;
+        best = new Date(t);
+      }
+    }
+    return best;
+  }
+
+  // Otherwise, the nearest job in either direction
+  return datedJobs.reduce((nearest, d) => {
+    return Math.abs(d.getTime() - todayLocal.getTime()) <
+      Math.abs(nearest.getTime() - todayLocal.getTime())
+      ? d
+      : nearest;
+  }, datedJobs[0]);
+}
+
+function getViewRange(view: CalendarView, currentDate: Date): { start: Date; end: Date } {
+  if (view === "day") {
+    const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+    const end = new Date(start);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }
+  if (view === "week") {
+    return {
+      start: startOfWeek(currentDate, { weekStartsOn: 1 }),
+      end: endOfWeek(currentDate, { weekStartsOn: 1 }),
+    };
+  }
+  return { start: startOfMonth(currentDate), end: endOfMonth(currentDate) };
 }
 
 export default function AdminCalendar() {
