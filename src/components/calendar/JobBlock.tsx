@@ -67,31 +67,47 @@ export function statusLabel(status: string): string {
   }
 }
 
+export function formatShortTime(hhmm?: string): string {
+  if (!hhmm) return "";
+  const [hStr, mStr] = hhmm.split(":");
+  const h = parseInt(hStr, 10);
+  const m = parseInt(mStr ?? "0", 10);
+  if (isNaN(h)) return "";
+  const period = h >= 12 ? "p" : "a";
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return m === 0 ? `${hour12}${period}` : `${hour12}:${String(m).padStart(2, "0")}${period}`;
+}
+
 interface JobBlockProps {
   job: Job;
   spName?: string;
   compact?: boolean;
+  showTime?: boolean;
   onClick?: () => void;
   className?: string;
   style?: React.CSSProperties;
 }
 
-export function JobBlock({ job, spName, compact, onClick, className, style }: JobBlockProps) {
+export function JobBlock({ job, spName, compact, showTime, onClick, className, style }: JobBlockProps) {
   const appearance = getJobAppearance(job);
+  const timePrefix = showTime ? formatShortTime(job.scheduledTime) : "";
   return (
     <button
       type="button"
       onClick={onClick}
       style={style}
       className={cn(
-        "w-full text-left rounded-md px-2 py-1.5 text-xs transition-all shadow-sm",
+        "w-full text-left rounded-md px-2 py-1.5 text-xs transition-all shadow-sm overflow-hidden",
         "focus:outline-none focus:ring-2 focus:ring-ring",
         appearance.classes,
         className
       )}
     >
       <div className="flex items-center justify-between gap-1">
-        <span className="font-semibold truncate">{job.id}</span>
+        <span className="font-semibold truncate">
+          {timePrefix && <span className="opacity-80 mr-1">{timePrefix}</span>}
+          {job.id}
+        </span>
         <span className="font-semibold shrink-0">${job.payout}</span>
       </div>
       {!compact && (
