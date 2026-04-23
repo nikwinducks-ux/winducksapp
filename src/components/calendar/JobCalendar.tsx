@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   startOfWeek,
   endOfWeek,
@@ -16,6 +16,12 @@ import { cn } from "@/lib/utils";
 
 export type CalendarView = "day" | "week" | "month";
 
+const DAY_START_HOUR = 6;
+const DAY_END_HOUR = 21;
+const HOUR_PX = 60;
+const HOURS = Array.from({ length: DAY_END_HOUR - DAY_START_HOUR }, (_, i) => DAY_START_HOUR + i);
+const GRID_HEIGHT_PX = (DAY_END_HOUR - DAY_START_HOUR) * HOUR_PX;
+
 interface JobCalendarProps {
   jobs: Job[];
   providers: ServiceProvider[];
@@ -31,10 +37,118 @@ function spNameLookup(providers: ServiceProvider[]) {
   return (id?: string) => (id ? map.get(id) ?? "Unknown SP" : "Unassigned");
 }
 
+/** Parse a Postgres `date` string ("YYYY-MM-DD") as a local date to avoid TZ shifts. */
+function parseLocalDate(s: string): Date {
+  const [y, m, d] = s.split("-").map((n) => parseInt(n, 10));
+  if (!y || !m || !d) return new Date(s);
+  return new Date(y, m - 1, d);
+}
+
 function jobsOnDate(jobs: Job[], date: Date) {
   return jobs
-    .filter((j) => j.scheduledDate && isSameDay(new Date(j.scheduledDate), date))
+    .filter((j) => j.scheduledDate && isSameDay(parseLocalDate(j.scheduledDate), date))
     .sort((a, b) => (a.scheduledTime || "").localeCompare(b.scheduledTime || ""));
+}
+
+function parseTimeToMinutes(hhmm?: string): number | null {
+  if (!hhmm) return null;
+  const [h, m] = hhmm.split(":").map((n) => parseInt(n, 10));
+  if (isNaN(h)) return null;
+  return h * 60 + (isNaN(m) ? 0 : m);
+}
+
+function parseDurationMinutes(d?: string): number {
+  if (!d) return 60;
+  // Try formats like "2h", "90m", "1h 30m", "1.5h", or plain number ("60")
+  const re = /(\d+(?:\.\d+)?)\s*(h|hr|hrs|hour|hours|m|min|mins|minute|minutes)?/gi;
+  let total = 0;
+  let matched = false;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(d)) !== null) {
+    matched = true;
+    const val = parseFloat(match[1]);
+    const unit = (match[2] ?? "").toLowerCase();
+    if (unit.startsWith("h")) total += val * 60;
+    else total += val; // minutes (or unitless treated as minutes)
+  }
+  if (!matched || total <= 0) return 60;
+  return total;
+}
+
+type Positioned = {
+  job: Job;
+  startMin: number;
+  endMin: number;
+  lane: number;
+  laneCount: number;
+};
+
+/** Categorize jobs for a single day into outside-hours, untimed, and grid items with overlap lanes. */
+function categorizeDayJobs(jobs: Job[]): {
+  untimed: Job[];
+  outside: Job[];
+  grid: Positioned[];
+} {
+  const startBound = DAY_START_HOUR * 60;
+  const endBound = DAY_END_HOUR * 60;
+  const untimed: Job[] = [];
+  const outside: Job[] = [];
+  const inGrid: { job: Job; startMin: number; endMin: number }[] = [];
+
+  for (const job of jobs) {
+    const mins = parseTimeToMinutes(job.scheduledTime);
+    if (mins == null) {
+      untimed.push(job);
+      continue;
+    }
+    if (mins < startBound || mins >= endBound) {
+      outside.push(job);
+      continue;
+    }
+    const dur = parseDurationMinutes(job.estimatedDuration);
+    inGrid.push({
+      job,
+      startMin: mins,
+      endMin: Math.min(endBound, mins + dur),
+    });
+  }
+
+  // Sort and group overlapping intervals; assign lanes per cluster.
+  inGrid.sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
+  const grid: Positioned[] = [];
+  let cluster: typeof inGrid = [];
+  let clusterEnd = -Infinity;
+
+  const flush = () => {
+    if (!cluster.length) return;
+    // Greedy lane assignment within the cluster.
+    const laneEnds: number[] = [];
+    const assigned = cluster.map((item) => {
+      let lane = laneEnds.findIndex((end) => end <= item.startMin);
+      if (lane === -1) {
+        lane = laneEnds.length;
+        laneEnds.push(item.endMin);
+      } else {
+        laneEnds[lane] = item.endMin;
+      }
+      return { ...item, lane };
+    });
+    const laneCount = laneEnds.length;
+    for (const a of assigned) {
+      grid.push({ ...a, laneCount });
+    }
+    cluster = [];
+    clusterEnd = -Infinity;
+  };
+
+  for (const item of inGrid) {
+    if (item.startMin >= clusterEnd) flush();
+    cluster.push(item);
+    clusterEnd = Math.max(clusterEnd, item.endMin);
+  }
+  flush();
+
+  return { untimed, outside, grid };
 }
 
 export function JobCalendar(props: JobCalendarProps) {
@@ -43,12 +157,170 @@ export function JobCalendar(props: JobCalendarProps) {
   return <MonthView {...props} />;
 }
 
+// ===== Now line hook =====
+function useNowMinutes() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  return { now, minutes: now.getHours() * 60 + now.getMinutes() };
+}
+
+// ===== Time Axis =====
+function TimeAxis() {
+  return (
+    <div className="w-14 shrink-0 border-r bg-muted/20 text-[10px] text-muted-foreground select-none">
+      <div style={{ height: HOUR_PX / 2 }} />
+      {HOURS.map((h) => {
+        const period = h >= 12 ? "PM" : "AM";
+        const hr12 = h % 12 === 0 ? 12 : h % 12;
+        return (
+          <div
+            key={h}
+            style={{ height: HOUR_PX }}
+            className="relative border-t border-border/60 -mt-px"
+          >
+            <span className="absolute -top-2 right-1.5 bg-muted/20 px-1">
+              {hr12}
+              {period}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ===== Day Column with grid =====
+interface DayColumnProps {
+  date: Date;
+  jobs: Job[];
+  getSpName: (id?: string) => string;
+  showSp: boolean;
+  compact: boolean;
+  onJobClick: (job: Job) => void;
+  onEmptyDayClick?: (date: Date) => void;
+  showAddAffordance: boolean;
+}
+
+function DayColumn({
+  date,
+  jobs,
+  getSpName,
+  showSp,
+  compact,
+  onJobClick,
+  onEmptyDayClick,
+  showAddAffordance,
+}: DayColumnProps) {
+  const { untimed, outside, grid } = useMemo(() => categorizeDayJobs(jobs), [jobs]);
+  const today = isToday(date);
+  const { minutes: nowMin } = useNowMinutes();
+  const showNowLine =
+    today && nowMin >= DAY_START_HOUR * 60 && nowMin < DAY_END_HOUR * 60;
+  const nowTop = (nowMin - DAY_START_HOUR * 60);
+
+  return (
+    <div className="flex-1 min-w-0 border-r last:border-r-0 flex flex-col">
+      {/* Top strip for untimed / outside-hours / add affordance */}
+      {(untimed.length > 0 || outside.length > 0 || showAddAffordance) && (
+        <div className="border-b bg-muted/10 p-1 space-y-1">
+          {untimed.map((job) => (
+            <div key={`u-${job.dbId}`} className="relative">
+              <div className="text-[9px] uppercase text-muted-foreground px-1">No time</div>
+              <JobBlock
+                job={job}
+                compact={compact}
+                spName={showSp ? getSpName(job.assignedSpId) : undefined}
+                onClick={() => onJobClick(job)}
+              />
+            </div>
+          ))}
+          {outside.map((job) => (
+            <div key={`o-${job.dbId}`} className="relative">
+              <div className="text-[9px] uppercase text-muted-foreground px-1">
+                Outside hours · {job.scheduledTime}
+              </div>
+              <JobBlock
+                job={job}
+                compact={compact}
+                spName={showSp ? getSpName(job.assignedSpId) : undefined}
+                onClick={() => onJobClick(job)}
+              />
+            </div>
+          ))}
+          {showAddAffordance && jobs.length === 0 && onEmptyDayClick && (
+            <button
+              type="button"
+              onClick={() => onEmptyDayClick(date)}
+              className="w-full text-[10px] text-muted-foreground hover:text-primary hover:bg-accent/40 rounded py-1"
+            >
+              + Add
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Hour grid */}
+      <div
+        className={cn("relative flex-1", today && "bg-primary/5")}
+        style={{ height: GRID_HEIGHT_PX }}
+      >
+        {HOURS.map((h) => (
+          <div
+            key={h}
+            className="border-t border-border/40"
+            style={{ height: HOUR_PX }}
+          />
+        ))}
+
+        {/* Now line */}
+        {showNowLine && (
+          <div
+            className="absolute left-0 right-0 z-20 pointer-events-none"
+            style={{ top: nowTop }}
+          >
+            <div className="h-px bg-destructive/70" />
+            <div className="absolute -left-1 -top-1 h-2 w-2 rounded-full bg-destructive" />
+          </div>
+        )}
+
+        {/* Grid jobs */}
+        {grid.map((item) => {
+          const top = item.startMin - DAY_START_HOUR * 60;
+          const height = Math.max(30, item.endMin - item.startMin);
+          const widthPct = 100 / item.laneCount;
+          const leftPct = widthPct * item.lane;
+          return (
+            <JobBlock
+              key={item.job.dbId}
+              job={item.job}
+              compact={compact}
+              spName={showSp ? getSpName(item.job.assignedSpId) : undefined}
+              onClick={() => onJobClick(item.job)}
+              style={{
+                position: "absolute",
+                top,
+                height,
+                left: `calc(${leftPct}% + 2px)`,
+                width: `calc(${widthPct}% - 4px)`,
+              }}
+              className="z-10"
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ===== Day View =====
 function DayView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode }: JobCalendarProps) {
   const getSpName = spNameLookup(providers);
   const dayJobs = jobsOnDate(jobs, currentDate);
   return (
-    <div className="rounded-lg border bg-card">
+    <div className="rounded-lg border bg-card overflow-hidden">
       <div className="border-b px-4 py-2 flex items-center justify-between">
         <div className="text-sm font-medium">
           {format(currentDate, "EEEE, MMMM d, yyyy")}
@@ -58,32 +330,18 @@ function DayView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mo
         </div>
         <div className="text-xs text-muted-foreground">{dayJobs.length} job(s)</div>
       </div>
-      <div className="p-4 space-y-2 min-h-[400px]">
-        {dayJobs.length === 0 ? (
-          <div className="text-center text-sm text-muted-foreground py-12">
-            No scheduled jobs for this day.
-            {mode === "admin" && onEmptyDayClick && (
-              <div className="mt-3">
-                <button
-                  type="button"
-                  onClick={() => onEmptyDayClick(currentDate)}
-                  className="text-primary hover:underline text-xs font-medium"
-                >
-                  + Schedule a job
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          dayJobs.map((job) => (
-            <JobBlock
-              key={job.dbId}
-              job={job}
-              spName={mode === "admin" ? getSpName(job.assignedSpId) : undefined}
-              onClick={() => onJobClick(job)}
-            />
-          ))
-        )}
+      <div className="flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
+        <TimeAxis />
+        <DayColumn
+          date={currentDate}
+          jobs={dayJobs}
+          getSpName={getSpName}
+          showSp={mode === "admin"}
+          compact={false}
+          onJobClick={onJobClick}
+          onEmptyDayClick={onEmptyDayClick}
+          showAddAffordance={mode === "admin" && !!onEmptyDayClick}
+        />
       </div>
     </div>
   );
@@ -98,12 +356,14 @@ function WeekView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, m
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
-      <div className="grid grid-cols-7 border-b bg-muted/30">
+      {/* Header strip aligned with time axis */}
+      <div className="flex border-b bg-muted/30">
+        <div className="w-14 shrink-0 border-r" />
         {days.map((d) => (
           <div
             key={d.toISOString()}
             className={cn(
-              "px-2 py-2 text-center border-r last:border-r-0",
+              "flex-1 min-w-0 px-2 py-2 text-center border-r last:border-r-0",
               isToday(d) && "bg-primary/10"
             )}
           >
@@ -121,34 +381,22 @@ function WeekView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, m
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7 min-h-[500px]">
+      <div className="flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
+        <TimeAxis />
         {days.map((d) => {
           const dayJobs = jobsOnDate(jobs, d);
           return (
-            <div
+            <DayColumn
               key={d.toISOString()}
-              className="border-r last:border-r-0 p-1.5 space-y-1 align-top"
-            >
-              {dayJobs.length === 0 && mode === "admin" && onEmptyDayClick ? (
-                <button
-                  type="button"
-                  onClick={() => onEmptyDayClick(d)}
-                  className="w-full text-[10px] text-muted-foreground hover:text-primary hover:bg-accent/40 rounded py-2"
-                >
-                  + Add
-                </button>
-              ) : (
-                dayJobs.map((job) => (
-                  <JobBlock
-                    key={job.dbId}
-                    job={job}
-                    compact
-                    spName={mode === "admin" ? getSpName(job.assignedSpId) : undefined}
-                    onClick={() => onJobClick(job)}
-                  />
-                ))
-              )}
-            </div>
+              date={d}
+              jobs={dayJobs}
+              getSpName={getSpName}
+              showSp={mode === "admin"}
+              compact
+              onJobClick={onJobClick}
+              onEmptyDayClick={onEmptyDayClick}
+              showAddAffordance={mode === "admin" && !!onEmptyDayClick}
+            />
           );
         })}
       </div>
@@ -211,6 +459,7 @@ function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, 
                   key={job.dbId}
                   job={job}
                   compact
+                  showTime
                   spName={mode === "admin" ? getSpName(job.assignedSpId) : undefined}
                   onClick={() => onJobClick(job)}
                 />
