@@ -7,6 +7,15 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  useSpUnavailableBlocks,
+  useCreateSpUnavailable,
+  useUpdateSpUnavailable,
+  useDeleteSpUnavailable,
+  type SpUnavailableBlock,
+} from "@/hooks/useSpUnavailable";
+import UnavailableDialog, { type UnavailableDialogValue } from "@/components/calendar/UnavailableDialog";
+import { Plus, Trash2 } from "lucide-react";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -204,6 +213,103 @@ export default function SPAvailabilityEditor({ spId }: Props) {
       <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
         {saveMutation.isPending ? "Saving..." : "Save Availability"}
       </Button>
+
+      <TimeOffSection spId={spId} />
+    </div>
+  );
+}
+
+function TimeOffSection({ spId }: { spId: string }) {
+  const { data: blocks = [] } = useSpUnavailableBlocks(spId);
+  const createBlock = useCreateSpUnavailable();
+  const updateBlock = useUpdateSpUnavailable();
+  const deleteBlock = useDeleteSpUnavailable();
+
+  const [open, setOpen] = useState(false);
+  const [initial, setInitial] = useState<UnavailableDialogValue | null>(null);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = blocks
+    .filter((b) => b.date >= today)
+    .sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
+
+  function openNew() {
+    setInitial({ date: today, start: "09:00", end: "12:00", reason: "" });
+    setOpen(true);
+  }
+
+  function openEdit(b: SpUnavailableBlock) {
+    setInitial({ id: b.id, date: b.date, start: b.start, end: b.end, reason: b.reason });
+    setOpen(true);
+  }
+
+  async function onSave(v: UnavailableDialogValue) {
+    if (v.id) {
+      await updateBlock.mutateAsync({ id: v.id, spId, date: v.date, start: v.start, end: v.end, reason: v.reason });
+    } else {
+      await createBlock.mutateAsync({ spId, date: v.date, start: v.start, end: v.end, reason: v.reason });
+    }
+    setOpen(false);
+    setInitial(null);
+  }
+
+  async function onDelete(id: string) {
+    await deleteBlock.mutateAsync({ id, spId });
+    setOpen(false);
+    setInitial(null);
+  }
+
+  return (
+    <div className="metric-card space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="section-title">Time Off</h2>
+        <Button size="sm" variant="outline" onClick={openNew}>
+          <Plus className="h-4 w-4 mr-1" /> Add time off
+        </Button>
+      </div>
+
+      {upcoming.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No upcoming time off scheduled.</p>
+      ) : (
+        <div className="space-y-2">
+          {upcoming.map((b) => (
+            <div
+              key={b.id}
+              className="flex items-center justify-between gap-3 rounded-md border bg-muted/20 px-3 py-2"
+            >
+              <button
+                type="button"
+                onClick={() => openEdit(b)}
+                className="flex-1 text-left text-sm hover:text-primary"
+              >
+                <div className="font-medium">{b.date}</div>
+                <div className="text-xs text-muted-foreground">
+                  {b.start} – {b.end}
+                  {b.reason && <span> · {b.reason}</span>}
+                </div>
+              </button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => deleteBlock.mutate({ id: b.id, spId })}
+                disabled={deleteBlock.isPending}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <UnavailableDialog
+        open={open}
+        initial={initial}
+        onClose={() => { setOpen(false); setInitial(null); }}
+        onSave={onSave}
+        onDelete={onDelete}
+        saving={createBlock.isPending || updateBlock.isPending}
+        deleting={deleteBlock.isPending}
+      />
     </div>
   );
 }

@@ -12,6 +12,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { CrewPicker, type CrewPickerValue } from "@/components/admin/CrewPicker";
 import { JobCalendar, type CalendarView } from "@/components/calendar/JobCalendar";
+import { useAllSpUnavailableBlocks, type SpUnavailableBlock } from "@/hooks/useSpUnavailable";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -130,6 +131,7 @@ export default function AdminCalendar() {
   const [editInstructions, setEditInstructions] = useState("");
   const [sheetCrew, setSheetCrew] = useState<CrewPickerValue[]>([]);
   const [debug, setDebug] = useState(() => isScheduleDebugEnabled());
+  const [unavailableDetail, setUnavailableDetail] = useState<SpUnavailableBlock | null>(null);
 
   function toggleDebug(next: boolean) {
     setDebug(next);
@@ -139,6 +141,26 @@ export default function AdminCalendar() {
   const scheduledJobs = useMemo(() => {
     return jobs.filter((j) => !!j.scheduledDate);
   }, [jobs]);
+
+  // Visible date range for fetching unavailable blocks
+  const visibleRange = useMemo(() => {
+    const r = getViewRange(view, currentDate);
+    const fmt = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    };
+    return { startISO: fmt(r.start), endISO: fmt(r.end) };
+  }, [view, currentDate]);
+
+  const { data: allBlocks = [] } = useAllSpUnavailableBlocks(visibleRange);
+
+  const visibleBlocks = useMemo(() => {
+    if (spFilter === "all") return allBlocks;
+    if (spFilter === "unassigned") return [];
+    return allBlocks.filter((b) => b.spId === spFilter);
+  }, [allBlocks, spFilter]);
 
   // ?date=YYYY-MM-DD takes precedence over auto-focus
   useEffect(() => {
@@ -583,8 +605,31 @@ export default function AdminCalendar() {
           enableDnd
           onReschedule={handleReschedule}
           onDragBlocked={handleDragBlocked}
+          unavailableBlocks={visibleBlocks}
+          onUnavailableClick={setUnavailableDetail}
         />
       )}
+
+      <Sheet open={!!unavailableDetail} onOpenChange={(o) => !o && setUnavailableDetail(null)}>
+        <SheetContent className="overflow-y-auto">
+          {unavailableDetail && (
+            <>
+              <SheetHeader>
+                <SheetTitle>Time Off · {unavailableDetail.spName ?? "SP"}</SheetTitle>
+                <SheetDescription>Read-only — SPs manage their own availability.</SheetDescription>
+              </SheetHeader>
+              <div className="space-y-2 mt-4 text-sm">
+                <div><span className="text-muted-foreground">Date:</span> {unavailableDetail.date}</div>
+                <div><span className="text-muted-foreground">Time:</span> {unavailableDetail.start} – {unavailableDetail.end}</div>
+                <div>
+                  <span className="text-muted-foreground">Reason:</span>{" "}
+                  {unavailableDetail.reason || <span className="italic text-muted-foreground">(none)</span>}
+                </div>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
 
       <Sheet open={!!selectedJob} onOpenChange={(o) => !o && setSelectedJob(null)}>
         <SheetContent className="overflow-y-auto">
