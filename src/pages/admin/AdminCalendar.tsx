@@ -7,9 +7,10 @@ import {
 } from "date-fns";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import {
-  useJobs, useServiceProviders, useUpdateJob, useAssignJob,
+  useJobs, useServiceProviders, useUpdateJob, useAssignJob, useJobCrew, useAssignCrew,
 } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
+import { CrewPicker, type CrewPickerValue } from "@/components/admin/CrewPicker";
 import { JobCalendar, type CalendarView } from "@/components/calendar/JobCalendar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
