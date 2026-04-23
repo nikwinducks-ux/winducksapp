@@ -392,26 +392,59 @@ export default function AdminCalendar() {
       </div>
 
       {debug && (
-        <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-[11px] font-mono text-muted-foreground">
-          Showing raw <span className="font-semibold">scheduledDate</span> /{" "}
-          <span className="font-semibold">scheduledTime</span> for each job below.
-          Red = parse failed (job won't land at the right slot).
+        <div className="space-y-2">
+          <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-[11px] font-mono text-muted-foreground">
+            Showing raw <span className="font-semibold">scheduledDate</span> /{" "}
+            <span className="font-semibold">scheduledTime</span> for each job below.
+            Red = parse failed (job won't land at the right slot).
+          </div>
+          <div className="rounded-md border border-dashed border-primary/40 bg-primary/5 px-3 py-2 text-[11px] font-mono text-foreground space-y-0.5">
+            <div>range: {format(rangeDiagnostics.range.start, "yyyy-MM-dd")} → {format(rangeDiagnostics.range.end, "yyyy-MM-dd")} ({view})</div>
+            <div>filtered scheduled jobs: {filteredJobs.length}</div>
+            <div>in current range: {rangeDiagnostics.inside.length}</div>
+            <div>outside current range: {rangeDiagnostics.outside.length}</div>
+            <div>
+              previous: {rangeDiagnostics.previous
+                ? `${rangeDiagnostics.previous.job.id} @ ${format(rangeDiagnostics.previous.date, "yyyy-MM-dd")} ${rangeDiagnostics.previous.job.scheduledTime ?? ""}`
+                : "—"}
+            </div>
+            <div>
+              next: {rangeDiagnostics.next
+                ? `${rangeDiagnostics.next.job.id} @ ${format(rangeDiagnostics.next.date, "yyyy-MM-dd")} ${rangeDiagnostics.next.job.scheduledTime ?? ""}`
+                : "—"}
+            </div>
+          </div>
         </div>
       )}
 
       {outOfViewInfo && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
-          <span className="text-foreground">
-            <span className="font-semibold">{outOfViewInfo.count}</span> scheduled job
-            {outOfViewInfo.count === 1 ? " is" : "s are"} not in this view.
-          </span>
+          <div className="text-foreground space-y-0.5">
+            <div>
+              <span className="font-semibold">{outOfViewInfo.count}</span> scheduled job
+              {outOfViewInfo.count === 1 ? " is" : "s are"} not in this view.
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {outOfViewInfo.next && (
+                <>Nearest next: {format(outOfViewInfo.next.date, "MMM d, yyyy")}</>
+              )}
+              {outOfViewInfo.next && outOfViewInfo.previous && " · "}
+              {outOfViewInfo.previous && (
+                <>Nearest previous: {format(outOfViewInfo.previous.date, "MMM d, yyyy")}</>
+              )}
+            </div>
+          </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => jumpTo(outOfViewInfo.earliest)}>
-              Jump to earliest ({format(outOfViewInfo.earliest, "MMM d, yyyy")})
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => jumpTo(outOfViewInfo.latest)}>
-              Jump to latest ({format(outOfViewInfo.latest, "MMM d, yyyy")})
-            </Button>
+            {outOfViewInfo.previous && (
+              <Button size="sm" variant="outline" onClick={() => jumpTo(outOfViewInfo.previous!.date)}>
+                ← Previous ({format(outOfViewInfo.previous.date, "MMM d")})
+              </Button>
+            )}
+            {outOfViewInfo.next && (
+              <Button size="sm" variant="outline" onClick={() => jumpTo(outOfViewInfo.next!.date)}>
+                Next ({format(outOfViewInfo.next.date, "MMM d")}) →
+              </Button>
+            )}
           </div>
         </div>
       )}
