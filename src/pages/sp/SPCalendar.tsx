@@ -21,6 +21,7 @@ import UnavailableDialog, { type UnavailableDialogValue } from "@/components/cal
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { SPVisibilityDiagnostics } from "@/components/sp/SPVisibilityDiagnostics";
 import {
   Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
