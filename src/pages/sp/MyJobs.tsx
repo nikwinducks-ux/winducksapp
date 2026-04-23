@@ -49,7 +49,11 @@ export default function MyJobs() {
         <div>
           <h2 className="section-title mb-4">Active Jobs</h2>
           <div className="space-y-3">
-            {activeJobs.map((job) => (
+            {activeJobs.map((job) => {
+              const crewSize = job.crew?.length ?? 0;
+              const isCrew = crewSize > 1;
+              const displayPayout = isCrew ? (job.payoutShare ?? job.payout) : job.payout;
+              return (
               <Link key={job.id} to={`/sp/jobs/${job.dbId}`} className="block">
                 <div className="metric-card space-y-2 hover:border-primary/30 transition-colors cursor-pointer">
                   <div className="flex items-center justify-between">
@@ -57,8 +61,16 @@ export default function MyJobs() {
                       <p className="font-semibold">{job.id}</p>
                       <StatusBadge label={job.status === "InProgress" ? "In Progress" : job.status} variant={job.status === "InProgress" ? "warning" : "info"} />
                       <UrgencyBadge urgency={job.urgency} />
+                      {isCrew && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">
+                          <Users className="h-3 w-3" /> Crew ({crewSize})
+                        </span>
+                      )}
                     </div>
-                    <p className="text-xl font-bold text-primary flex items-center gap-1"><DollarSign className="h-4 w-4" />{job.payout}</p>
+                    <p className="text-xl font-bold text-primary flex items-center gap-1">
+                      <DollarSign className="h-4 w-4" />{displayPayout.toFixed(2)}
+                      {isCrew && <span className="text-[10px] font-normal text-muted-foreground ml-1">your share</span>}
+                    </p>
                   </div>
                   <p className="text-sm font-medium">{job.customerName} — {job.services && job.services.length > 0 ? <JobServicesSummary services={job.services} /> : job.serviceCategory}</p>
                   <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
@@ -74,7 +86,8 @@ export default function MyJobs() {
                   )}
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
