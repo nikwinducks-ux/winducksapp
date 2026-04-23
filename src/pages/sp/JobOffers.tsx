@@ -213,6 +213,8 @@ export default function JobOffers() {
 
   const currentSp = serviceProviders.find(sp => sp.id === spId);
 
+  const [declineTarget, setDeclineTarget] = useState<{ offerId: string; jobNumber: string; customerName: string } | null>(null);
+
   // Expire stale offers
   useEffect(() => {
     expireStale.mutate();
