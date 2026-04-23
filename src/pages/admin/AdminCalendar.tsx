@@ -184,6 +184,33 @@ export default function AdminCalendar() {
     };
   }, [filteredJobs, view, currentDate]);
 
+  // SP legend: unique SPs (and unassigned indicator) visible in the current filtered set.
+  const legendEntries = useMemo(() => {
+    if (spFilter !== "all" && spFilter !== "unassigned") return [];
+    const seen = new Set<string>();
+    let hasUnassigned = false;
+    const entries: { id: string | null; name: string; swatch: string }[] = [];
+    for (const j of filteredJobs) {
+      if (!j.assignedSpId) {
+        hasUnassigned = true;
+        continue;
+      }
+      if (seen.has(j.assignedSpId)) continue;
+      seen.add(j.assignedSpId);
+      const provider = providers.find((p) => p.id === j.assignedSpId);
+      entries.push({
+        id: j.assignedSpId,
+        name: provider?.name ?? "Unknown SP",
+        swatch: getSpColor(j.assignedSpId).swatch,
+      });
+    }
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    if (hasUnassigned) {
+      entries.push({ id: null, name: "Unassigned", swatch: getUnassignedSpColor().swatch });
+    }
+    return entries;
+  }, [filteredJobs, providers, spFilter]);
+
   function jumpTo(date: Date) {
     setCurrentDate(date);
   }
