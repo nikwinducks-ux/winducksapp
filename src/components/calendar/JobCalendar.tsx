@@ -508,6 +508,7 @@ function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, 
                   compact
                   showTime
                   showDebug={showDebug}
+                  colorMode={colorMode}
                   spName={mode === "admin" ? getSpName(job.assignedSpId) : undefined}
                   onClick={() => onJobClick(job)}
                 />
