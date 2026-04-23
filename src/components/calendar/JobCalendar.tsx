@@ -748,11 +748,12 @@ type ViewProps = JobCalendarProps & { dnd?: DndApi };
 function DayView({
   jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug,
   nearestPrevious, nearestNext, nearestPreviousLabel, nearestNextLabel, onJumpToDate,
-  dnd,
+  dnd, unavailableBlocks, onUnavailableClick, onCreateUnavailable,
 }: ViewProps) {
   const getSpName = spNameLookup(providers);
   const getSpColorFor = spColorLookup(providers);
   const dayJobs = jobsOnDate(jobs, currentDate);
+  const dayBlocks = blocksOnDate(unavailableBlocks, currentDate);
   const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
   const showEmpty = dayJobs.length === 0 && (nearestPrevious || nearestNext);
   return (
@@ -771,6 +772,7 @@ function DayView({
         <DayColumn
           date={currentDate}
           jobs={dayJobs}
+          blocks={dayBlocks}
           getSpName={getSpName}
           getSpColorFor={getSpColorFor}
           showSp={mode === "admin"}
@@ -778,9 +780,12 @@ function DayView({
           showDebug={showDebug}
           colorMode={colorMode}
           onJobClick={onJobClick}
+          onUnavailableClick={onUnavailableClick}
+          onCreateUnavailable={onCreateUnavailable}
           onEmptyDayClick={onEmptyDayClick}
           showAddAffordance={mode === "admin" && !!onEmptyDayClick}
           dnd={dnd}
+          mode={mode}
         />
         {showEmpty && (
           <EmptyRangeOverlay
