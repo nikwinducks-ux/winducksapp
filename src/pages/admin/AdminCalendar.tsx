@@ -168,21 +168,38 @@ export default function AdminCalendar() {
     });
   }, [scheduledJobs, spFilter, statusFilters]);
 
-  // Jobs that match filters but fall outside the visible date range
-  const outOfViewInfo = useMemo(() => {
+  // Range diagnostics: jobs in/out of view + nearest neighbours
+  const rangeDiagnostics = useMemo(() => {
     const range = getViewRange(view, currentDate);
-    const outside = filteredJobs
+    const dated = filteredJobs
       .map((j) => ({ job: j, date: parseLocalDate(j.scheduledDate) }))
       .filter((x): x is { job: Job; date: Date } => !!x.date)
-      .filter(({ date }) => !isWithinInterval(date, { start: range.start, end: range.end }))
       .sort((a, b) => a.date.getTime() - b.date.getTime());
-    if (outside.length === 0) return null;
-    return {
-      count: outside.length,
-      earliest: outside[0].date,
-      latest: outside[outside.length - 1].date,
-    };
+
+    const inside = dated.filter(({ date }) =>
+      isWithinInterval(date, { start: range.start, end: range.end })
+    );
+    const outside = dated.filter(
+      ({ date }) => !isWithinInterval(date, { start: range.start, end: range.end })
+    );
+    const previous = [...outside]
+      .filter(({ date }) => date.getTime() < range.start.getTime())
+      .sort((a, b) => b.date.getTime() - a.date.getTime())[0];
+    const next = outside
+      .filter(({ date }) => date.getTime() > range.end.getTime())[0];
+
+    return { range, inside, outside, previous: previous ?? null, next: next ?? null };
   }, [filteredJobs, view, currentDate]);
+
+  const outOfViewInfo = rangeDiagnostics.outside.length > 0
+    ? {
+        count: rangeDiagnostics.outside.length,
+        earliest: rangeDiagnostics.outside[0].date,
+        latest: rangeDiagnostics.outside[rangeDiagnostics.outside.length - 1].date,
+        previous: rangeDiagnostics.previous,
+        next: rangeDiagnostics.next,
+      }
+    : null;
 
   // SP legend: unique SPs (and unassigned indicator) visible in the current filtered set.
   const legendEntries = useMemo(() => {
@@ -375,26 +392,59 @@ export default function AdminCalendar() {
       </div>
 
       {debug && (
-        <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-[11px] font-mono text-muted-foreground">
-          Showing raw <span className="font-semibold">scheduledDate</span> /{" "}
-          <span className="font-semibold">scheduledTime</span> for each job below.
-          Red = parse failed (job won't land at the right slot).
+        <div className="space-y-2">
+          <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-[11px] font-mono text-muted-foreground">
+            Showing raw <span className="font-semibold">scheduledDate</span> /{" "}
+            <span className="font-semibold">scheduledTime</span> for each job below.
+            Red = parse failed (job won't land at the right slot).
+          </div>
+          <div className="rounded-md border border-dashed border-primary/40 bg-primary/5 px-3 py-2 text-[11px] font-mono text-foreground space-y-0.5">
+            <div>range: {format(rangeDiagnostics.range.start, "yyyy-MM-dd")} → {format(rangeDiagnostics.range.end, "yyyy-MM-dd")} ({view})</div>
+            <div>filtered scheduled jobs: {filteredJobs.length}</div>
+            <div>in current range: {rangeDiagnostics.inside.length}</div>
+            <div>outside current range: {rangeDiagnostics.outside.length}</div>
+            <div>
+              previous: {rangeDiagnostics.previous
+                ? `${rangeDiagnostics.previous.job.id} @ ${format(rangeDiagnostics.previous.date, "yyyy-MM-dd")} ${rangeDiagnostics.previous.job.scheduledTime ?? ""}`
+                : "—"}
+            </div>
+            <div>
+              next: {rangeDiagnostics.next
+                ? `${rangeDiagnostics.next.job.id} @ ${format(rangeDiagnostics.next.date, "yyyy-MM-dd")} ${rangeDiagnostics.next.job.scheduledTime ?? ""}`
+                : "—"}
+            </div>
+          </div>
         </div>
       )}
 
       {outOfViewInfo && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
-          <span className="text-foreground">
-            <span className="font-semibold">{outOfViewInfo.count}</span> scheduled job
-            {outOfViewInfo.count === 1 ? " is" : "s are"} not in this view.
-          </span>
+          <div className="text-foreground space-y-0.5">
+            <div>
+              <span className="font-semibold">{outOfViewInfo.count}</span> scheduled job
+              {outOfViewInfo.count === 1 ? " is" : "s are"} not in this view.
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {outOfViewInfo.next && (
+                <>Nearest next: {format(outOfViewInfo.next.date, "MMM d, yyyy")}</>
+              )}
+              {outOfViewInfo.next && outOfViewInfo.previous && " · "}
+              {outOfViewInfo.previous && (
+                <>Nearest previous: {format(outOfViewInfo.previous.date, "MMM d, yyyy")}</>
+              )}
+            </div>
+          </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => jumpTo(outOfViewInfo.earliest)}>
-              Jump to earliest ({format(outOfViewInfo.earliest, "MMM d, yyyy")})
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => jumpTo(outOfViewInfo.latest)}>
-              Jump to latest ({format(outOfViewInfo.latest, "MMM d, yyyy")})
-            </Button>
+            {outOfViewInfo.previous && (
+              <Button size="sm" variant="outline" onClick={() => jumpTo(outOfViewInfo.previous!.date)}>
+                ← Previous ({format(outOfViewInfo.previous.date, "MMM d")})
+              </Button>
+            )}
+            {outOfViewInfo.next && (
+              <Button size="sm" variant="outline" onClick={() => jumpTo(outOfViewInfo.next!.date)}>
+                Next ({format(outOfViewInfo.next.date, "MMM d")}) →
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -422,6 +472,27 @@ export default function AdminCalendar() {
           onJobClick={openJob}
           mode="admin"
           showDebug={debug}
+          nearestPrevious={rangeDiagnostics.previous?.date ?? null}
+          nearestNext={rangeDiagnostics.next?.date ?? null}
+          nearestPreviousLabel={
+            rangeDiagnostics.previous
+              ? `${format(rangeDiagnostics.previous.date, "EEE MMM d")}${
+                  rangeDiagnostics.previous.job.scheduledTime
+                    ? ` at ${rangeDiagnostics.previous.job.scheduledTime}`
+                    : ""
+                }`
+              : null
+          }
+          nearestNextLabel={
+            rangeDiagnostics.next
+              ? `${format(rangeDiagnostics.next.date, "EEE MMM d")}${
+                  rangeDiagnostics.next.job.scheduledTime
+                    ? ` at ${rangeDiagnostics.next.job.scheduledTime}`
+                    : ""
+                }`
+              : null
+          }
+          onJumpToDate={jumpTo}
         />
       )}
 

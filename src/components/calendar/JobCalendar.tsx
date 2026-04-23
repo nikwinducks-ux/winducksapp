@@ -31,6 +31,12 @@ interface JobCalendarProps {
   onEmptyDayClick?: (date: Date) => void;
   mode: "admin" | "sp";
   showDebug?: boolean;
+  /** Nearest scheduled job date OUTSIDE the visible range, for empty-state jumps. */
+  nearestPrevious?: Date | null;
+  nearestNext?: Date | null;
+  nearestPreviousLabel?: string | null;
+  nearestNextLabel?: string | null;
+  onJumpToDate?: (date: Date) => void;
 }
 
 function spNameLookup(providers: ServiceProvider[]) {
@@ -355,11 +361,70 @@ function DayColumn({
   );
 }
 
+// ===== Empty range overlay (Day/Week) =====
+interface EmptyRangeOverlayProps {
+  message: string;
+  nearestPrevious?: Date | null;
+  nearestNext?: Date | null;
+  nearestPreviousLabel?: string | null;
+  nearestNextLabel?: string | null;
+  onJumpToDate?: (date: Date) => void;
+}
+
+function EmptyRangeOverlay({
+  message,
+  nearestPrevious,
+  nearestNext,
+  nearestPreviousLabel,
+  nearestNextLabel,
+  onJumpToDate,
+}: EmptyRangeOverlayProps) {
+  const hasJump = (nearestPrevious || nearestNext) && onJumpToDate;
+  return (
+    <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+      <div className="pointer-events-auto max-w-md rounded-lg border bg-card/95 backdrop-blur px-5 py-4 text-center shadow-sm space-y-2">
+        <div className="text-sm font-medium text-foreground">{message}</div>
+        {nearestNext && nearestNextLabel && (
+          <div className="text-xs text-muted-foreground">
+            Next scheduled job: <span className="text-foreground font-medium">{nearestNextLabel}</span>
+          </div>
+        )}
+        {hasJump && (
+          <div className="flex items-center justify-center gap-2 pt-1">
+            {nearestPrevious && onJumpToDate && (
+              <button
+                type="button"
+                onClick={() => onJumpToDate(nearestPrevious)}
+                className="text-xs px-2.5 py-1 rounded-md border bg-background hover:bg-accent transition-colors"
+              >
+                ← Jump to previous{nearestPreviousLabel ? ` (${nearestPreviousLabel})` : ""}
+              </button>
+            )}
+            {nearestNext && onJumpToDate && (
+              <button
+                type="button"
+                onClick={() => onJumpToDate(nearestNext)}
+                className="text-xs px-2.5 py-1 rounded-md border bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                Jump to next{nearestNextLabel ? ` (${nearestNextLabel})` : ""} →
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ===== Day View =====
-function DayView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug }: JobCalendarProps) {
+function DayView({
+  jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug,
+  nearestPrevious, nearestNext, nearestPreviousLabel, nearestNextLabel, onJumpToDate,
+}: JobCalendarProps) {
   const getSpName = spNameLookup(providers);
   const dayJobs = jobsOnDate(jobs, currentDate);
   const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
+  const showEmpty = dayJobs.length === 0 && (nearestPrevious || nearestNext);
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="border-b px-4 py-2 flex items-center justify-between">
@@ -371,7 +436,7 @@ function DayView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mo
         </div>
         <div className="text-xs text-muted-foreground">{dayJobs.length} job(s)</div>
       </div>
-      <div className="flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
+      <div className="relative flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
         <TimeAxis />
         <DayColumn
           date={currentDate}
@@ -385,18 +450,33 @@ function DayView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mo
           onEmptyDayClick={onEmptyDayClick}
           showAddAffordance={mode === "admin" && !!onEmptyDayClick}
         />
+        {showEmpty && (
+          <EmptyRangeOverlay
+            message="No scheduled jobs on this day"
+            nearestPrevious={nearestPrevious}
+            nearestNext={nearestNext}
+            nearestPreviousLabel={nearestPreviousLabel}
+            nearestNextLabel={nearestNextLabel}
+            onJumpToDate={onJumpToDate}
+          />
+        )}
       </div>
     </div>
   );
 }
 
 // ===== Week View =====
-function WeekView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug }: JobCalendarProps) {
+function WeekView({
+  jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug,
+  nearestPrevious, nearestNext, nearestPreviousLabel, nearestNextLabel, onJumpToDate,
+}: JobCalendarProps) {
   const getSpName = spNameLookup(providers);
   const start = startOfWeek(currentDate, { weekStartsOn: 1 });
   const end = endOfWeek(currentDate, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start, end });
   const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
+  const totalWeekJobs = days.reduce((sum, d) => sum + jobsOnDate(jobs, d).length, 0);
+  const showEmpty = totalWeekJobs === 0 && (nearestPrevious || nearestNext);
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
@@ -425,7 +505,7 @@ function WeekView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, m
           </div>
         ))}
       </div>
-      <div className="flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
+      <div className="relative flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
         <TimeAxis />
         {days.map((d) => {
           const dayJobs = jobsOnDate(jobs, d);
@@ -445,6 +525,16 @@ function WeekView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, m
             />
           );
         })}
+        {showEmpty && (
+          <EmptyRangeOverlay
+            message="No scheduled jobs in this week"
+            nearestPrevious={nearestPrevious}
+            nearestNext={nearestNext}
+            nearestPreviousLabel={nearestPreviousLabel}
+            nearestNextLabel={nearestNextLabel}
+            onJumpToDate={onJumpToDate}
+          />
+        )}
       </div>
     </div>
   );
