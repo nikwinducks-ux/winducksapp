@@ -12,6 +12,8 @@ import {
   isSameDay,
   isSameMonth,
   isToday,
+  addDays,
+  differenceInCalendarDays,
 } from "date-fns";
 import {
   DndContext,
@@ -71,6 +73,8 @@ interface JobCalendarProps {
   onDayClick?: (date: Date) => void;
   /** Mobile swipe on the week-view date header advances to next/prev week. */
   onNavigateWeek?: (direction: -1 | 1) => void;
+  /** Notifies parent when the user navigates to a new date via the week-view date strip. */
+  onDateChange?: (date: Date) => void;
 }
 
 
@@ -833,11 +837,123 @@ function DayView({
   );
 }
 
+
+// ===== Week Date Strip (mobile, infinite scroll) =====
+interface WeekDateStripProps {
+  jobs: Job[];
+  currentDate: Date;
+  dayMinWidthPx: number;
+  onDateChange?: (d: Date) => void;
+}
+
+function WeekDateStrip({ jobs, currentDate, dayMinWidthPx, onDateChange }: WeekDateStripProps) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const settleTimer = useRef<number | null>(null);
+  const suppressSettle = useRef(false);
+  // Anchor + half-window. We render days from `anchor - half` to `anchor + half`
+  // and grow the half-window when the user scrolls near either edge.
+  const [anchor] = useState(() => currentDate);
+  const [half, setHalf] = useState(28);
+
+  const cells = useMemo(() => {
+    const start = addDays(anchor, -half);
+    const end = addDays(anchor, half);
+    return eachDayOfInterval({ start, end });
+  }, [anchor, half]);
+
+  const indexOf = (d: Date) => half + differenceInCalendarDays(d, anchor);
+
+  // Center the scroller on the active date. Uses `auto` on first paint, then
+  // `smooth` for subsequent external jumps (Today, navigation arrows, etc.).
+  const didInitialCenter = useRef(false);
+  useLayoutEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const idx = indexOf(currentDate);
+    if (idx < 0 || idx >= cells.length) return;
+    const target = idx * dayMinWidthPx + dayMinWidthPx / 2 - el.clientWidth / 2;
+    suppressSettle.current = true;
+    el.scrollTo({ left: Math.max(0, target), behavior: didInitialCenter.current ? "smooth" : "auto" });
+    didInitialCenter.current = true;
+    requestAnimationFrame(() => requestAnimationFrame(() => { suppressSettle.current = false; }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentDate, dayMinWidthPx]);
+
+  function onScroll() {
+    const el = scrollerRef.current;
+    if (!el) return;
+    if (settleTimer.current) window.clearTimeout(settleTimer.current);
+    settleTimer.current = window.setTimeout(() => {
+      if (suppressSettle.current) return;
+      const center = el.scrollLeft + el.clientWidth / 2;
+      const idx = Math.max(0, Math.min(cells.length - 1, Math.round(center / dayMinWidthPx - 0.5)));
+      const d = cells[idx];
+      if (d && !isSameDay(d, currentDate)) {
+        onDateChange?.(d);
+      }
+      // Grow the window when we get near either edge so scrolling stays "infinite".
+      if (idx < 7 || idx > cells.length - 8) {
+        setHalf((h) => h + 28);
+      }
+    }, 110);
+  }
+
+  return (
+    <div
+      ref={scrollerRef}
+      onScroll={onScroll}
+      className="overflow-x-auto overflow-y-hidden overscroll-x-contain border-b bg-muted/30"
+      style={{
+        touchAction: "pan-x",
+        WebkitOverflowScrolling: "touch",
+        scrollSnapType: "x proximity",
+      }}
+    >
+      <div className="flex" style={{ minWidth: `${cells.length * dayMinWidthPx}px` }}>
+        {cells.map((d) => {
+          const dayJobs = jobsOnDate(jobs, d);
+          const total = dayJobs.length;
+          const selected = isSameDay(d, currentDate);
+          return (
+            <button
+              type="button"
+              key={d.toISOString()}
+              onClick={() => onDateChange?.(d)}
+              style={{ minWidth: `${dayMinWidthPx}px`, scrollSnapAlign: "center" }}
+              className={cn(
+                "flex-1 px-1 py-2 text-center border-r last:border-r-0 transition-colors",
+                isToday(d) && !selected && "bg-primary/10",
+                selected && "bg-primary/20"
+              )}
+              aria-pressed={selected}
+            >
+              <div className="text-[10px] uppercase text-muted-foreground font-semibold leading-tight">
+                {format(d, "EEE")}
+              </div>
+              <div
+                className={cn(
+                  "text-sm font-semibold leading-tight",
+                  (isToday(d) || selected) && "text-primary"
+                )}
+              >
+                {format(d, "d")}
+              </div>
+              {total > 0 && (
+                <div className="mx-auto mt-0.5 h-1 w-1 rounded-full bg-primary" aria-hidden />
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ===== Week View =====
 function WeekView({
   jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug,
   nearestPrevious, nearestNext, nearestPreviousLabel, nearestNextLabel, onJumpToDate,
-  dnd, unavailableBlocks, onUnavailableClick, onCreateUnavailable, onNavigateWeek,
+  dnd, unavailableBlocks, onUnavailableClick, onCreateUnavailable, onNavigateWeek, onDateChange,
 }: ViewProps) {
   const getSpName = spNameLookup(providers);
   const getSpColorFor = spColorLookup(providers);
@@ -883,34 +999,9 @@ function WeekView({
   const isFit = isMobile && weekZoom === "fit";
   useHorizontalWheelScroll(hScrollRef, !isMobile);
 
-  // Swipe gesture on the date-header strip → navigate weeks.
-  const headerSwipeRef = useRef<{ x: number; y: number; t: number; moved: boolean } | null>(null);
-  function onHeaderPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (!onNavigateWeek) return;
-    if (e.pointerType === "mouse" && e.button !== 0) return;
-    headerSwipeRef.current = { x: e.clientX, y: e.clientY, t: Date.now(), moved: false };
-  }
-  function onHeaderPointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    const s = headerSwipeRef.current;
-    if (!s) return;
-    const dx = e.clientX - s.x;
-    const dy = e.clientY - s.y;
-    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) s.moved = true;
-  }
-  function onHeaderPointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    const s = headerSwipeRef.current;
-    headerSwipeRef.current = null;
-    if (!s || !onNavigateWeek) return;
-    const dx = e.clientX - s.x;
-    const dy = e.clientY - s.y;
-    const dt = Date.now() - s.t;
-    if (Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 600) {
-      try { navigator.vibrate?.(10); } catch { /* noop */ }
-      onNavigateWeek(dx < 0 ? 1 : -1);
-    }
-  }
-  function onHeaderPointerCancel() {
-    headerSwipeRef.current = null;
+  // Mobile-only: handle the date strip's date change.
+  function handleStripDateChange(d: Date) {
+    onDateChange?.(d);
   }
 
   function handleZoomIn() {
@@ -953,6 +1044,14 @@ function WeekView({
           </div>
         </div>
       )}
+      {isMobile && (
+        <WeekDateStrip
+          jobs={jobs}
+          currentDate={currentDate}
+          dayMinWidthPx={dayMinWidthPx}
+          onDateChange={handleStripDateChange}
+        />
+      )}
       <div
         ref={hScrollRef}
         className={cn(
@@ -962,61 +1061,47 @@ function WeekView({
         style={{
           touchAction: isFit ? "pan-y" : "pan-x pan-y",
           WebkitOverflowScrolling: "touch",
-          scrollSnapType: isMobile && !isFit ? "x mandatory" : undefined,
-          scrollBehavior: "smooth",
+          scrollSnapType: isMobile && !isFit ? "x proximity" : undefined,
+          scrollPaddingLeft: isMobile ? 56 : undefined,
         }}
       >
         <div style={{ minWidth: `${56 + dayMinWidthPx * days.length}px` }}>
-          <div
-            className={cn(
-              "flex border-b bg-muted/30 relative",
-              onNavigateWeek && isMobile && "cursor-grab"
-            )}
-            onPointerDown={onNavigateWeek && isMobile ? onHeaderPointerDown : undefined}
-            onPointerMove={onNavigateWeek && isMobile ? onHeaderPointerMove : undefined}
-            onPointerUp={onNavigateWeek && isMobile ? onHeaderPointerUp : undefined}
-            onPointerCancel={onNavigateWeek && isMobile ? onHeaderPointerCancel : undefined}
-            style={onNavigateWeek && isMobile ? { touchAction: "pan-y" } : undefined}
-          >
-            <div className="w-14 shrink-0 border-r" />
-            {days.map((d) => {
-              const headerDayJobs = jobsOnDate(jobs, d);
-              const dayTotal = formatDayTotal(headerDayJobs);
-              return (
-                <div
-                  key={d.toISOString()}
-                  style={{ minWidth: `${dayMinWidthPx}px`, scrollSnapAlign: isMobile ? "start" : undefined }}
-                  className={cn(
-                    "flex-1 px-2 py-2 text-center border-r last:border-r-0",
-                    isToday(d) && "bg-primary/10"
-                  )}
-                >
-                  <div className="text-[10px] uppercase text-muted-foreground font-semibold">
-                    {format(d, "EEE")}
-                  </div>
+          {!isMobile && (
+            <div className="flex border-b bg-muted/30 relative">
+              <div className="w-14 shrink-0 border-r" />
+              {days.map((d) => {
+                const headerDayJobs = jobsOnDate(jobs, d);
+                const dayTotal = formatDayTotal(headerDayJobs);
+                return (
                   <div
+                    key={d.toISOString()}
+                    style={{ minWidth: `${dayMinWidthPx}px` }}
                     className={cn(
-                      "text-sm font-semibold",
-                      isToday(d) && "text-primary"
+                      "flex-1 px-2 py-2 text-center border-r last:border-r-0",
+                      isToday(d) && "bg-primary/10"
                     )}
                   >
-                    {format(d, "d")}
-                  </div>
-                  {dayTotal && (
-                    <div className="text-[10px] font-semibold text-primary mt-0.5 truncate">
-                      {dayTotal}
+                    <div className="text-[10px] uppercase text-muted-foreground font-semibold">
+                      {format(d, "EEE")}
                     </div>
-                  )}
-                </div>
-              );
-            })}
-            {onNavigateWeek && isMobile && (
-              <div className="pointer-events-none absolute inset-y-0 left-14 right-0 flex items-center justify-between px-1 text-[10px] text-muted-foreground/50">
-                <span aria-hidden>‹</span>
-                <span aria-hidden>›</span>
-              </div>
-            )}
-          </div>
+                    <div
+                      className={cn(
+                        "text-sm font-semibold",
+                        isToday(d) && "text-primary"
+                      )}
+                    >
+                      {format(d, "d")}
+                    </div>
+                    {dayTotal && (
+                      <div className="text-[10px] font-semibold text-primary mt-0.5 truncate">
+                        {dayTotal}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <div className="relative flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
             <TimeAxis />
             {days.map((d) => {
