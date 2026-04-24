@@ -110,8 +110,10 @@ function AppRoutes() {
 
         {/* Admin Routes — accessible to admin and owner roles */}
         <Route path="/admin" element={isAdmin ? <AdminDashboard /> : <Navigate to="/" replace />} />
-        <Route path="/admin/allocation" element={isAdmin ? <AllocationControl /> : <Navigate to="/" replace />} />
-        <Route path="/admin/fairness" element={isAdmin ? <FairnessControls /> : <Navigate to="/" replace />} />
+        <Route path="/admin/allocation" element={isAdmin ? <AllocationHub /> : <Navigate to="/" replace />} />
+        <Route path="/admin/fairness" element={<Navigate to="/admin/allocation?tab=fairness" replace />} />
+        <Route path="/admin/simulation" element={<Navigate to="/admin/allocation?tab=simulation" replace />} />
+        <Route path="/admin/qa" element={<Navigate to="/admin/allocation?tab=qa" replace />} />
         <Route path="/admin/providers" element={isAdmin ? <SPManagement /> : <Navigate to="/" replace />} />
         <Route path="/admin/providers/new" element={isAdmin ? <SPForm /> : <Navigate to="/" replace />} />
         <Route path="/admin/providers/:id" element={isAdmin ? <SPDetail /> : <Navigate to="/" replace />} />
