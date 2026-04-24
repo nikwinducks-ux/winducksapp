@@ -932,6 +932,14 @@ function WeekView({
           </div>
         </div>
       )}
+      {isMobile && (
+        <WeekDateStrip
+          jobs={jobs}
+          currentDate={currentDate}
+          dayMinWidthPx={dayMinWidthPx}
+          onDateChange={handleStripDateChange}
+        />
+      )}
       <div
         ref={hScrollRef}
         className={cn(
@@ -941,61 +949,47 @@ function WeekView({
         style={{
           touchAction: isFit ? "pan-y" : "pan-x pan-y",
           WebkitOverflowScrolling: "touch",
-          scrollSnapType: isMobile && !isFit ? "x mandatory" : undefined,
-          scrollBehavior: "smooth",
+          scrollSnapType: isMobile && !isFit ? "x proximity" : undefined,
+          scrollPaddingLeft: isMobile ? 56 : undefined,
         }}
       >
         <div style={{ minWidth: `${56 + dayMinWidthPx * days.length}px` }}>
-          <div
-            className={cn(
-              "flex border-b bg-muted/30 relative",
-              onNavigateWeek && isMobile && "cursor-grab"
-            )}
-            onPointerDown={onNavigateWeek && isMobile ? onHeaderPointerDown : undefined}
-            onPointerMove={onNavigateWeek && isMobile ? onHeaderPointerMove : undefined}
-            onPointerUp={onNavigateWeek && isMobile ? onHeaderPointerUp : undefined}
-            onPointerCancel={onNavigateWeek && isMobile ? onHeaderPointerCancel : undefined}
-            style={onNavigateWeek && isMobile ? { touchAction: "pan-y" } : undefined}
-          >
-            <div className="w-14 shrink-0 border-r" />
-            {days.map((d) => {
-              const headerDayJobs = jobsOnDate(jobs, d);
-              const dayTotal = formatDayTotal(headerDayJobs);
-              return (
-                <div
-                  key={d.toISOString()}
-                  style={{ minWidth: `${dayMinWidthPx}px`, scrollSnapAlign: isMobile ? "start" : undefined }}
-                  className={cn(
-                    "flex-1 px-2 py-2 text-center border-r last:border-r-0",
-                    isToday(d) && "bg-primary/10"
-                  )}
-                >
-                  <div className="text-[10px] uppercase text-muted-foreground font-semibold">
-                    {format(d, "EEE")}
-                  </div>
+          {!isMobile && (
+            <div className="flex border-b bg-muted/30 relative">
+              <div className="w-14 shrink-0 border-r" />
+              {days.map((d) => {
+                const headerDayJobs = jobsOnDate(jobs, d);
+                const dayTotal = formatDayTotal(headerDayJobs);
+                return (
                   <div
+                    key={d.toISOString()}
+                    style={{ minWidth: `${dayMinWidthPx}px` }}
                     className={cn(
-                      "text-sm font-semibold",
-                      isToday(d) && "text-primary"
+                      "flex-1 px-2 py-2 text-center border-r last:border-r-0",
+                      isToday(d) && "bg-primary/10"
                     )}
                   >
-                    {format(d, "d")}
-                  </div>
-                  {dayTotal && (
-                    <div className="text-[10px] font-semibold text-primary mt-0.5 truncate">
-                      {dayTotal}
+                    <div className="text-[10px] uppercase text-muted-foreground font-semibold">
+                      {format(d, "EEE")}
                     </div>
-                  )}
-                </div>
-              );
-            })}
-            {onNavigateWeek && isMobile && (
-              <div className="pointer-events-none absolute inset-y-0 left-14 right-0 flex items-center justify-between px-1 text-[10px] text-muted-foreground/50">
-                <span aria-hidden>‹</span>
-                <span aria-hidden>›</span>
-              </div>
-            )}
-          </div>
+                    <div
+                      className={cn(
+                        "text-sm font-semibold",
+                        isToday(d) && "text-primary"
+                      )}
+                    >
+                      {format(d, "d")}
+                    </div>
+                    {dayTotal && (
+                      <div className="text-[10px] font-semibold text-primary mt-0.5 truncate">
+                        {dayTotal}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <div className="relative flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
             <TimeAxis />
             {days.map((d) => {
