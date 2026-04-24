@@ -1,16 +1,27 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useServiceCategories, useCreateServiceCategory, useUpdateServiceCategory } from "@/hooks/useSupabaseData";
+import { useServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory } from "@/hooks/useSupabaseData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Plus, Pencil, X, Check, ChevronRight } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Plus, Pencil, X, Check, ChevronRight, Trash2 } from "lucide-react";
 
 export default function ServiceCategories() {
   const { data: categories = [], isLoading } = useServiceCategories();
   const createCategory = useCreateServiceCategory();
   const updateCategory = useUpdateServiceCategory();
+  const deleteCategory = useDeleteServiceCategory();
 
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
@@ -20,6 +31,7 @@ export default function ServiceCategories() {
   const [editName, setEditName] = useState("");
   const [editCode, setEditCode] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const handleAdd = () => {
     if (!newName.trim()) return;
@@ -115,6 +127,15 @@ export default function ServiceCategories() {
                 <Button size="sm" variant="ghost" onClick={(e) => { stop(e); handleToggleActive(cat.id, cat.active); }}>
                   {cat.active ? "Deactivate" : "Activate"}
                 </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={(e) => { stop(e); setDeleteTarget({ id: cat.id, name: cat.name }); }}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  aria-label={`Delete ${cat.name}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
                 <ChevronRight className="h-4 w-4 text-muted-foreground ml-1" />
               </div>
             </>
@@ -129,6 +150,33 @@ export default function ServiceCategories() {
           );
         })}
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete category?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <span className="font-semibold text-foreground">{deleteTarget?.name}</span> and all of its line items. This action cannot be undone.
+              <br />
+              <span className="mt-2 block text-xs">Tip: existing jobs that referenced this category will keep their saved category text.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteCategory.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteCategory.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (!deleteTarget) return;
+                deleteCategory.mutate(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) });
+              }}
+            >
+              {deleteCategory.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
