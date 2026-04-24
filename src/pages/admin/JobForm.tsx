@@ -280,6 +280,7 @@ export default function JobForm() {
       try {
         const { data: newJob, error } = await supabase.from("jobs").insert({
           customer_id: payload.customerId || null,
+          customer_property_id: payload.customerPropertyId || null,
           service_category: payload.serviceCategory,
           payout: parseFloat(payload.payout) || 0,
           job_address_street: payload.street,
