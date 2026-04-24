@@ -301,7 +301,25 @@ export function useCustomers() {
     queryFn: async () => {
       const { data, error } = await supabase.from("customers").select("*").order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []).map(dbToCustomer);
+      const rows = data ?? [];
+      const ids = rows.map((r: any) => r.id);
+      let propsByCust: Record<string, CustomerProperty[]> = {};
+      let contactsByCust: Record<string, CustomerContact[]> = {};
+      if (ids.length > 0) {
+        const [{ data: pData }, { data: cData }] = await Promise.all([
+          supabase.from("customer_properties").select("*").in("customer_id", ids).order("display_order", { ascending: true }),
+          supabase.from("customer_contacts").select("*").in("customer_id", ids).order("display_order", { ascending: true }),
+        ]);
+        for (const p of (pData ?? []) as any[]) {
+          if (!propsByCust[p.customer_id]) propsByCust[p.customer_id] = [];
+          propsByCust[p.customer_id].push(dbPropertyToCustomerProperty(p));
+        }
+        for (const c of (cData ?? []) as any[]) {
+          if (!contactsByCust[c.customer_id]) contactsByCust[c.customer_id] = [];
+          contactsByCust[c.customer_id].push(dbContactToCustomerContact(c));
+        }
+      }
+      return rows.map((r: any) => dbToCustomer(r, propsByCust[r.id] ?? [], contactsByCust[r.id] ?? []));
     },
   });
 }
@@ -311,9 +329,15 @@ export function useCustomer(id: string | undefined) {
     queryKey: ["customers", id],
     queryFn: async () => {
       if (!id) return null;
-      const { data, error } = await supabase.from("customers").select("*").eq("id", id).single();
+      const [{ data, error }, { data: pData }, { data: cData }] = await Promise.all([
+        supabase.from("customers").select("*").eq("id", id).single(),
+        supabase.from("customer_properties").select("*").eq("customer_id", id).order("display_order", { ascending: true }),
+        supabase.from("customer_contacts").select("*").eq("customer_id", id).order("display_order", { ascending: true }),
+      ]);
       if (error) throw error;
-      return dbToCustomer(data);
+      const properties = (pData ?? []).map(dbPropertyToCustomerProperty);
+      const contacts = (cData ?? []).map(dbContactToCustomerContact);
+      return dbToCustomer(data, properties, contacts);
     },
     enabled: !!id,
   });
