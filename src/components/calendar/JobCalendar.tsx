@@ -887,34 +887,9 @@ function WeekView({
   const isFit = isMobile && weekZoom === "fit";
   useHorizontalWheelScroll(hScrollRef, !isMobile);
 
-  // Swipe gesture on the date-header strip → navigate weeks.
-  const headerSwipeRef = useRef<{ x: number; y: number; t: number; moved: boolean } | null>(null);
-  function onHeaderPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (!onNavigateWeek) return;
-    if (e.pointerType === "mouse" && e.button !== 0) return;
-    headerSwipeRef.current = { x: e.clientX, y: e.clientY, t: Date.now(), moved: false };
-  }
-  function onHeaderPointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    const s = headerSwipeRef.current;
-    if (!s) return;
-    const dx = e.clientX - s.x;
-    const dy = e.clientY - s.y;
-    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) s.moved = true;
-  }
-  function onHeaderPointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    const s = headerSwipeRef.current;
-    headerSwipeRef.current = null;
-    if (!s || !onNavigateWeek) return;
-    const dx = e.clientX - s.x;
-    const dy = e.clientY - s.y;
-    const dt = Date.now() - s.t;
-    if (Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 600) {
-      try { navigator.vibrate?.(10); } catch { /* noop */ }
-      onNavigateWeek(dx < 0 ? 1 : -1);
-    }
-  }
-  function onHeaderPointerCancel() {
-    headerSwipeRef.current = null;
+  // Mobile-only: handle the date strip's date change.
+  function handleStripDateChange(d: Date) {
+    onDateChange?.(d);
   }
 
   function handleZoomIn() {
