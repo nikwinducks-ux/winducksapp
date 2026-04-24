@@ -732,7 +732,7 @@ function DayView({
   const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
   const showEmpty = dayJobs.length === 0 && (nearestPrevious || nearestNext);
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
+    <div className="rounded-lg border bg-card overflow-hidden" data-no-ptr="true">
       <div className="border-b px-4 py-2 flex items-center justify-between gap-2">
         <div className="text-sm font-medium min-w-0 truncate">
           {format(currentDate, "EEEE, MMMM d, yyyy")}
