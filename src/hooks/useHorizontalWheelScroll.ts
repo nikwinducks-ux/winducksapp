@@ -1,5 +1,23 @@
 import { useEffect } from "react";
 
+function getHorizontalScrollableTarget(boundary: HTMLElement, origin: EventTarget | null) {
+  const isScrollable = (node: HTMLElement) => {
+    const max = node.scrollWidth - node.clientWidth;
+    if (max <= 0) return false;
+    const overflowX = window.getComputedStyle(node).overflowX;
+    return overflowX === "auto" || overflowX === "scroll" || overflowX === "overlay";
+  };
+
+  let node = origin instanceof HTMLElement ? origin : null;
+  while (node) {
+    if (isScrollable(node)) return node;
+    if (node === boundary) break;
+    node = node.parentElement;
+  }
+
+  return isScrollable(boundary) ? boundary : null;
+}
+
 /**
  * Captures horizontal trackpad / shift+wheel gestures inside `targetRef` and
  * translates them into `scrollLeft` updates on the same element. While the
@@ -23,16 +41,21 @@ export function useHorizontalWheelScroll<T extends HTMLElement>(
       // Capture clear horizontal trackpad intent and shift+wheel desktop scrolling.
       if ((!dominantHorizontal && !e.shiftKey) || (absX < 1 && Math.abs(e.deltaY) < 1)) return;
 
-      const max = el.scrollWidth - el.clientWidth;
-      if (max <= 0) return;
+      const scrollTarget = getHorizontalScrollableTarget(el, e.target) ?? el;
+      const max = scrollTarget.scrollWidth - scrollTarget.clientWidth;
+      if (max <= 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
 
-      const current = el.scrollLeft;
+      const current = scrollTarget.scrollLeft;
       const delta = absX >= 1 ? e.deltaX : e.deltaY;
       const next = current + delta;
 
       e.preventDefault();
       e.stopPropagation();
-      el.scrollLeft = Math.max(0, Math.min(max, next));
+      scrollTarget.scrollLeft = Math.max(0, Math.min(max, next));
     };
 
     el.addEventListener("wheel", onWheel, { passive: false, capture: true });
