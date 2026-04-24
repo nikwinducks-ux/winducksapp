@@ -532,63 +532,32 @@ function DayGridDroppable({
     return () => cancelAnimationFrame(raf);
   }, [isOver, dndEnabled, dnd, node, date]);
 
-  // Drag-to-create unavailable (SP-only)
+  // Tap-to-create unavailable (SP-only)
   const createEnabled = !!onCreateUnavailable;
-  const containerRef = node; // dnd-kit ref; we also attach our own
-  const [drag, setDrag] = useState<{ startMin: number; endMin: number } | null>(null);
-  const dragStateRef = useRef<{ startMin: number; endMin: number; startY: number } | null>(null);
 
-  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+  function onGridClick(e: React.MouseEvent<HTMLDivElement>) {
     if (!createEnabled) return;
-    if (e.button !== 0) return;
-    // Ignore if click originated on a job block / interactive child
     const target = e.target as HTMLElement;
     if (target.closest("[data-jobblock]")) return;
     if (target.closest("[data-unavailable-block]")) return;
-    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
-    const start = yToSnappedMinutes(y);
-    dragStateRef.current = { startMin: start, endMin: start + 15, startY: y };
-    setDrag({ startMin: start, endMin: start + 15 });
-    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
-  }
-
-  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (!createEnabled || !dragStateRef.current) return;
-    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const cur = yToSnappedMinutes(y);
-    const s = dragStateRef.current.startMin;
-    const startMin = Math.min(s, cur);
-    const endMin = Math.max(s + 15, cur + 15);
-    setDrag({ startMin, endMin });
-  }
-
-  function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    if (!createEnabled || !dragStateRef.current) return;
-    const d = drag;
-    dragStateRef.current = null;
-    setDrag(null);
-    try {
-      (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId);
-    } catch {}
-    if (d && d.endMin - d.startMin >= 15) {
-      onCreateUnavailable?.(date, minutesToHHMM(d.startMin), minutesToHHMM(d.endMin));
-    }
+    const startMin = yToSnappedMinutes(y);
+    const dayEndMin = DAY_END_HOUR * 60;
+    let endMin = Math.min(startMin + 60, dayEndMin);
+    if (endMin - startMin < 15) endMin = startMin + 15;
+    onCreateUnavailable?.(date, minutesToHHMM(startMin), minutesToHHMM(endMin));
   }
 
   return (
     <div
       ref={setNodeRef}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={() => { dragStateRef.current = null; setDrag(null); }}
+      onClick={onGridClick}
       className={cn(
         "relative flex-1",
         today && "bg-primary/5",
         isOver && "bg-primary/10 ring-2 ring-primary ring-inset",
-        createEnabled && "cursor-crosshair"
+        createEnabled && "cursor-pointer"
       )}
       style={{ height: GRID_HEIGHT_PX }}
     >
