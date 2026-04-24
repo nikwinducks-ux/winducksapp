@@ -1,46 +1,35 @@
 
 
-## Add a Desktop / Mobile layout toggle
+## Fix: Mobile-view toggle missing on phones
 
-### Goal
+### Problem
 
-Stop tying the layout to viewport width. Always render the **desktop sidebar layout** by default on every screen, and let the user opt into the **mobile top-bar layout** via a toggle in the top-right corner. The choice persists across reloads.
+The Monitor/Smartphone toggle button in `MobileTopNav` Row 1 sits to the **left of the avatar**, alongside the optional History button. On narrow phone widths (e.g. 375–414px), Row 1 runs out of horizontal space and the toggle gets pushed off-screen or hidden behind the avatar, especially when the page title is long ("Service Categories", "Allocation Control", etc.). The flex children aren't allowed to shrink, so the title eats the available space and the toggle disappears.
 
-### How it works
+### Fix
 
-1. **New `LayoutModeContext`** (`src/contexts/LayoutModeContext.tsx`)
-   - State: `mode: "desktop" | "mobile"`, `setMode`, `toggle`.
-   - Default: `"desktop"` for everyone (previous width-based auto-switch is removed).
-   - Persisted to `localStorage` under `winducks:layoutMode`. Hydrates on mount.
+Make Row 1 of `src/components/MobileTopNav.tsx` resilient on narrow screens:
 
-2. **Wrap app** in `LayoutModeProvider` inside `src/App.tsx` (above the router so every page sees it).
+1. **Force the title to shrink, not the controls**
+   - Add `min-w-0` and keep `truncate` on the title `<h1>`. Right-side controls get `shrink-0` so they always render.
 
-3. **`DashboardLayout` becomes mode-driven, not breakpoint-driven** (`src/components/DashboardLayout.tsx`)
-   - Read `mode` from context.
-   - `mode === "desktop"`: render the existing left sidebar + main content. Sidebar visible at all widths (no `xl:` gating).
-   - `mode === "mobile"`: render `MobileTopNav` + main content, no sidebar. Visible at all widths.
-   - Remove the `xl:hidden` / `xl:flex` width-based switches.
+2. **Always-visible toggle**
+   - Keep the layout-mode toggle (`Monitor` / `Smartphone` icon) as a dedicated `Button` in Row 1, immediately left of the avatar, with `shrink-0`. Tooltip + `aria-label` retained.
 
-4. **Layout toggle button**
-   - Lives in the **top-right corner of every page**, in both layouts:
-     - **Desktop layout**: small floating header strip at the top of `<main>` (right-aligned) containing the toggle. Sits above page content, doesn't disturb existing pages.
-     - **Mobile layout**: added into `MobileTopNav` Row 1, just left of the avatar.
-   - Icon-only button: `Monitor` icon when in mobile mode (click → switch to desktop), `Smartphone` icon when in desktop mode (click → switch to mobile). Tooltip: "Switch to mobile view" / "Switch to desktop view".
+3. **Tighten Row 1 on small screens**
+   - Reduce horizontal padding (`px-2 sm:px-3`), reduce gap (`gap-1.5`), and shrink the logo to `h-7 w-7` on mobile so all controls fit on a 360px-wide device.
 
-5. **Cleanup**
-   - Drop the `xl:` breakpoint gymnastics added last round in `DashboardLayout.tsx` and `MobileTopNav.tsx` (`xl:hidden` on the header). The mode context decides visibility now.
-   - `MobileTopBar.tsx` and `MobileBottomNav.tsx` remain unused (kept on disk for reference).
+4. **Verify in both roles**
+   - Same `MobileTopNav` is used by SP and Admin, so this single fix covers both. The History button (admin-only, optional) already has `shrink-0`; confirm and keep.
+
+5. **Sanity check the Mobile-mode header in `DashboardLayout`**
+   - Confirm `MobileTopNav` is the only top element when `mode === "mobile"` (no extra desktop toggle strip rendering on top of it). No change expected — just verify the conditional render.
 
 ### Files touched
 
-- `src/contexts/LayoutModeContext.tsx` — **new**.
-- `src/App.tsx` — wrap with `LayoutModeProvider`.
-- `src/components/DashboardLayout.tsx` — mode-driven render; add desktop-mode top-right toggle strip.
-- `src/components/MobileTopNav.tsx` — drop `xl:hidden`; add toggle button next to avatar.
+- `src/components/MobileTopNav.tsx` — width-resilient Row 1 layout, `shrink-0` on all right-side controls, smaller logo/padding on mobile.
 
 ### Result
 
-- Default experience on any device: the familiar **desktop sidebar layout**.
-- One tap on the top-right toggle switches to the **mobile sticky top-bar layout** (and back). Choice is remembered.
-- No automatic switching based on screen width — the user is in control.
+The Desktop/Mobile toggle is visible and tappable in the top-right of the mobile shell on every phone size, for both SP and Admin accounts.
 
