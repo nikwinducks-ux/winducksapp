@@ -127,8 +127,6 @@ function AppRoutes() {
         <Route path="/admin/jobs/new" element={isAdmin ? <JobForm /> : <Navigate to="/" replace />} />
         <Route path="/admin/jobs/:id" element={isAdmin ? <JobDetail /> : <Navigate to="/" replace />} />
         <Route path="/admin/jobs/:id/edit" element={isAdmin ? <JobForm /> : <Navigate to="/" replace />} />
-        <Route path="/admin/simulation" element={isAdmin ? <SimulationTool /> : <Navigate to="/" replace />} />
-        <Route path="/admin/qa" element={isAdmin ? <AllocationQA /> : <Navigate to="/" replace />} />
         <Route path="/admin/workflow" element={isAdmin ? <OfferWorkflow /> : <Navigate to="/" replace />} />
         <Route path="/admin/integrations" element={isAdmin ? <Integrations /> : <Navigate to="/" replace />} />
         <Route path="/admin/users" element={isAdmin ? <UserManagement /> : <Navigate to="/" replace />} />
