@@ -4,9 +4,10 @@ import { formatAddress } from "@/data/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, Plus, Eye, Pencil, Archive } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function CustomerManagement() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const { data: customers = [], isLoading } = useCustomers();
   const archiveMutation = useArchiveCustomer();
@@ -53,8 +54,28 @@ export default function CustomerManagement() {
           </thead>
           <tbody>
             {filtered.map((c) => (
-              <tr key={c.id} className="border-b last:border-0">
-                <td className="py-3 font-medium">{c.name}</td>
+              <tr
+                key={c.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/admin/customers/${c.id}`)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    navigate(`/admin/customers/${c.id}`);
+                  }
+                }}
+                className="border-b last:border-0 cursor-pointer hover:bg-muted/40 transition-colors"
+              >
+                <td className="py-3 font-medium">
+                  <Link
+                    to={`/admin/customers/${c.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-primary hover:underline"
+                  >
+                    {c.name}
+                  </Link>
+                </td>
                 <td className="py-3 text-muted-foreground">{c.phone}</td>
                 <td className="py-3 text-muted-foreground">{c.email}</td>
                 <td className="py-3">{c.serviceAddress.city}</td>
@@ -65,7 +86,7 @@ export default function CustomerManagement() {
                     ))}
                   </div>
                 </td>
-                <td className="py-3">
+                <td className="py-3" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-1">
                     <Link to={`/admin/customers/${c.id}`}>
                       <Button size="sm" variant="ghost" title="View"><Eye className="h-4 w-4" /></Button>
