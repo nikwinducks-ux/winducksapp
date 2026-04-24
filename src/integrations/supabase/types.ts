@@ -260,7 +260,54 @@ export type Database = {
         }
         Relationships: []
       }
-      customers: {
+      customer_contacts: {
+        Row: {
+          created_at: string
+          customer_id: string
+          display_order: number
+          email: string
+          id: string
+          is_primary: boolean
+          name: string
+          phone: string
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          display_order?: number
+          email?: string
+          id?: string
+          is_primary?: boolean
+          name?: string
+          phone?: string
+          role?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          display_order?: number
+          email?: string
+          id?: string
+          is_primary?: boolean
+          name?: string
+          phone?: string
+          role?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_contacts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_properties: {
         Row: {
           address_city: string
           address_country: string
@@ -270,8 +317,101 @@ export type Database = {
           address_region: string
           address_street: string
           created_at: string
-          email: string
+          customer_id: string
+          display_order: number
           id: string
+          is_primary: boolean
+          label: string
+          notes: string
+          updated_at: string
+        }
+        Insert: {
+          address_city?: string
+          address_country?: string
+          address_lat?: number | null
+          address_lng?: number | null
+          address_postal?: string
+          address_region?: string
+          address_street?: string
+          created_at?: string
+          customer_id: string
+          display_order?: number
+          id?: string
+          is_primary?: boolean
+          label?: string
+          notes?: string
+          updated_at?: string
+        }
+        Update: {
+          address_city?: string
+          address_country?: string
+          address_lat?: number | null
+          address_lng?: number | null
+          address_postal?: string
+          address_region?: string
+          address_street?: string
+          created_at?: string
+          customer_id?: string
+          display_order?: number
+          id?: string
+          is_primary?: boolean
+          label?: string
+          notes?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_properties_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_tags: {
+        Row: {
+          color: string
+          created_at: string
+          display_order: number
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      customers: {
+        Row: {
+          address_city: string
+          address_country: string
+          address_lat: number | null
+          address_lng: number | null
+          address_postal: string
+          address_region: string
+          address_street: string
+          company_name: string
+          created_at: string
+          display_as: string
+          email: string
+          first_name: string
+          id: string
+          last_name: string
           name: string
           notes: string
           phone: string
@@ -287,9 +427,13 @@ export type Database = {
           address_postal?: string
           address_region?: string
           address_street?: string
+          company_name?: string
           created_at?: string
+          display_as?: string
           email?: string
+          first_name?: string
           id?: string
+          last_name?: string
           name: string
           notes?: string
           phone?: string
@@ -305,9 +449,13 @@ export type Database = {
           address_postal?: string
           address_region?: string
           address_street?: string
+          company_name?: string
           created_at?: string
+          display_as?: string
           email?: string
+          first_name?: string
           id?: string
+          last_name?: string
           name?: string
           notes?: string
           phone?: string
@@ -686,6 +834,7 @@ export type Database = {
           completed_at: string | null
           created_at: string
           customer_id: string | null
+          customer_property_id: string | null
           estimated_duration: string
           id: string
           is_broadcast: boolean
@@ -715,6 +864,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           customer_id?: string | null
+          customer_property_id?: string | null
           estimated_duration?: string
           id?: string
           is_broadcast?: boolean
@@ -744,6 +894,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           customer_id?: string | null
+          customer_property_id?: string | null
           estimated_duration?: string
           id?: string
           is_broadcast?: boolean
@@ -779,6 +930,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_customer_property_id_fkey"
+            columns: ["customer_property_id"]
+            isOneToOne: false
+            referencedRelation: "customer_properties"
             referencedColumns: ["id"]
           },
         ]
