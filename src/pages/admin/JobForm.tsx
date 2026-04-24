@@ -85,6 +85,7 @@ export default function JobForm() {
 
   const [form, setForm] = useState({
     customerId: "",
+    customerPropertyId: "",
     payout: "",
     street: "",
     city: "",
@@ -116,6 +117,7 @@ export default function JobForm() {
       if (data) {
         setForm({
           customerId: data.customer_id ?? "",
+          customerPropertyId: (data as any).customer_property_id ?? "",
           payout: String(data.payout),
           street: data.job_address_street,
           city: data.job_address_city,
@@ -157,23 +159,28 @@ export default function JobForm() {
     }
   }, [isEdit, existingCrew.length]);
 
-  // Auto-fill address from customer
+  // Auto-fill address from selected property (or fall back to customer's primary/legacy address)
   useEffect(() => {
     if (isEdit) return;
     const cust = customers.find((c) => c.id === form.customerId);
-    if (cust) {
-      setForm((f) => ({
-        ...f,
-        street: cust.serviceAddress.street,
-        city: cust.serviceAddress.city,
-        province: cust.serviceAddress.province,
-        postalCode: cust.serviceAddress.postalCode,
-        country: cust.serviceAddress.country,
-        lat: cust.serviceAddress.lat?.toString() ?? "",
-        lng: cust.serviceAddress.lng?.toString() ?? "",
-      }));
-    }
-  }, [form.customerId, customers, isEdit]);
+    if (!cust) return;
+    const props = cust.properties ?? [];
+    let prop = props.find((p) => p.id === form.customerPropertyId);
+    if (!prop) prop = props.find((p) => p.isPrimary) ?? props[0];
+    const addr = prop ? prop.address : cust.serviceAddress;
+    setForm((f) => ({
+      ...f,
+      customerPropertyId: prop?.id ?? "",
+      street: addr.street,
+      city: addr.city,
+      province: addr.province,
+      postalCode: addr.postalCode,
+      country: addr.country,
+      lat: addr.lat?.toString() ?? "",
+      lng: addr.lng?.toString() ?? "",
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.customerId, form.customerPropertyId, customers, isEdit]);
 
   const update = (field: string, value: string) => setForm({ ...form, [field]: value });
   const isSaving = createJob.isPending || updateJob.isPending;
