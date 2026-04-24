@@ -221,6 +221,45 @@ export type Database = {
           },
         ]
       }
+      customer_activity_log: {
+        Row: {
+          actor_email: string
+          actor_role: string
+          actor_user_id: string | null
+          created_at: string
+          customer_id: string
+          details: Json
+          event_type: string
+          id: string
+          job_id: string | null
+          summary: string
+        }
+        Insert: {
+          actor_email?: string
+          actor_role?: string
+          actor_user_id?: string | null
+          created_at?: string
+          customer_id: string
+          details?: Json
+          event_type: string
+          id?: string
+          job_id?: string | null
+          summary: string
+        }
+        Update: {
+          actor_email?: string
+          actor_role?: string
+          actor_user_id?: string | null
+          created_at?: string
+          customer_id?: string
+          details?: Json
+          event_type?: string
+          id?: string
+          job_id?: string | null
+          summary?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           address_city: string
@@ -1148,6 +1187,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _actor_info: {
+        Args: never
+        Returns: {
+          email: string
+          role: string
+          user_id: string
+        }[]
+      }
+      _log_customer_activity: {
+        Args: {
+          _customer_id: string
+          _details: Json
+          _event_type: string
+          _job_id: string
+          _summary: string
+        }
+        Returns: undefined
+      }
       accept_offer: { Args: { _offer_id: string }; Returns: Json }
       decline_offer: {
         Args: { _offer_id: string; _reason?: string }
