@@ -914,7 +914,7 @@ function WeekView({
 }
 
 // ===== Month View =====
-function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug, dnd }: ViewProps) {
+function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, onDayClick, mode, showDebug, dnd }: ViewProps) {
   const getSpName = spNameLookup(providers);
   const getSpColorFor = spColorLookup(providers);
   const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
@@ -924,19 +924,23 @@ function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, 
   const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
   const dndEnabled = !!dnd?.enabled;
+  const isMobile = useIsMobile();
 
   const weekdays = useMemo(
-    () => ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-    []
+    () =>
+      isMobile
+        ? ["M", "T", "W", "T", "F", "S", "S"]
+        : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    [isMobile]
   );
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="grid grid-cols-7 border-b bg-muted/30">
-        {weekdays.map((w) => (
+        {weekdays.map((w, i) => (
           <div
-            key={w}
-            className="px-2 py-2 text-center text-[10px] uppercase text-muted-foreground font-semibold border-r last:border-r-0"
+            key={`${w}-${i}`}
+            className="px-1 sm:px-2 py-2 text-center text-[10px] uppercase text-muted-foreground font-semibold border-r last:border-r-0"
           >
             {w}
           </div>
@@ -963,7 +967,9 @@ function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, 
               mode={mode}
               onJobClick={onJobClick}
               onEmptyDayClick={onEmptyDayClick}
+              onDayClick={onDayClick}
               dndEnabled={dndEnabled}
+              isMobile={isMobile}
             />
           );
         })}
@@ -985,12 +991,14 @@ interface MonthCellProps {
   mode: "admin" | "sp";
   onJobClick: (job: Job) => void;
   onEmptyDayClick?: (date: Date) => void;
+  onDayClick?: (date: Date) => void;
   dndEnabled: boolean;
+  isMobile: boolean;
 }
 
 function MonthCell({
   date, inMonth, dayJobs, visible, overflow, showDebug, colorMode, getSpName, getSpColorFor,
-  mode, onJobClick, onEmptyDayClick, dndEnabled,
+  mode, onJobClick, onEmptyDayClick, onDayClick, dndEnabled, isMobile,
 }: MonthCellProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `month-cell:${date.toISOString()}`,
@@ -998,17 +1006,36 @@ function MonthCell({
     disabled: !dndEnabled,
   });
 
+  const dayTotal = formatDayTotal(dayJobs);
+  const clickable = !!onDayClick;
+  const mobileDots = dayJobs.slice(0, 2);
+  const mobileOverflow = dayJobs.length - mobileDots.length;
+
   return (
     <div
       ref={setNodeRef}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? () => onDayClick!(date) : undefined}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onDayClick!(date);
+              }
+            }
+          : undefined
+      }
       className={cn(
-        "border-r border-b last:border-r-0 min-h-[110px] p-1 space-y-1 transition-colors",
+        "border-r border-b last:border-r-0 min-h-[64px] sm:min-h-[110px] p-0.5 sm:p-1 space-y-0.5 sm:space-y-1 transition-colors",
         !inMonth && "bg-muted/20",
         isToday(date) && "bg-primary/5",
-        isOver && "bg-primary/10 ring-2 ring-primary ring-inset"
+        isOver && "bg-primary/10 ring-2 ring-primary ring-inset",
+        clickable && "cursor-pointer hover:bg-accent/40 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset"
       )}
     >
-      <div className="flex items-center justify-between gap-1 px-1">
+      <div className="flex items-center justify-between gap-1 px-0.5 sm:px-1">
         <div
           className={cn(
             "text-xs font-semibold",
@@ -1018,39 +1045,73 @@ function MonthCell({
         >
           {format(date, "d")}
         </div>
-        {formatDayTotal(dayJobs) && (
-          <div className="text-[10px] font-semibold text-primary truncate">
-            {formatDayTotal(dayJobs)}
+        {dayTotal && (
+          <div className={cn(
+            "font-semibold text-primary truncate",
+            isMobile ? "text-[9px]" : "text-[10px]"
+          )}>
+            {dayTotal}
           </div>
         )}
       </div>
-      {visible.map((job) => (
-        <JobBlock
-          key={job.dbId}
-          job={job}
-          compact
-          showTime
-          showDebug={showDebug}
-          colorMode={colorMode}
-          spName={mode === "admin" ? getSpName(job.assignedSpId) : undefined}
-          spColor={getSpColorFor(job.assignedSpId)}
-          onClick={() => onJobClick(job)}
-          enableDnd={dndEnabled}
-        />
-      ))}
-      {overflow > 0 && (
-        <div className="text-[10px] text-muted-foreground px-1">
-          +{overflow} more
-        </div>
-      )}
-      {dayJobs.length === 0 && inMonth && mode === "admin" && onEmptyDayClick && (
-        <button
-          type="button"
-          onClick={() => onEmptyDayClick(date)}
-          className="w-full text-[10px] text-muted-foreground/60 hover:text-primary py-1"
-        >
-          +
-        </button>
+
+      {isMobile ? (
+        dayJobs.length > 0 && (
+          <div className="flex items-center gap-1 px-0.5 flex-wrap">
+            {mobileDots.map((job) => {
+              const appearance = getJobAppearance(job);
+              return (
+                <button
+                  key={job.dbId}
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onJobClick(job); }}
+                  className={cn(
+                    "h-2 w-2 rounded-full border",
+                    appearance.classes
+                  )}
+                  aria-label={`Job ${job.id}`}
+                />
+              );
+            })}
+            {mobileOverflow > 0 && (
+              <span className="text-[9px] text-muted-foreground leading-none">
+                +{mobileOverflow}
+              </span>
+            )}
+          </div>
+        )
+      ) : (
+        <>
+          {visible.map((job) => (
+            <div key={job.dbId} onClick={(e) => e.stopPropagation()}>
+              <JobBlock
+                job={job}
+                compact
+                showTime
+                showDebug={showDebug}
+                colorMode={colorMode}
+                spName={mode === "admin" ? getSpName(job.assignedSpId) : undefined}
+                spColor={getSpColorFor(job.assignedSpId)}
+                onClick={() => onJobClick(job)}
+                enableDnd={dndEnabled}
+              />
+            </div>
+          ))}
+          {overflow > 0 && (
+            <div className="text-[10px] text-muted-foreground px-1">
+              +{overflow} more
+            </div>
+          )}
+          {dayJobs.length === 0 && inMonth && mode === "admin" && onEmptyDayClick && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onEmptyDayClick(date); }}
+              className="w-full text-[10px] text-muted-foreground/60 hover:text-primary py-1"
+            >
+              +
+            </button>
+          )}
+        </>
       )}
     </div>
   );
