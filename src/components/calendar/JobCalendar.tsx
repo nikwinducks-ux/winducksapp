@@ -849,13 +849,38 @@ function WeekView({
   const showEmpty = totalWeekJobs === 0 && (nearestPrevious || nearestNext);
 
   const isMobile = useIsMobile();
-  // Per-day min width on desktop guarantees real horizontal overflow so
-  // trackpad swipes scroll the calendar instead of triggering browser back/forward.
-  // On mobile, slightly wider columns (110px) make horizontal pans feel more
-  // deliberate and reduce jitter when alternating with vertical scroll.
-  const dayMinWidthPx = isMobile ? 110 : 160;
+
+  // Mobile zoom: "fit" shows all 7 days within the viewport, "comfortable" shows
+  // ~5 days, "large" shows ~3 days. Desktop uses a fixed comfortable width.
+  type WeekZoom = "fit" | "comfortable" | "large";
+  const [weekZoom, setWeekZoom] = useState<WeekZoom>("comfortable");
 
   const hScrollRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  useLayoutEffect(() => {
+    const el = hScrollRef.current;
+    if (!el) return;
+    const update = () => setContainerWidth(el.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Per-day column width: desktop keeps 160px so trackpad swipes scroll horizontally
+  // instead of triggering browser back/forward. Mobile width follows the zoom level.
+  const dayMinWidthPx = useMemo(() => {
+    if (!isMobile) return 160;
+    const axis = 56;
+    const avail = Math.max(0, containerWidth - axis);
+    if (weekZoom === "fit" && avail > 0) {
+      return Math.max(36, Math.floor(avail / days.length));
+    }
+    if (weekZoom === "large") return 132;
+    return 84;
+  }, [isMobile, containerWidth, weekZoom, days.length]);
+
+  const isFit = isMobile && weekZoom === "fit";
   useHorizontalWheelScroll(hScrollRef, !isMobile);
 
   // Swipe gesture on the date-header strip → navigate weeks.
@@ -888,16 +913,60 @@ function WeekView({
     headerSwipeRef.current = null;
   }
 
+  function handleZoomIn() {
+    setWeekZoom((z) => (z === "fit" ? "comfortable" : "large"));
+  }
+  function handleZoomOut() {
+    setWeekZoom((z) => (z === "large" ? "comfortable" : "fit"));
+  }
+
   return (
     <div className="rounded-lg border bg-card overflow-hidden" data-no-ptr="true">
+      {isMobile && (
+        <div className="flex items-center justify-between gap-2 border-b bg-muted/20 px-2 py-1">
+          <span className="text-[11px] text-muted-foreground">
+            {weekZoom === "fit" ? "7-day view" : weekZoom === "comfortable" ? "5-day view" : "3-day view"}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={handleZoomOut}
+              disabled={weekZoom === "fit"}
+              aria-label="Show more days"
+            >
+              <ZoomOut className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={handleZoomIn}
+              disabled={weekZoom === "large"}
+              aria-label="Show fewer days"
+            >
+              <ZoomIn className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
       <div
         ref={hScrollRef}
-        className="overflow-x-auto overflow-y-hidden overscroll-x-contain"
+        className={cn(
+          "overflow-y-hidden overscroll-x-contain",
+          isFit ? "overflow-x-hidden" : "overflow-x-auto"
+        )}
         style={{
-          touchAction: "pan-x pan-y",
+          touchAction: isFit ? "pan-y" : "pan-x pan-y",
           WebkitOverflowScrolling: "touch",
-          scrollSnapType: isMobile ? "x proximity" : undefined,
+          scrollSnapType: isMobile && !isFit ? "x mandatory" : undefined,
+          scrollBehavior: "smooth",
         }}
+      >
+
       >
         <div style={{ minWidth: `${56 + dayMinWidthPx * days.length}px` }}>
           <div
