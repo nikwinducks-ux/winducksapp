@@ -2,14 +2,51 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useRef } from "react";
-import type { Address, Customer, ServiceProvider, Job, JobService, AllocationScores } from "@/data/mockData";
+import type { Address, Customer, CustomerProperty, CustomerContact, ServiceProvider, Job, JobService, AllocationScores } from "@/data/mockData";
 
 // ===== Type mappers =====
 
-function dbToCustomer(row: any): Customer {
+function dbPropertyToCustomerProperty(row: any): CustomerProperty {
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    label: row.label ?? "",
+    isPrimary: !!row.is_primary,
+    address: {
+      street: row.address_street ?? "",
+      city: row.address_city ?? "",
+      province: row.address_region ?? "",
+      postalCode: row.address_postal ?? "",
+      country: row.address_country ?? "Canada",
+      lat: row.address_lat ?? undefined,
+      lng: row.address_lng ?? undefined,
+    },
+    notes: row.notes ?? "",
+    displayOrder: row.display_order ?? 0,
+  };
+}
+
+function dbContactToCustomerContact(row: any): CustomerContact {
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    name: row.name ?? "",
+    role: row.role ?? "",
+    phone: row.phone ?? "",
+    email: row.email ?? "",
+    isPrimary: !!row.is_primary,
+    displayOrder: row.display_order ?? 0,
+  };
+}
+
+function dbToCustomer(row: any, properties: CustomerProperty[] = [], contacts: CustomerContact[] = []): Customer {
   return {
     id: row.id,
     name: row.name,
+    firstName: row.first_name ?? "",
+    lastName: row.last_name ?? "",
+    companyName: row.company_name ?? "",
+    displayAs: (row.display_as ?? "person") as "person" | "company",
     phone: row.phone,
     email: row.email,
     serviceAddress: {
@@ -21,6 +58,8 @@ function dbToCustomer(row: any): Customer {
       lat: row.address_lat ?? undefined,
       lng: row.address_lng ?? undefined,
     },
+    properties,
+    contacts,
     notes: row.notes,
     tags: row.tags ?? [],
     archived: row.status === "Archived",
@@ -262,7 +301,25 @@ export function useCustomers() {
     queryFn: async () => {
       const { data, error } = await supabase.from("customers").select("*").order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []).map(dbToCustomer);
+      const rows = data ?? [];
+      const ids = rows.map((r: any) => r.id);
+      let propsByCust: Record<string, CustomerProperty[]> = {};
+      let contactsByCust: Record<string, CustomerContact[]> = {};
+      if (ids.length > 0) {
+        const [{ data: pData }, { data: cData }] = await Promise.all([
+          supabase.from("customer_properties").select("*").in("customer_id", ids).order("display_order", { ascending: true }),
+          supabase.from("customer_contacts").select("*").in("customer_id", ids).order("display_order", { ascending: true }),
+        ]);
+        for (const p of (pData ?? []) as any[]) {
+          if (!propsByCust[p.customer_id]) propsByCust[p.customer_id] = [];
+          propsByCust[p.customer_id].push(dbPropertyToCustomerProperty(p));
+        }
+        for (const c of (cData ?? []) as any[]) {
+          if (!contactsByCust[c.customer_id]) contactsByCust[c.customer_id] = [];
+          contactsByCust[c.customer_id].push(dbContactToCustomerContact(c));
+        }
+      }
+      return rows.map((r: any) => dbToCustomer(r, propsByCust[r.id] ?? [], contactsByCust[r.id] ?? []));
     },
   });
 }
@@ -272,9 +329,15 @@ export function useCustomer(id: string | undefined) {
     queryKey: ["customers", id],
     queryFn: async () => {
       if (!id) return null;
-      const { data, error } = await supabase.from("customers").select("*").eq("id", id).single();
+      const [{ data, error }, { data: pData }, { data: cData }] = await Promise.all([
+        supabase.from("customers").select("*").eq("id", id).single(),
+        supabase.from("customer_properties").select("*").eq("customer_id", id).order("display_order", { ascending: true }),
+        supabase.from("customer_contacts").select("*").eq("customer_id", id).order("display_order", { ascending: true }),
+      ]);
       if (error) throw error;
-      return dbToCustomer(data);
+      const properties = (pData ?? []).map(dbPropertyToCustomerProperty);
+      const contacts = (cData ?? []).map(dbContactToCustomerContact);
+      return dbToCustomer(data, properties, contacts);
     },
     enabled: !!id,
   });
@@ -521,24 +584,123 @@ export function getJobPhotoUrl(storage_path: string): string {
 
 // ===== Mutations =====
 
+export interface CustomerFormProperty {
+  id?: string;
+  label: string;
+  isPrimary: boolean;
+  street: string;
+  city: string;
+  province: string;
+  postalCode: string;
+  country: string;
+  lat: string;
+  lng: string;
+  notes: string;
+}
+
+export interface CustomerFormContact {
+  id?: string;
+  name: string;
+  role: string;
+  phone: string;
+  email: string;
+  isPrimary: boolean;
+}
+
+export interface CustomerFormPayload {
+  firstName: string;
+  lastName: string;
+  companyName: string;
+  displayAs: "person" | "company";
+  email: string;
+  phone: string;
+  notes: string;
+  tags: string[];
+  properties: CustomerFormProperty[];
+  contacts: CustomerFormContact[];
+}
+
+function normalizeProperties(props: CustomerFormProperty[]): CustomerFormProperty[] {
+  if (props.length === 0) return [];
+  const hasPrimary = props.some((p) => p.isPrimary);
+  return props.map((p, i) => ({
+    ...p,
+    label: p.label || (i === 0 ? "Primary" : `Property ${i + 1}`),
+    isPrimary: hasPrimary ? p.isPrimary : i === 0,
+  }));
+}
+
+function normalizeContacts(contacts: CustomerFormContact[]): CustomerFormContact[] {
+  if (contacts.length === 0) return [];
+  const hasPrimary = contacts.some((c) => c.isPrimary);
+  return contacts.map((c, i) => ({
+    ...c,
+    isPrimary: hasPrimary ? c.isPrimary : i === 0,
+  }));
+}
+
+async function replaceCustomerProperties(customerId: string, props: CustomerFormProperty[]) {
+  // Delete existing then insert. The trigger will sync the legacy address columns.
+  await supabase.from("customer_properties").delete().eq("customer_id", customerId);
+  const normalized = normalizeProperties(props);
+  if (normalized.length === 0) return;
+  const rows = normalized.map((p, i) => ({
+    customer_id: customerId,
+    label: p.label,
+    is_primary: p.isPrimary,
+    address_street: p.street,
+    address_city: p.city,
+    address_region: p.province,
+    address_postal: p.postalCode,
+    address_country: p.country || "Canada",
+    address_lat: p.lat ? parseFloat(p.lat) : null,
+    address_lng: p.lng ? parseFloat(p.lng) : null,
+    notes: p.notes,
+    display_order: i,
+  }));
+  const { error } = await supabase.from("customer_properties").insert(rows);
+  if (error) throw error;
+}
+
+async function replaceCustomerContacts(customerId: string, contacts: CustomerFormContact[]) {
+  await supabase.from("customer_contacts").delete().eq("customer_id", customerId);
+  const normalized = normalizeContacts(contacts);
+  if (normalized.length === 0) return;
+  const rows = normalized.map((c, i) => ({
+    customer_id: customerId,
+    name: c.name,
+    role: c.role,
+    phone: c.phone,
+    email: c.email,
+    is_primary: c.isPrimary,
+    display_order: i,
+  }));
+  const { error } = await supabase.from("customer_contacts").insert(rows);
+  if (error) throw error;
+}
+
 export function useCreateCustomer() {
   const qc = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: async (form: {
-      name: string; email: string; phone: string;
-      street: string; city: string; province: string; postalCode: string; country: string;
-      lat: string; lng: string; notes: string; tags: string[];
-    }) => {
-      const { error } = await supabase.from("customers").insert({
-        name: form.name, email: form.email, phone: form.phone,
-        address_street: form.street, address_city: form.city, address_region: form.province,
-        address_postal: form.postalCode, address_country: form.country,
-        address_lat: form.lat ? parseFloat(form.lat) : null,
-        address_lng: form.lng ? parseFloat(form.lng) : null,
-        notes: form.notes, tags: form.tags, status: "Active",
-      });
+    mutationFn: async (form: CustomerFormPayload) => {
+      const { data, error } = await supabase.from("customers").insert({
+        name: "", // sync trigger will fill from first/last/company
+        first_name: form.firstName,
+        last_name: form.lastName,
+        company_name: form.companyName,
+        display_as: form.displayAs,
+        email: form.email,
+        phone: form.phone,
+        notes: form.notes,
+        tags: form.tags,
+        status: "Active",
+      }).select("id").single();
       if (error) throw error;
+      const newId = data!.id as string;
+      await replaceCustomerProperties(newId, form.properties);
+      await replaceCustomerContacts(newId, form.contacts);
+      return newId;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customers"] });
@@ -554,23 +716,24 @@ export function useUpdateCustomer() {
   const qc = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: async ({ id, ...form }: {
-      id: string; name: string; email: string; phone: string;
-      street: string; city: string; province: string; postalCode: string; country: string;
-      lat: string; lng: string; notes: string; tags: string[];
-    }) => {
+    mutationFn: async ({ id, ...form }: { id: string } & CustomerFormPayload) => {
       const { error } = await supabase.from("customers").update({
-        name: form.name, email: form.email, phone: form.phone,
-        address_street: form.street, address_city: form.city, address_region: form.province,
-        address_postal: form.postalCode, address_country: form.country,
-        address_lat: form.lat ? parseFloat(form.lat) : null,
-        address_lng: form.lng ? parseFloat(form.lng) : null,
-        notes: form.notes, tags: form.tags,
+        first_name: form.firstName,
+        last_name: form.lastName,
+        company_name: form.companyName,
+        display_as: form.displayAs,
+        email: form.email,
+        phone: form.phone,
+        notes: form.notes,
+        tags: form.tags,
       }).eq("id", id);
       if (error) throw error;
+      await replaceCustomerProperties(id, form.properties);
+      await replaceCustomerContacts(id, form.contacts);
     },
-    onSuccess: () => {
+    onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["customers", vars.id] });
       toast({ title: "Customer updated", description: "Changes saved." });
     },
     onError: (err: any) => {
@@ -578,6 +741,93 @@ export function useUpdateCustomer() {
     },
   });
 }
+
+// ===== Customer Tags Catalog =====
+
+export interface CustomerTag {
+  id: string;
+  name: string;
+  color: string;
+  display_order: number;
+}
+
+export const TAG_COLOR_OPTIONS: { value: string; label: string; className: string }[] = [
+  { value: "primary", label: "Blue", className: "bg-primary/10 text-primary border-primary/30" },
+  { value: "accent", label: "Orange", className: "bg-accent/10 text-accent-foreground border-accent/30" },
+  { value: "success", label: "Green", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30" },
+  { value: "warning", label: "Yellow", className: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30" },
+  { value: "destructive", label: "Red", className: "bg-destructive/10 text-destructive border-destructive/30" },
+  { value: "neutral", label: "Gray", className: "bg-secondary text-secondary-foreground border-border" },
+];
+
+export function tagColorClass(color: string | undefined): string {
+  return TAG_COLOR_OPTIONS.find((o) => o.value === color)?.className ?? TAG_COLOR_OPTIONS[0].className;
+}
+
+export function useCustomerTags() {
+  return useQuery({
+    queryKey: ["customer_tags"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("customer_tags")
+        .select("*")
+        .order("display_order", { ascending: true })
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as CustomerTag[];
+    },
+  });
+}
+
+export function useCreateCustomerTag() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (form: { name: string; color: string; display_order?: number }) => {
+      const { data, error } = await supabase.from("customer_tags").insert(form).select("*").single();
+      if (error) throw error;
+      return data as CustomerTag;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["customer_tags"] });
+      toast({ title: "Tag created" });
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+}
+
+export function useUpdateCustomerTag() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ id, ...fields }: { id: string; name?: string; color?: string; display_order?: number }) => {
+      const { error } = await supabase.from("customer_tags").update(fields).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["customer_tags"] });
+      toast({ title: "Tag updated" });
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+}
+
+export function useDeleteCustomerTag() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("customer_tags").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["customer_tags"] });
+      toast({ title: "Tag deleted" });
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+}
+
 
 export function useArchiveCustomer() {
   const qc = useQueryClient();

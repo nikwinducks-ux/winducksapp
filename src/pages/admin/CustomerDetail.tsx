@@ -1,17 +1,18 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useCustomer, useJobs } from "@/hooks/useSupabaseData";
+import { useCustomer, useJobs, useCustomerTags, tagColorClass } from "@/hooks/useSupabaseData";
 import { formatAddress } from "@/data/mockData";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CustomerActivityLog } from "@/components/CustomerActivityLog";
-import { ArrowLeft, MapPin, Pencil, History } from "lucide-react";
+import { ArrowLeft, MapPin, Pencil, History, Star, Mail, Phone, Building2 } from "lucide-react";
 
 export default function CustomerDetail() {
   const { id } = useParams();
   const { data: customer, isLoading } = useCustomer(id);
   const { data: jobs = [] } = useJobs();
+  const { data: tagCatalog = [] } = useCustomerTags();
   const [logOpen, setLogOpen] = useState(false);
 
   if (isLoading) return <div className="py-20 text-center text-muted-foreground">Loading...</div>;
@@ -26,6 +27,13 @@ export default function CustomerDetail() {
   }
 
   const customerJobs = jobs.filter((j) => j.customerId === customer.id);
+  const properties = customer.properties ?? [];
+  const contacts = customer.contacts ?? [];
+  const personName = `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim();
+  const subtitle =
+    customer.displayAs === "company"
+      ? personName || ""
+      : customer.companyName || "";
 
   return (
     <div className="space-y-6 animate-fade-in max-w-3xl">
@@ -33,12 +41,18 @@ export default function CustomerDetail() {
         <ArrowLeft className="h-4 w-4" /> Back to Customers
       </Link>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="page-header">{customer.name}</h1>
-          <p className="text-sm text-muted-foreground">{customer.email} · {customer.phone}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="page-header truncate">{customer.name}</h1>
+          {subtitle && (
+            <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+              {customer.displayAs === "person" ? <Building2 className="h-3.5 w-3.5" /> : null}
+              {subtitle}
+            </p>
+          )}
+          <p className="text-sm text-muted-foreground mt-1">{customer.email} · {customer.phone}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Button variant="outline" size="sm" onClick={() => setLogOpen(true)}>
             <History className="h-4 w-4 mr-2" />Log
           </Button>
@@ -60,54 +74,85 @@ export default function CustomerDetail() {
       </Sheet>
 
       {customer.tags.length > 0 && (
-        <div className="flex gap-2">
-          {customer.tags.map((t) => (
-            <span key={t} className="status-badge bg-primary/10 text-primary">{t}</span>
-          ))}
+        <div className="flex flex-wrap gap-2">
+          {customer.tags.map((tagName) => {
+            const tag = tagCatalog.find((t) => t.name === tagName);
+            return (
+              <span key={tagName} className={`status-badge border ${tagColorClass(tag?.color)}`}>
+                {tagName}
+              </span>
+            );
+          })}
         </div>
       )}
 
+      {/* Properties */}
       <div className="metric-card space-y-4">
-        <h2 className="section-title">Service Address</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Street</p>
-            <p className="text-sm font-medium">{customer.serviceAddress.street}</p>
+        <h2 className="section-title">Properties</h2>
+        {properties.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No properties on file.</p>
+        ) : (
+          <div className="space-y-3">
+            {properties.map((p) => (
+              <div key={p.id} className="rounded-lg border p-3 bg-secondary/30">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm">{p.label}</span>
+                    {p.isPrimary && (
+                      <span className="status-badge bg-primary/10 text-primary border border-primary/30 inline-flex items-center gap-1">
+                        <Star className="h-3 w-3 fill-current" /> Primary
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <p className="text-sm flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  {formatAddress(p.address)}
+                </p>
+                {(p.address.lat != null && p.address.lng != null) && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {p.address.lat.toFixed(4)}, {p.address.lng.toFixed(4)}
+                  </p>
+                )}
+                {p.notes && <p className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap">{p.notes}</p>}
+              </div>
+            ))}
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">City</p>
-            <p className="text-sm font-medium">{customer.serviceAddress.city}</p>
+        )}
+      </div>
+
+      {/* Contacts */}
+      <div className="metric-card space-y-4">
+        <h2 className="section-title">Additional Contacts</h2>
+        {contacts.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No additional contacts.</p>
+        ) : (
+          <div className="space-y-2">
+            {contacts.map((c) => (
+              <div key={c.id} className="rounded-lg border p-3 bg-secondary/30">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-medium text-sm">{c.name || "Contact"}</span>
+                  {c.role && <span className="text-xs text-muted-foreground">· {c.role}</span>}
+                  {c.isPrimary && (
+                    <span className="status-badge bg-primary/10 text-primary border border-primary/30 inline-flex items-center gap-1">
+                      <Star className="h-3 w-3 fill-current" /> Primary
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  {c.phone && <span className="inline-flex items-center gap-1"><Phone className="h-3 w-3" />{c.phone}</span>}
+                  {c.email && <span className="inline-flex items-center gap-1"><Mail className="h-3 w-3" />{c.email}</span>}
+                </div>
+              </div>
+            ))}
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Province</p>
-            <p className="text-sm font-medium">{customer.serviceAddress.province}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Postal Code</p>
-            <p className="text-sm font-medium">{customer.serviceAddress.postalCode}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Coordinates</p>
-            <p className="text-sm font-medium">
-              {customer.serviceAddress.lat && customer.serviceAddress.lng
-                ? `${customer.serviceAddress.lat}, ${customer.serviceAddress.lng}`
-                : "Not set"}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Full Address</p>
-            <p className="text-sm font-medium flex items-center gap-1">
-              <MapPin className="h-3 w-3 text-muted-foreground" />
-              {formatAddress(customer.serviceAddress)}
-            </p>
-          </div>
-        </div>
+        )}
       </div>
 
       {customer.notes && (
         <div className="metric-card">
           <h2 className="section-title mb-2">Notes</h2>
-          <p className="text-sm text-muted-foreground">{customer.notes}</p>
+          <p className="text-sm text-muted-foreground whitespace-pre-wrap">{customer.notes}</p>
         </div>
       )}
 

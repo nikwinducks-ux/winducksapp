@@ -33,6 +33,7 @@ import SPForm from "./pages/admin/SPForm";
 import CustomerManagement from "./pages/admin/CustomerManagement";
 import CustomerDetail from "./pages/admin/CustomerDetail";
 import CustomerForm from "./pages/admin/CustomerForm";
+import CustomerTags from "./pages/admin/CustomerTags";
 import SimulationTool from "./pages/admin/SimulationTool";
 import AllocationQA from "./pages/admin/AllocationQA";
 import OfferWorkflow from "./pages/admin/OfferWorkflow";
@@ -118,6 +119,7 @@ function AppRoutes() {
         <Route path="/admin/providers/:id" element={isAdmin ? <SPDetail /> : <Navigate to="/" replace />} />
         <Route path="/admin/providers/:id/edit" element={isAdmin ? <SPForm /> : <Navigate to="/" replace />} />
         <Route path="/admin/customers" element={isAdmin ? <CustomerManagement /> : <Navigate to="/" replace />} />
+        <Route path="/admin/customers/tags" element={isAdmin ? <CustomerTags /> : <Navigate to="/" replace />} />
         <Route path="/admin/customers/new" element={isAdmin ? <CustomerForm /> : <Navigate to="/" replace />} />
         <Route path="/admin/customers/:id" element={isAdmin ? <CustomerDetail /> : <Navigate to="/" replace />} />
         <Route path="/admin/customers/:id/edit" element={isAdmin ? <CustomerForm /> : <Navigate to="/" replace />} />
