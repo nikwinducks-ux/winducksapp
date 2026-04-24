@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -56,6 +57,18 @@ export default function UnavailableDialog({
 
   function handleSave() {
     setError(null);
+    if (!/^\d{2}:\d{2}$/.test(end)) {
+      setError("Please enter a valid end time.");
+      return;
+    }
+    const [sh, sm] = start.split(":").map(Number);
+    const [eh, em] = end.split(":").map(Number);
+    const startMin = sh * 60 + sm;
+    const endMin = eh * 60 + em;
+    if (endMin - startMin < 15) {
+      setError("End time must be at least 15 minutes after start time.");
+      return;
+    }
     onSave({ id: initial?.id, date, start, end, reason: reason.trim() });
   }
 
@@ -101,6 +114,16 @@ export default function UnavailableDialog({
               {summary}
             </div>
           )}
+          <div className="space-y-2">
+            <Label htmlFor="ua-end">End time</Label>
+            <Input
+              id="ua-end"
+              type="time"
+              step={900}
+              value={end}
+              onChange={(e) => setEnd(e.target.value)}
+            />
+          </div>
           <div className="space-y-2">
             <Label htmlFor="ua-reason">Reason (optional)</Label>
             <Textarea
