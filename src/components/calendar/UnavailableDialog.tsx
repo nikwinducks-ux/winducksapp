@@ -115,6 +115,16 @@ export default function UnavailableDialog({
             </div>
           )}
           <div className="space-y-2">
+            <Label htmlFor="ua-end">End time</Label>
+            <Input
+              id="ua-end"
+              type="time"
+              step={900}
+              value={end}
+              onChange={(e) => setEnd(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="ua-reason">Reason (optional)</Label>
             <Textarea
               id="ua-reason"
