@@ -222,10 +222,12 @@ export default function SPCalendar() {
     return spOffers.find((o) => o.job_id === selectedJob.dbId) ?? null;
   }, [selectedJob, spOffers]);
 
+  // A job is awaiting my response whenever there's a pending offer record for me
+  // OR the job is still in the "Offered" state. We intentionally do NOT exclude
+  // jobs already preassigned to me — an Offered job needs explicit Accept/Decline
+  // before "Start Job" becomes available.
   const isPendingOffer = selectedJob
-    ? (pendingOfferJobIds.has(selectedJob.dbId) ||
-        (selectedJob.status === "Offered" && selectedJob.assignedSpId !== spId)) &&
-      selectedJob.assignedSpId !== spId
+    ? pendingOfferJobIds.has(selectedJob.dbId) || selectedJob.status === "Offered"
     : false;
   const me = providers.find((p) => p.id === spId);
   const autoAcceptOn = !!me?.autoAccept;
@@ -416,8 +418,7 @@ export default function SPCalendar() {
                 {!isPendingOffer &&
                   selectedJob.assignedSpId === spId &&
                   (selectedJob.status === "Assigned" ||
-                    selectedJob.status === "Accepted" ||
-                    selectedJob.status === "Offered") && (
+                    selectedJob.status === "Accepted") && (
                   <div className="rounded-md border bg-card p-3 space-y-2">
                     <h3 className="text-sm font-semibold">Update Status</h3>
                     <Button
