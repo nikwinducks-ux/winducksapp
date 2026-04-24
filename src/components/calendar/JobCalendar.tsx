@@ -67,6 +67,8 @@ interface JobCalendarProps {
   onCreateUnavailable?: (date: Date, start: string, end: string) => void;
   /** Tap a day in month view to drill into Day view. */
   onDayClick?: (date: Date) => void;
+  /** Mobile swipe on the week-view date header advances to next/prev week. */
+  onNavigateWeek?: (direction: -1 | 1) => void;
 }
 
 
@@ -599,12 +601,12 @@ function DayGridDroppable({
       onPointerCancel={createEnabled ? clearLongPress : undefined}
       onPointerLeave={createEnabled ? clearLongPress : undefined}
       className={cn(
-        "relative flex-1 touch-pan-y select-none",
+        "relative flex-1 select-none",
         today && "bg-primary/5",
         isOver && "bg-primary/10 ring-2 ring-primary ring-inset",
         pressActive && "bg-primary/10"
       )}
-      style={{ height: GRID_HEIGHT_PX }}
+      style={{ height: GRID_HEIGHT_PX, touchAction: "pan-x pan-y" }}
     >
       {HOURS.map((h) => (
         <div
@@ -833,7 +835,7 @@ function DayView({
 function WeekView({
   jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug,
   nearestPrevious, nearestNext, nearestPreviousLabel, nearestNextLabel, onJumpToDate,
-  dnd, unavailableBlocks, onUnavailableClick, onCreateUnavailable,
+  dnd, unavailableBlocks, onUnavailableClick, onCreateUnavailable, onNavigateWeek,
 }: ViewProps) {
   const getSpName = spNameLookup(providers);
   const getSpColorFor = spColorLookup(providers);
@@ -847,20 +849,66 @@ function WeekView({
   const isMobile = useIsMobile();
   // Per-day min width on desktop guarantees real horizontal overflow so
   // trackpad swipes scroll the calendar instead of triggering browser back/forward.
-  const dayMinWidthPx = isMobile ? 88 : 160;
+  // On mobile, slightly wider columns (110px) make horizontal pans feel more
+  // deliberate and reduce jitter when alternating with vertical scroll.
+  const dayMinWidthPx = isMobile ? 110 : 160;
 
   const hScrollRef = useRef<HTMLDivElement>(null);
   useHorizontalWheelScroll(hScrollRef, !isMobile);
+
+  // Swipe gesture on the date-header strip → navigate weeks.
+  const headerSwipeRef = useRef<{ x: number; y: number; t: number; moved: boolean } | null>(null);
+  function onHeaderPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (!onNavigateWeek) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    headerSwipeRef.current = { x: e.clientX, y: e.clientY, t: Date.now(), moved: false };
+  }
+  function onHeaderPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const s = headerSwipeRef.current;
+    if (!s) return;
+    const dx = e.clientX - s.x;
+    const dy = e.clientY - s.y;
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) s.moved = true;
+  }
+  function onHeaderPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    const s = headerSwipeRef.current;
+    headerSwipeRef.current = null;
+    if (!s || !onNavigateWeek) return;
+    const dx = e.clientX - s.x;
+    const dy = e.clientY - s.y;
+    const dt = Date.now() - s.t;
+    if (Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 600) {
+      try { navigator.vibrate?.(10); } catch { /* noop */ }
+      onNavigateWeek(dx < 0 ? 1 : -1);
+    }
+  }
+  function onHeaderPointerCancel() {
+    headerSwipeRef.current = null;
+  }
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden" data-no-ptr="true">
       <div
         ref={hScrollRef}
         className="overflow-x-auto overflow-y-hidden overscroll-x-contain"
-        style={{ touchAction: "pan-x pan-y" }}
+        style={{
+          touchAction: "pan-x pan-y",
+          WebkitOverflowScrolling: "touch",
+          scrollSnapType: isMobile ? "x proximity" : undefined,
+        }}
       >
         <div style={{ minWidth: `${56 + dayMinWidthPx * days.length}px` }}>
-          <div className="flex border-b bg-muted/30">
+          <div
+            className={cn(
+              "flex border-b bg-muted/30 relative",
+              onNavigateWeek && isMobile && "cursor-grab"
+            )}
+            onPointerDown={onNavigateWeek && isMobile ? onHeaderPointerDown : undefined}
+            onPointerMove={onNavigateWeek && isMobile ? onHeaderPointerMove : undefined}
+            onPointerUp={onNavigateWeek && isMobile ? onHeaderPointerUp : undefined}
+            onPointerCancel={onNavigateWeek && isMobile ? onHeaderPointerCancel : undefined}
+            style={onNavigateWeek && isMobile ? { touchAction: "pan-y" } : undefined}
+          >
             <div className="w-14 shrink-0 border-r" />
             {days.map((d) => {
               const headerDayJobs = jobsOnDate(jobs, d);
@@ -868,7 +916,7 @@ function WeekView({
               return (
                 <div
                   key={d.toISOString()}
-                  style={{ minWidth: `${dayMinWidthPx}px` }}
+                  style={{ minWidth: `${dayMinWidthPx}px`, scrollSnapAlign: isMobile ? "start" : undefined }}
                   className={cn(
                     "flex-1 px-2 py-2 text-center border-r last:border-r-0",
                     isToday(d) && "bg-primary/10"
@@ -893,6 +941,12 @@ function WeekView({
                 </div>
               );
             })}
+            {onNavigateWeek && isMobile && (
+              <div className="pointer-events-none absolute inset-y-0 left-14 right-0 flex items-center justify-between px-1 text-[10px] text-muted-foreground/50">
+                <span aria-hidden>‹</span>
+                <span aria-hidden>›</span>
+              </div>
+            )}
           </div>
           <div className="relative flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
             <TimeAxis />
@@ -902,7 +956,7 @@ function WeekView({
               return (
                 <div
                   key={d.toISOString()}
-                  style={{ minWidth: `${dayMinWidthPx}px` }}
+                  style={{ minWidth: `${dayMinWidthPx}px`, scrollSnapAlign: isMobile ? "start" : undefined }}
                   className="flex-1 flex"
                 >
                   <DayColumn

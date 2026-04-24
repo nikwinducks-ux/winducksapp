@@ -317,6 +317,7 @@ export default function SPCalendar() {
               onUnavailableClick={handleClickBlock}
               onCreateUnavailable={handleCreateUnavailable}
               onDayClick={(date) => { setCurrentDate(date); setView("day"); }}
+              onNavigateWeek={navigate}
             />
           )}
 

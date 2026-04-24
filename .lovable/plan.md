@@ -1,32 +1,45 @@
-## Problem
-
-On the SP calendar (Day/Week views), tapping any empty spot in the time grid immediately opens the "Mark unavailable" dialog. On mobile this fires accidentally while scrolling, panning, or just trying to tap a job nearby.
-
 ## Goal
 
-Require a deliberate **long-press (~500ms)** on an empty grid area before the unavailable dialog opens. Quick taps and scroll gestures should do nothing.
+On mobile in the week view of the calendar (admin + SP):
 
-## Approach
+1. Make horizontal panning across the time-slot grid smoother and less likely to be hijacked (by the long-press unavailable gesture or by browser back/forward).
+2. Add a horizontal swipe gesture on the **date header row** (the "Mon 21 / Tue 22 / …" strip at the top of week view) to advance to the next or previous week.
 
-Replace the `onClick` handler on the day-grid droppable in `src/components/calendar/JobCalendar.tsx` (the `DayGridDroppable` component, around lines 539–556) with pointer-based long-press detection:
+## Changes
 
-1. On `onPointerDown` over an empty area (not on a job block or unavailable block):
-   - Record start position, time, and the snapped start minute.
-   - Start a 500ms timer.
-   - When the timer fires: trigger a short haptic vibration (`navigator.vibrate?.(15)`), add a brief visual "press" highlight, and call `onCreateUnavailable(date, start, end)`.
-2. On `onPointerMove`: if the pointer moves more than ~8px from the start position, cancel the timer (user is scrolling/panning).
-3. On `onPointerUp`, `onPointerCancel`, or `onPointerLeave`: cancel the timer if it hasn't fired. Do **not** fall back to opening the dialog — short taps now do nothing on empty grid space.
-4. Remove the existing `onClick={onGridClick}` so quick taps no longer trigger creation.
-5. Apply this only when `createEnabled` (i.e. SP mode where `onCreateUnavailable` is provided). Admin mode is unaffected.
+### 1. `src/components/calendar/JobCalendar.tsx` — WeekView horizontal scroll polish
 
-Desktop behavior: long-press with mouse also works (press and hold 500ms). This is acceptable and matches mobile behavior — admins don't use this handler so desktop SPs are the only group affected, and the gesture is still discoverable.
+- Add `-webkit-overflow-scrolling: touch` and `scroll-snap-type: x proximity` on the horizontal scroll container so swipes feel native and momentum-scroll on iOS.
+- Snap each day column to its left edge (`scroll-snap-align: start`) so a swipe naturally lands on a day boundary instead of mid-column.
+- Bump mobile per-day min-width from `88px` → ~`110px` so day columns are wider and a one-finger horizontal pan is more deliberate (less jitter from vertical scroll attempts).
+- Set `touchAction: "pan-x"` on the day-grid columns when there's real horizontal overflow (mobile, week view) so the browser routes ambiguous diagonal gestures to horizontal pan more readily, while still allowing vertical scroll on the inner `overflow-y-auto` track.
 
-## Files to change
+### 2. `src/components/calendar/JobCalendar.tsx` — Long-press grid no longer eats horizontal swipes
 
-- `src/components/calendar/JobCalendar.tsx` — replace tap handling in `DayGridDroppable` with long-press logic. Keep job-block and unavailable-block click handlers untouched.
+- In `DayGridDroppable`, change the grid container's `touch-action` from `pan-y` to `pan-x pan-y` so a horizontal swipe starting inside the grid is delivered to the parent scroll container instead of being captured for long-press.
+- Already-implemented MOVE_CANCEL_PX (8px) cancels the long-press timer if the user pans — keep as-is (covers the swipe case).
+
+### 3. `src/components/calendar/JobCalendar.tsx` — Swipe-the-date-header to switch weeks
+
+- Add a new optional prop on `JobCalendarProps`:
+  ```ts
+  onNavigateWeek?: (direction: -1 | 1) => void;
+  ```
+- In `WeekView`, attach pointer handlers to the date-header strip (the row with day names/dates):
+  - `onPointerDown`: record `{x, y, time}`.
+  - `onPointerUp`: if total horizontal travel ≥ 50px AND `|dx| > |dy| * 1.5` AND elapsed < 600ms, call `onNavigateWeek(dx < 0 ? 1 : -1)` and trigger a short `navigator.vibrate(10)`.
+  - Cancel on `onPointerCancel`/`onPointerLeave`.
+- Add a subtle visual hint on mobile: small `‹ swipe ›` chevrons at the far ends of the header row (mobile only) so the affordance is discoverable.
+- Ensure these handlers do **not** interfere with tapping a day header (admin's `onDayClick` still works via short tap detection — only fire navigation when movement > 50px).
+
+### 4. Wire the new prop through pages
+
+- `src/pages/sp/SPCalendar.tsx`: pass `onNavigateWeek={navigate}` to `<JobCalendar />`.
+- `src/pages/admin/AdminCalendar.tsx`: pass `onNavigateWeek={navigate}` to `<JobCalendar />`.
+
+Both pages already define `navigate(direction)` that does week±1 in week view, so we reuse it directly.
 
 ## Out of scope
 
-- Month view (already uses `onDayClick`, not the time grid).
-- Drag-to-create unavailable ranges.
-- Visual onboarding/tooltip explaining the new gesture (can add later if users are confused).
+- No swipe-to-change on the body grid itself (would conflict with the long-press unavailable gesture and inner vertical scroll). The header row is the dedicated target.
+- No changes to month/day view navigation gestures.
