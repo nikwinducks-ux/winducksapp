@@ -800,7 +800,7 @@ function WeekView({
   const showEmpty = totalWeekJobs === 0 && (nearestPrevious || nearestNext);
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
+    <div className="rounded-lg border bg-card overflow-hidden" data-no-ptr="true">
       <div className="flex border-b bg-muted/30">
         <div className="w-14 shrink-0 border-r" />
         {days.map((d) => {
