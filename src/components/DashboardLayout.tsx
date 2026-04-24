@@ -172,7 +172,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   if (mode === "mobile") {
     return (
-      <div className="flex min-h-screen w-full flex-col">
+      <div className="flex h-screen w-full flex-col overflow-hidden">
         <MobileTopNav
           title={pageTitle}
           links={links}
