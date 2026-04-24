@@ -783,7 +783,8 @@ export default function JobManagement() {
                     )}
                   </td>
                   <td className="py-3" onClick={(e) => e.stopPropagation()}>
-
+                    {(() => {
+                      const blocked = NON_ASSIGNABLE.has(job.status);
                       const spName = job.assignedSpId ? spMap.get(job.assignedSpId) ?? "Unknown" : "";
                       if (job.assignedSpId) {
                         return (
