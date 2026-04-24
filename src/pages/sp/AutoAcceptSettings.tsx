@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
-export default function AutoAcceptSettings() {
+export function AutoAcceptSection() {
   const { user } = useAuth();
   const spId = user?.spId ?? null;
   const { data: currentSp, isLoading: spLoading } = useServiceProvider(spId ?? undefined);
@@ -102,7 +102,7 @@ export default function AutoAcceptSettings() {
   return (
     <div className="space-y-8 animate-fade-in max-w-2xl">
       <div>
-        <h1 className="page-header">Auto-Accept Settings</h1>
+        <h2 className="section-title">Auto-Accept</h2>
         <p className="mt-1 text-sm text-muted-foreground">Configure automatic job acceptance rules</p>
       </div>
 
@@ -204,6 +204,17 @@ export default function AutoAcceptSettings() {
       >
         {saving ? "Saving…" : "Save Settings"}
       </Button>
+    </div>
+  );
+}
+
+export default function AutoAcceptSettings() {
+  return (
+    <div className="space-y-8 animate-fade-in">
+      <div>
+        <h1 className="page-header">Auto-Accept Settings</h1>
+      </div>
+      <AutoAcceptSection />
     </div>
   );
 }
