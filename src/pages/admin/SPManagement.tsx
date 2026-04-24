@@ -212,9 +212,7 @@ export default function SPManagement() {
                         variant={sp.complianceStatus === "Valid" ? "valid" : sp.complianceStatus === "Expiring" ? "warning" : "error"}
                       />
                     </td>
-                    <td className="py-3">
-                      <div className="flex items-center gap-1">
-                        <Link to={`/admin/providers/${sp.id}`}>
+                    <td className="py-3" onClick={(e) => e.stopPropagation()}>
                           <Button size="sm" variant="ghost" title="View"><Eye className="h-4 w-4" /></Button>
                         </Link>
                         {isArchivedView ? (
