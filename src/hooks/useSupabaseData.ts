@@ -2,14 +2,51 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useRef } from "react";
-import type { Address, Customer, ServiceProvider, Job, JobService, AllocationScores } from "@/data/mockData";
+import type { Address, Customer, CustomerProperty, CustomerContact, ServiceProvider, Job, JobService, AllocationScores } from "@/data/mockData";
 
 // ===== Type mappers =====
 
-function dbToCustomer(row: any): Customer {
+function dbPropertyToCustomerProperty(row: any): CustomerProperty {
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    label: row.label ?? "",
+    isPrimary: !!row.is_primary,
+    address: {
+      street: row.address_street ?? "",
+      city: row.address_city ?? "",
+      province: row.address_region ?? "",
+      postalCode: row.address_postal ?? "",
+      country: row.address_country ?? "Canada",
+      lat: row.address_lat ?? undefined,
+      lng: row.address_lng ?? undefined,
+    },
+    notes: row.notes ?? "",
+    displayOrder: row.display_order ?? 0,
+  };
+}
+
+function dbContactToCustomerContact(row: any): CustomerContact {
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    name: row.name ?? "",
+    role: row.role ?? "",
+    phone: row.phone ?? "",
+    email: row.email ?? "",
+    isPrimary: !!row.is_primary,
+    displayOrder: row.display_order ?? 0,
+  };
+}
+
+function dbToCustomer(row: any, properties: CustomerProperty[] = [], contacts: CustomerContact[] = []): Customer {
   return {
     id: row.id,
     name: row.name,
+    firstName: row.first_name ?? "",
+    lastName: row.last_name ?? "",
+    companyName: row.company_name ?? "",
+    displayAs: (row.display_as ?? "person") as "person" | "company",
     phone: row.phone,
     email: row.email,
     serviceAddress: {
@@ -21,6 +58,8 @@ function dbToCustomer(row: any): Customer {
       lat: row.address_lat ?? undefined,
       lng: row.address_lng ?? undefined,
     },
+    properties,
+    contacts,
     notes: row.notes,
     tags: row.tags ?? [],
     archived: row.status === "Archived",
