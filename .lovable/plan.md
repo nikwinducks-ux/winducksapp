@@ -1,73 +1,48 @@
 
 
-## Mobile calendar Week view + Samsung $ clipping fix + iOS pull-to-refresh fix
+## Replace drag-to-block with tap-to-block on SP calendar
 
-Three small, targeted fixes for the SP mobile experience.
+The current SP "drag empty time to mark unavailable" gesture in `DayGridDroppable` captures pointer events on the entire day grid, which hijacks vertical scroll on mobile. Replace it with a single **tap** that opens the existing `UnavailableDialog` prefilled with start = tapped time and end = start + 1 hour. The user then adjusts the end time in the dialog and saves.
 
----
+### What you'll see
 
-### 1. Enable Week view on mobile (SP calendar)
+- On the SP Day/Week view, tap any empty area of a day's hourly grid → the existing "Mark unavailable" dialog opens with:
+  - **Date**: that day
+  - **Start**: snapped to the nearest 15‑min slot at the tap point (e.g. tap at 2:07pm → 2:00pm)
+  - **End**: start + 1:00 (clamped to 9:00pm day‑end)
+  - **Reason**: empty
+- Adjust the end time (and reason) in the dialog, save → block appears on the calendar.
+- Tapping an existing unavailable block still opens the dialog in **edit** mode (unchanged).
+- Tapping a job block still opens the job sheet (unchanged).
+- No more pointer capture on the day grid → vertical scroll on mobile works normally.
+- The hint copy on the SP calendar header changes from "Drag empty time to mark yourself unavailable." to **"Tap empty time to mark yourself unavailable."**
 
-Right now `SPCalendar.tsx` hides the **Week** tab on mobile and force-switches to **Day** if a user lands on Week with a small viewport. Bring Week back as a first-class option.
+### Implementation
 
-**Changes in `src/pages/sp/SPCalendar.tsx`:**
-- Remove the `{!isMobile && <TabsTrigger value="week">}` guard — show **Day / Week / Month / Avail.** on every viewport.
-- Remove the `useEffect` that auto-flips Week → Day on mobile.
-- The existing `WeekView` in `JobCalendar.tsx` already uses `flex-1 min-w-0` columns + horizontal time axis, so it fits at 360–414px wide. The day-header date totals already use `truncate` and a smaller font, so they degrade gracefully.
+**`src/components/calendar/JobCalendar.tsx`** — `DayGridDroppable`:
+- Remove `onPointerDown` / `onPointerMove` / `onPointerUp` / `onPointerCancel` handlers, the `drag` state, `dragStateRef`, and the in‑progress drag overlay block.
+- Replace with a single `onClick` handler on the grid container:
+  - Ignore clicks that originated on a job block (`[data-jobblock]`) or existing unavailable block (`[data-unavailable-block]`).
+  - Compute Y within the grid via `e.currentTarget.getBoundingClientRect()`.
+  - `startMin = yToSnappedMinutes(y)` (already exists in `useCalendarDnd.ts`).
+  - `endMin = Math.min(startMin + 60, DAY_END_HOUR * 60)`; if that yields `< startMin + 15`, fall back to `startMin + 15`.
+  - Call `onCreateUnavailable?.(date, minutesToHHMM(startMin), minutesToHHMM(endMin))`.
+- Change cursor class from `cursor-crosshair` → `cursor-pointer` when `createEnabled`.
+- Keep all other logic (droppable for admin DnD job rescheduling, blocks rendering, now line, jobs) exactly as is. Admin drag‑to‑reschedule jobs is unaffected.
 
-No changes to admin calendar (admins already get Week on mobile).
+**`src/pages/sp/SPCalendar.tsx`**:
+- Update the subheader copy: "Drag empty time…" → **"Tap empty time to mark yourself unavailable."**
+- No other changes; `handleCreateUnavailable(date, start, end)` already opens the dialog with these values, and `UnavailableDialog` already lets the user edit start/end before saving.
 
----
+### Notes / non‑goals
 
-### 2. Fix clipped daily $ total on Samsung (Month view)
-
-On a 360px-wide Samsung viewport, the Month cell header packs the day number and total into a single flex row separated by `justify-between`. With totals like `$1,250` and `gap-1 px-0.5`, the amount truncates mid-character.
-
-**Changes in `src/components/calendar/JobCalendar.tsx` (`MonthCell`):**
-- On mobile, **stack** the day number and total vertically inside the cell header (column layout, total on its own line, full-width, centered or right-aligned, no `truncate`).
-- On mobile, render the total using a **compact format** (`$1.2k`, `$950`, `$12k`) so it always fits even on the narrowest Android viewports.
-- Add a tiny helper `formatCompactCAD(n: number)`:
-  - `< 1000` → `$950`
-  - `1000–9999` → `$1.2k`
-  - `≥ 10000` → `$12k`
-- Desktop continues to show the full `formatCADWhole` value.
-
-Result: the $ total is always fully readable on every device, including 360px Samsung screens.
-
----
-
-### 3. Fix pull-to-refresh on iPhone
-
-iOS Safari's native rubber-band overscroll competes with our gesture. Specifically:
-- On iOS, `<main className="overflow-auto">` still lets the document body bounce, so `scrollTop===0` checks pass but iOS hijacks the touchmove and we never get reliable `e.preventDefault()` cycles.
-- Our `touchmove` listener is registered on the scroll container. On iOS, when the gesture starts at the very top, Safari pre-emptively starts the bounce animation before our handler decides to call `preventDefault()`.
-
-**Changes:**
-
-**`src/components/DashboardLayout.tsx`:**
-- Add `overscroll-behavior: contain` (`overscroll-contain` Tailwind class) and `touch-action: pan-y` to both the mobile and desktop `<main>` scroll containers. This tells iOS we'll handle the vertical gesture and stops body-level rubber-banding.
-- Add `-webkit-overflow-scrolling: touch` is no longer needed (modern iOS), but ensure no `position: fixed` ancestor is constraining scroll height.
-
-**`src/hooks/usePullToRefresh.ts`:**
-- Track gesture state with **two** thresholds: a small `activationThreshold` (~6px) to claim the gesture before iOS bounce kicks in. Once a downward intent is detected at `scrollTop === 0`, immediately call `e.preventDefault()` on subsequent moves (not just when `damped > 5`) to suppress iOS bounce.
-- Detect iOS via `/iP(hone|ad|od)/.test(navigator.userAgent)` or feature-test, and on iOS:
-  - Always call `e.preventDefault()` on touchmove once the gesture is "active", regardless of distance.
-  - Use a slightly looser `scrollTop` check (`<= 0`) since iOS can briefly report negative values during bounce — treat negative as "at top".
-- Keep current Android behavior intact.
-- Add a fallback: if `touchend` doesn't fire (interrupted by tab switch), `touchcancel` already resets — verified.
-
-**`src/components/PullToRefreshIndicator.tsx`:**
-- No logic change, but add `will-change: transform` to avoid jank on iOS during the spring animation.
-
----
+- Admin calendar's drag‑to‑reschedule jobs (a separate dnd‑kit flow on `JobBlock`) is untouched.
+- No DB, RLS, hook, or schema changes.
+- Month view is unaffected (no grid taps there).
+- The `UnavailableDialog` already validates `end - start ≥ 15min`, so users can shorten the prefilled hour if desired.
 
 ### Files touched
 
-- **Edited**: `src/pages/sp/SPCalendar.tsx` (re-enable Week tab on mobile)
-- **Edited**: `src/components/calendar/JobCalendar.tsx` (`MonthCell` mobile header layout + compact $ formatter)
-- **Edited**: `src/components/DashboardLayout.tsx` (`overscroll-contain` + `touch-action: pan-y` on main)
-- **Edited**: `src/hooks/usePullToRefresh.ts` (iOS-aware preventDefault + activation threshold)
-- **Edited**: `src/components/PullToRefreshIndicator.tsx` (`will-change: transform`)
-
-No schema, RLS, hook-API, or admin-side changes.
+- **Edited**: `src/components/calendar/JobCalendar.tsx` (replace drag handlers in `DayGridDroppable` with `onClick`)
+- **Edited**: `src/pages/sp/SPCalendar.tsx` (update subheader copy)
 
