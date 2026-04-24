@@ -67,6 +67,8 @@ interface JobCalendarProps {
   onCreateUnavailable?: (date: Date, start: string, end: string) => void;
   /** Tap a day in month view to drill into Day view. */
   onDayClick?: (date: Date) => void;
+  /** Mobile swipe on the week-view date header advances to next/prev week. */
+  onNavigateWeek?: (direction: -1 | 1) => void;
 }
 
 
