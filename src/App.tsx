@@ -33,7 +33,7 @@ import CustomerManagement from "./pages/admin/CustomerManagement";
 import CustomerDetail from "./pages/admin/CustomerDetail";
 import CustomerForm from "./pages/admin/CustomerForm";
 import CustomerTags from "./pages/admin/CustomerTags";
-import AllocationQA from "./pages/admin/AllocationQA";
+
 import OfferWorkflow from "./pages/admin/OfferWorkflow";
 import Integrations from "./pages/admin/Integrations";
 import JobManagement from "./pages/admin/JobManagement";
