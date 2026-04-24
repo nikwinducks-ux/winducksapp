@@ -1,5 +1,23 @@
 import { useEffect } from "react";
 
+function getHorizontalScrollableTarget(boundary: HTMLElement, origin: EventTarget | null) {
+  const isScrollable = (node: HTMLElement) => {
+    const max = node.scrollWidth - node.clientWidth;
+    if (max <= 0) return false;
+    const overflowX = window.getComputedStyle(node).overflowX;
+    return overflowX === "auto" || overflowX === "scroll" || overflowX === "overlay";
+  };
+
+  let node = origin instanceof HTMLElement ? origin : null;
+  while (node) {
+    if (isScrollable(node)) return node;
+    if (node === boundary) break;
+    node = node.parentElement;
+  }
+
+  return isScrollable(boundary) ? boundary : null;
+}
+
 /**
  * Captures horizontal trackpad / shift+wheel gestures inside `targetRef` and
  * translates them into `scrollLeft` updates on the same element. While the
@@ -19,28 +37,30 @@ export function useHorizontalWheelScroll<T extends HTMLElement>(
     const onWheel = (e: WheelEvent) => {
       const absX = Math.abs(e.deltaX);
       const absY = Math.abs(e.deltaY);
-      // Only act on predominantly-horizontal intent.
-      if (absX <= absY || absX < 1) return;
+      const dominantHorizontal = absX > absY * 0.65;
+      // Capture clear horizontal trackpad intent and shift+wheel desktop scrolling.
+      if ((!dominantHorizontal && !e.shiftKey) || (absX < 1 && Math.abs(e.deltaY) < 1)) return;
 
-      const max = el.scrollWidth - el.clientWidth;
-      if (max <= 0) return;
+      const scrollTarget = getHorizontalScrollableTarget(el, e.target) ?? el;
+      const max = scrollTarget.scrollWidth - scrollTarget.clientWidth;
+      if (max <= 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
 
-      const current = el.scrollLeft;
-      const next = current + e.deltaX;
-
-      // If the user is trying to swipe further past an edge, let the browser
-      // decide (still suppressed globally by overscroll-behavior-x: none).
-      const atLeftEdge = current <= 0 && e.deltaX < 0;
-      const atRightEdge = current >= max && e.deltaX > 0;
-      if (atLeftEdge || atRightEdge) return;
+      const current = scrollTarget.scrollLeft;
+      const delta = absX >= 1 ? e.deltaX : e.deltaY;
+      const next = current + delta;
 
       e.preventDefault();
-      el.scrollLeft = Math.max(0, Math.min(max, next));
+      e.stopPropagation();
+      scrollTarget.scrollLeft = Math.max(0, Math.min(max, next));
     };
 
-    el.addEventListener("wheel", onWheel, { passive: false });
+    el.addEventListener("wheel", onWheel, { passive: false, capture: true });
     return () => {
-      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("wheel", onWheel, { capture: true });
     };
   }, [enabled, targetRef]);
 }

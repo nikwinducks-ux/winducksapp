@@ -17,6 +17,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
+import { useHorizontalWheelScroll } from "@/hooks/useHorizontalWheelScroll";
 
 const spLinks = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -169,6 +170,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     enabled: ptrEnabled && mode !== "mobile",
     onRefresh: handleRefresh,
   });
+  useHorizontalWheelScroll(desktopMainRef, mode !== "mobile" && !isMobile);
 
   if (mode === "mobile") {
     return (
