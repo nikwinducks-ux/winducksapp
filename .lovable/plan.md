@@ -1,57 +1,50 @@
 
 
-## Customer Activity Log
+## Global Activity Log (admin dashboard)
 
-Add a per-customer audit trail capturing every meaningful event tied to a customer (job lifecycle, scheduling, pricing, line-item edits, photo uploads, customer profile edits) and surface it from a new **Log** button on the customer detail page.
+Add a system-wide history feed accessible from the top-right of the Admin Dashboard, showing every customer/job/service/photo/profile change across the platform.
 
-### Backend
+### Where it lives
 
-**New table** `customer_activity_log`
-- `id uuid pk`
-- `customer_id uuid not null` (indexed)
-- `job_id uuid null` (indexed, nullable for non-job events)
-- `event_type text not null` — e.g. `job_created`, `job_scheduled`, `job_rescheduled`, `job_assigned`, `job_unassigned`, `job_status_changed`, `job_completed`, `job_cancelled`, `job_deleted`, `job_payout_changed`, `job_address_changed`, `job_notes_changed`, `service_added`, `service_removed`, `service_updated`, `photo_added`, `photo_removed`, `customer_created`, `customer_updated`
-- `summary text not null` — short human-readable line ("Payout changed $200 → $250")
-- `details jsonb` — structured before/after, line-item diffs, etc.
-- `actor_user_id uuid null`, `actor_email text`, `actor_role text`
-- `created_at timestamptz default now()` (indexed desc)
+- New header row on `src/pages/admin/AdminDashboard.tsx`: page title on the left, **History** button (outline, `History` icon, with an unread count badge) pinned top-right.
+- Clicking opens a right-side `Sheet` titled "Activity History" containing the new `<GlobalActivityLog />` component.
 
-**RLS**
-- Admin/owner: full access.
-- SP: select rows where the related job is theirs (`assigned_sp_id` or crew) — read-only.
+### Data source
 
-**Triggers (SECURITY DEFINER, capture `auth.uid()` and join `user_roles` for role/email):**
-1. `jobs` AFTER INSERT → `job_created` (+ `job_scheduled` if date set, + `job_assigned` if SP set).
-2. `jobs` AFTER UPDATE → diff old/new and emit one row per material field: `scheduled_date`/`scheduled_time` → `job_rescheduled`; `assigned_sp_id` → `job_assigned`/`job_unassigned`; `status` → `job_status_changed` (with `job_completed` / `job_cancelled` specializations); `payout` → `job_payout_changed`; address fields → `job_address_changed`; `notes` → `job_notes_changed`; `urgency` → `job_urgency_changed`.
-3. `jobs` AFTER DELETE → `job_deleted` (capture `customer_id` from OLD).
-4. `job_services` AFTER INSERT/UPDATE/DELETE → `service_added` / `service_updated` / `service_removed` with category, qty, unit_price, line_total in `details`.
-5. `job_photos` AFTER INSERT/DELETE → `photo_added` / `photo_removed`.
-6. `customers` AFTER INSERT/UPDATE → `customer_created` / `customer_updated` (diff name, phone, email, address, tags, notes).
+Reuse the existing `customer_activity_log` table — it already records every job lifecycle event, schedule/payout/address/notes/urgency change, service line edits, photo uploads, and customer profile updates via the triggers shipped last turn. No schema or trigger changes needed.
 
-All triggers resolve `customer_id` from the row (or via `jobs.customer_id` lookup for service/photo events) and skip writing when `customer_id` is null.
+### New hook
 
-### Frontend
+`src/hooks/useSupabaseData.ts` → `useGlobalActivityLog(limit = 200)`
+- `select` from `customer_activity_log` ordered by `created_at desc`, limit 200.
+- Joins customer name + job number client-side via the cached `useCustomers()` and `useJobs()` data so each row can show context ("ACME Corp · JOB-1027").
+- React Query key `["global-activity", limit]`; realtime subscription on `customer_activity_log` INSERT to invalidate the key (so the feed updates live as admins/SPs make changes).
 
-**`src/hooks/useSupabaseData.ts`** — add `useCustomerActivityLog(customerId)` returning rows ordered by `created_at desc`, with React Query cache key `["customer-activity", customerId]`.
+### New component
 
-**New component** `src/components/CustomerActivityLog.tsx`
-- Renders a vertical timeline: icon per event type, summary, actor email + role chip, relative time, expandable JSON for `details` (collapsed by default).
-- Filter chips: All / Jobs / Services / Photos / Profile.
-- Empty state: "No activity recorded yet."
+`src/components/GlobalActivityLog.tsx`
+- Reuses the same icon map / event styling as `CustomerActivityLog.tsx` (extract the icon+color helpers into a small shared module `src/components/activityLogIcons.ts` so both components stay in sync).
+- Header row with filter chips: **All / Jobs / Services / Photos / Customers** plus a search box (matches summary text, customer name, job number).
+- Each row: icon, summary line, secondary line `Customer · Job · Actor email (role)`, relative timestamp; click row → navigate to `/admin/customers/:id` (and close sheet).
+- Expandable raw `details` JSON (collapsed by default).
+- Empty/loading/error states.
 
-**`src/pages/admin/CustomerDetail.tsx`**
-- Add **Log** button (variant `outline`, `History` icon from lucide) next to **Edit**.
-- Clicking opens a `Sheet` (right side, wide) titled "{customer.name} — Activity Log" containing `<CustomerActivityLog customerId={customer.id} />`.
+### Unread badge
+
+- Track "last seen" timestamp in `localStorage` under `winducks.activity.lastSeen`.
+- Badge count = rows with `created_at > lastSeen` (cap display at `99+`).
+- Opening the sheet sets `lastSeen = new Date().toISOString()` and clears the badge.
 
 ### Files touched
 
-- `supabase/migrations/<timestamp>_customer_activity_log.sql` — table, indexes, RLS, all triggers + helper to insert rows.
-- `src/hooks/useSupabaseData.ts` — `useCustomerActivityLog` hook + invalidations on customer/job mutations.
-- `src/components/CustomerActivityLog.tsx` — new timeline component.
-- `src/pages/admin/CustomerDetail.tsx` — Log button + Sheet wiring.
+- `src/components/activityLogIcons.ts` — new shared icon/label/color helpers.
+- `src/components/CustomerActivityLog.tsx` — switch to shared helpers (no UI change).
+- `src/components/GlobalActivityLog.tsx` — new global feed component.
+- `src/hooks/useSupabaseData.ts` — `useGlobalActivityLog` hook + realtime invalidation.
+- `src/pages/admin/AdminDashboard.tsx` — top-right History button + Sheet wiring + unread badge.
 
 ### Notes
 
-- Triggers are the single source of truth, so any path that mutates jobs/services/photos/customers (admin UI, RPCs, edge functions, future imports) is logged automatically — no per-mutation code changes needed.
-- Existing historical data is not backfilled; the log starts from migration time. If you want a one-time seed from `job_status_events` / `job_assignments` / `admin_audit_logs`, say so and I'll add it.
+- Admin/owner only — RLS already restricts `customer_activity_log` reads to admins (SPs only see their own job rows), so the global feed is naturally admin-scoped.
+- No backend or migration work; this is purely a new presentation layer over the existing log.
 
