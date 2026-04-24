@@ -1009,14 +1009,21 @@ function MonthCell({
         isOver && "bg-primary/10 ring-2 ring-primary ring-inset"
       )}
     >
-      <div
-        className={cn(
-          "text-xs font-semibold px-1",
-          !inMonth && "text-muted-foreground",
-          isToday(date) && "text-primary"
+      <div className="flex items-center justify-between gap-1 px-1">
+        <div
+          className={cn(
+            "text-xs font-semibold",
+            !inMonth && "text-muted-foreground",
+            isToday(date) && "text-primary"
+          )}
+        >
+          {format(date, "d")}
+        </div>
+        {formatDayTotal(dayJobs) && (
+          <div className="text-[10px] font-semibold text-primary truncate">
+            {formatDayTotal(dayJobs)}
+          </div>
         )}
-      >
-        {format(date, "d")}
       </div>
       {visible.map((job) => (
         <JobBlock
