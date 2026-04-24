@@ -380,7 +380,7 @@ export default function SPCalendar() {
                     <h3 className="text-sm font-semibold">Auto-Accept is ON</h3>
                     <p className="text-xs text-muted-foreground">
                       Offers are handled automatically.{" "}
-                      <Link to="/sp/auto-accept" className="text-primary hover:underline">
+                      <Link to="/auto-accept" className="text-primary hover:underline">
                         Turn it off
                       </Link>{" "}
                       to respond manually.
