@@ -47,6 +47,7 @@ import AdminCalendar from "./pages/admin/AdminCalendar";
 import SPCalendar from "./pages/sp/SPCalendar";
 import ReviewSubmit from "./pages/ReviewSubmit";
 import Unsubscribe from "./pages/Unsubscribe";
+import Install from "./pages/Install";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 
@@ -92,6 +93,7 @@ function AppRoutes() {
         {/* Public routes (also accessible while logged in) */}
         <Route path="/review/:token" element={<ReviewSubmit />} />
         <Route path="/unsubscribe" element={<Unsubscribe />} />
+        <Route path="/install" element={<Install />} />
 
         {/* SP Routes — only accessible to SP role */}
         <Route path="/" element={!isAdmin ? <SPDashboard /> : <Navigate to="/admin" replace />} />

@@ -96,6 +96,7 @@ export function JobPhotosUploader({ existing, onChange }: Props) {
           ref={inputRef}
           type="file"
           accept="image/jpeg,image/png,image/webp"
+          capture="environment"
           multiple
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}

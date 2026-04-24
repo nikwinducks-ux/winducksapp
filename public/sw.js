@@ -1,41 +1,52 @@
-// Winducks Service Worker — handles web push notifications
-self.addEventListener('install', (event) => {
+/// <reference lib="webworker" />
+// Winducks Service Worker
+// - Handles web push notifications (existing behavior)
+// - Pre-caches the built app shell via vite-plugin-pwa's injectManifest
+
+import { precacheAndRoute, cleanupOutdatedCaches } from "workbox-precaching";
+
+// Workbox replaces self.__WB_MANIFEST at build time with the precache manifest.
+// The cast keeps the file valid as plain JS (no TS) while still parsing in editors.
+precacheAndRoute(self.__WB_MANIFEST || []);
+cleanupOutdatedCaches();
+
+self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-self.addEventListener('push', (event) => {
+self.addEventListener("push", (event) => {
   let data = {};
   try {
     data = event.data ? event.data.json() : {};
   } catch (_e) {
-    data = { title: 'Winducks', body: event.data ? event.data.text() : 'New notification' };
+    data = { title: "Winducks", body: event.data ? event.data.text() : "New notification" };
   }
 
-  const title = data.title || 'Winducks';
+  const title = data.title || "Winducks";
   const options = {
-    body: data.body || '',
-    icon: '/assets/branding/winducks-iconw.png',
-    badge: '/assets/branding/winducks-iconw.png',
-    tag: data.tag || 'winducks-offer',
-    data: { url: data.url || '/' },
+    body: data.body || "",
+    icon: "/icons/icon-192.png",
+    badge: "/icons/icon-192.png",
+    tag: data.tag || "winducks-offer",
+    data: { url: data.url || "/" },
     requireInteraction: data.requireInteraction || false,
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || '/';
+  const targetUrl = event.notification.data?.url || "/";
   event.waitUntil((async () => {
-    const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const allClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const client of allClients) {
-      if ('focus' in client) {
+      if ("focus" in client) {
         await client.focus();
-        if ('navigate' in client) {
+        if ("navigate" in client) {
           try { await client.navigate(targetUrl); } catch (_e) { /* cross-origin */ }
         }
         return;

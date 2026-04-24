@@ -6,6 +6,7 @@ import {
   isWithinInterval,
 } from "date-fns";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   useJobs, useServiceProviders, useUpdateJob, useAssignJob, useJobCrew, useAssignCrew,
 } from "@/hooks/useSupabaseData";
@@ -118,9 +119,15 @@ export default function AdminCalendar() {
   const autoFocusedInitialDateRef = useRef(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const isMobile = useIsMobile();
   const [view, setView] = useState<CalendarView>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [spFilter, setSpFilter] = useState<string>("all");
+
+  // Mobile defaults to Day view; week/month grids are unusable on phones.
+  useEffect(() => {
+    if (isMobile && view !== "day") setView("day");
+  }, [isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
   const [statusFilters, setStatusFilters] = useState<string[]>(
     STATUS_FILTERS.map((s) => s.id)
   );
@@ -439,8 +446,8 @@ export default function AdminCalendar() {
         <Tabs value={view} onValueChange={(v) => setView(v as CalendarView)}>
           <TabsList>
             <TabsTrigger value="day">Day</TabsTrigger>
-            <TabsTrigger value="week">Week</TabsTrigger>
-            <TabsTrigger value="month">Month</TabsTrigger>
+            {!isMobile && <TabsTrigger value="week">Week</TabsTrigger>}
+            {!isMobile && <TabsTrigger value="month">Month</TabsTrigger>}
           </TabsList>
         </Tabs>
       </div>
