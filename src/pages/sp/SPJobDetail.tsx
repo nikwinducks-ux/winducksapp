@@ -8,6 +8,7 @@ import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, File
 import { useMemo } from "react";
 import { computeProximityResult, DISTANCE_SOURCE_LABELS } from "@/lib/proximity";
 import { JobPhotosCard } from "@/components/JobPhotosCard";
+import { CrewTeammates } from "@/components/sp/CrewTeammates";
 import { openInMaps } from "@/lib/geolocation";
 
 import { UrgencyBadge } from "@/components/UrgencyBadge";
@@ -187,29 +188,8 @@ export default function SPJobDetail() {
       {crew.length > 1 && (
         <div className="metric-card space-y-3">
           <h2 className="section-title flex items-center gap-2"><Users className="h-4 w-4" />Crew ({crew.length})</h2>
-          <div className="space-y-2">
-            {crew.map((m) => {
-              const sp = providers.find((p) => p.id === m.spId);
-              const isYou = m.spId === user.spId;
-              return (
-                <div key={m.id} className="flex items-center gap-3 rounded-md border p-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                    {sp?.avatar ?? "?"}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {sp?.name ?? "Unknown SP"} {isYou && <span className="text-xs text-muted-foreground">(you)</span>}
-                    </p>
-                  </div>
-                  {m.isLead && (
-                    <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
-                      <Star className="h-3 w-3 fill-current" /> Lead
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <CrewTeammates jobId={job.dbId} excludeSpId={user.spId} variant="card" showPhone hideWhenEmpty={false} />
+          <p className="text-xs text-muted-foreground">You are also on this crew.</p>
         </div>
       )}
 

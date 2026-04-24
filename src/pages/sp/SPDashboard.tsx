@@ -3,7 +3,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useServiceProviders, useJobs } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { haversineDistance } from "@/lib/proximity";
-import { Briefcase, Clock, Star, TrendingUp, Shield, Scale } from "lucide-react";
+import { Briefcase, Clock, Star, TrendingUp, Shield, Scale, Users } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 export default function SPDashboard() {
@@ -68,13 +68,20 @@ export default function SPDashboard() {
           <div className="metric-card text-center text-muted-foreground py-8">No jobs assigned today</div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            {assignedJobs.map((job) => (
+            {assignedJobs.map((job) => {
+              const teammateCount = (job.crew?.length ?? 0) - 1;
+              return (
               <Link key={job.id} to={`/my-jobs/${job.id}`} className="metric-card hover:border-primary/30 transition-colors cursor-pointer">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="font-semibold">{job.customerName}</p>
                     <p className="text-sm text-muted-foreground">{job.address}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{job.serviceCategory} · {job.estimatedDuration}</p>
+                    {teammateCount > 0 && (
+                      <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">
+                        <Users className="h-3 w-3" /> +{teammateCount} teammate{teammateCount > 1 ? "s" : ""}
+                      </span>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-bold text-primary">${job.payout}</p>
@@ -82,7 +89,8 @@ export default function SPDashboard() {
                   </div>
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

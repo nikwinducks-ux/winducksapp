@@ -28,6 +28,7 @@ import {
   Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
 import { statusLabel } from "@/components/calendar/JobBlock";
+import { CrewTeammates } from "@/components/sp/CrewTeammates";
 import type { Job } from "@/data/mockData";
 
 function dateToISO(d: Date): string {
@@ -366,6 +367,8 @@ export default function SPCalendar() {
                     </div>
                   </div>
                 )}
+
+                <CrewTeammates jobId={selectedJob.dbId} excludeSpId={spId} variant="card" showPhone />
 
                 <div className="border-t pt-4 space-y-2">
                   {isPendingOffer && selectedOffer && (
