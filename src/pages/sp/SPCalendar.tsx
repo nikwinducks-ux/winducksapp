@@ -60,7 +60,7 @@ export default function SPCalendar() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogInitial, setDialogInitial] = useState<UnavailableDialogValue | null>(null);
 
-  // Default to "day" on mobile (week/month grids are unusable on small screens).
+  // Week grid is unusable on small screens — bump to day if mobile lands on week.
   useEffect(() => {
     if (isMobile && view === "week") setView("day");
   }, [isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
