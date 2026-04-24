@@ -12,6 +12,7 @@ export default function CustomerDetail() {
   const { id } = useParams();
   const { data: customer, isLoading } = useCustomer(id);
   const { data: jobs = [] } = useJobs();
+  const [logOpen, setLogOpen] = useState(false);
 
   if (isLoading) return <div className="py-20 text-center text-muted-foreground">Loading...</div>;
 
