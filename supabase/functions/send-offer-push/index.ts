@@ -165,9 +165,9 @@ async function encryptPayload(
   // Plaintext + 0x02 padding delimiter (single record, no extra padding)
   const plaintext = concat(enc.encode(payload), new Uint8Array([0x02]));
 
-  const aesKey = await crypto.subtle.importKey("raw", cek, { name: "AES-GCM" }, false, ["encrypt"]);
+  const aesKey = await crypto.subtle.importKey("raw", cek as BufferSource, { name: "AES-GCM" }, false, ["encrypt"]);
   const ciphertext = new Uint8Array(
-    await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, aesKey, plaintext)
+    await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce as BufferSource }, aesKey, plaintext as BufferSource)
   );
 
   // Build aes128gcm header: salt(16) | rs(4 BE) | idlen(1) | keyid(asPublicRaw, 65)
