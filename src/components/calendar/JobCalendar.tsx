@@ -847,19 +847,43 @@ function WeekView({
 }: ViewProps) {
   const getSpName = spNameLookup(providers);
   const getSpColorFor = spColorLookup(providers);
-  const start = startOfWeek(currentDate, { weekStartsOn: 1 });
-  const end = endOfWeek(currentDate, { weekStartsOn: 1 });
-  const days = eachDayOfInterval({ start, end });
-  const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
-  const totalWeekJobs = days.reduce((sum, d) => sum + jobsOnDate(jobs, d).length, 0);
-  const showEmpty = totalWeekJobs === 0 && (nearestPrevious || nearestNext);
-
   const isMobile = useIsMobile();
 
   // Mobile zoom: "fit" shows all 7 days within the viewport, "comfortable" shows
   // ~5 days, "large" shows ~3 days. Desktop uses a fixed comfortable width.
   type WeekZoom = "fit" | "comfortable" | "large";
   const [weekZoom, setWeekZoom] = useState<WeekZoom>("comfortable");
+
+  // On mobile we render a windowed range of days around `currentDate` so the
+  // single horizontal scroller acts as an infinite calendar. The date header
+  // sits inside the same scroller as the time columns, guaranteeing each date
+  // label is locked above its column. Desktop and "fit" mobile keep the
+  // classic 7-day week.
+  const [half, setHalf] = useState(28);
+  const useWindowed = isMobile && weekZoom !== "fit";
+
+  const days = useMemo(() => {
+    if (useWindowed) {
+      return eachDayOfInterval({
+        start: addDays(currentDate, -half),
+        end: addDays(currentDate, half),
+      });
+    }
+    const start = startOfWeek(currentDate, { weekStartsOn: 1 });
+    const end = endOfWeek(currentDate, { weekStartsOn: 1 });
+    return eachDayOfInterval({ start, end });
+  }, [useWindowed, currentDate, half]);
+
+  const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
+  // Empty-range overlay only makes sense for the bounded 7-day week — skip it
+  // when we render a wide windowed range on mobile.
+  const visibleWeekDays = useMemo(() => {
+    const start = startOfWeek(currentDate, { weekStartsOn: 1 });
+    const end = endOfWeek(currentDate, { weekStartsOn: 1 });
+    return eachDayOfInterval({ start, end });
+  }, [currentDate]);
+  const totalWeekJobs = visibleWeekDays.reduce((sum, d) => sum + jobsOnDate(jobs, d).length, 0);
+  const showEmpty = !useWindowed && totalWeekJobs === 0 && (nearestPrevious || nearestNext);
 
   const hScrollRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -880,18 +904,70 @@ function WeekView({
     const axis = 56;
     const avail = Math.max(0, containerWidth - axis);
     if (weekZoom === "fit" && avail > 0) {
-      return Math.max(36, Math.floor(avail / days.length));
+      return Math.max(36, Math.floor(avail / 7));
     }
     if (weekZoom === "large") return 132;
     return 84;
-  }, [isMobile, containerWidth, weekZoom, days.length]);
+  }, [isMobile, containerWidth, weekZoom]);
 
   const isFit = isMobile && weekZoom === "fit";
-  useHorizontalWheelScroll(hScrollRef, !isMobile);
+  useHorizontalWheelScroll(hScrollRef, !isFit);
 
-  // Mobile-only: handle the date strip's date change.
-  function handleStripDateChange(d: Date) {
-    onDateChange?.(d);
+  // ----- Center-on-date + infinite window growth (mobile only) -----
+  const suppressSettle = useRef(false);
+  const settleTimer = useRef<number | null>(null);
+  const didInitialCenter = useRef(false);
+
+  // Center the active date column whenever currentDate changes externally
+  // (Today button, navigation arrows, tap on a header cell).
+  useLayoutEffect(() => {
+    const el = hScrollRef.current;
+    if (!el || !useWindowed || dayMinWidthPx <= 0) return;
+    const idx = days.findIndex((d) => isSameDay(d, currentDate));
+    if (idx < 0) return;
+    const axis = 56;
+    const target = axis + idx * dayMinWidthPx + dayMinWidthPx / 2 - el.clientWidth / 2;
+    suppressSettle.current = true;
+    el.scrollTo({
+      left: Math.max(0, target),
+      behavior: didInitialCenter.current ? "smooth" : "auto",
+    });
+    didInitialCenter.current = true;
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        suppressSettle.current = false;
+      })
+    );
+    // Re-run when window grows so the centered column stays visible.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentDate, dayMinWidthPx, useWindowed, half]);
+
+  function handleScroll() {
+    if (!useWindowed) return;
+    const el = hScrollRef.current;
+    if (!el) return;
+    if (settleTimer.current) window.clearTimeout(settleTimer.current);
+    settleTimer.current = window.setTimeout(() => {
+      if (suppressSettle.current) return;
+      const axis = 56;
+      const center = el.scrollLeft + el.clientWidth / 2 - axis;
+      const idx = Math.max(0, Math.min(days.length - 1, Math.round(center / dayMinWidthPx - 0.5)));
+      const d = days[idx];
+      if (d && !isSameDay(d, currentDate)) {
+        suppressSettle.current = true;
+        onDateChange?.(d);
+        // Allow the parent state to settle before the centering effect runs.
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            suppressSettle.current = false;
+          })
+        );
+      }
+      // Grow the window when the user nears either edge so scrolling is "infinite".
+      if (idx < 7 || idx > days.length - 8) {
+        setHalf((h) => h + 28);
+      }
+    }, 110);
   }
 
   function handleZoomIn() {
@@ -934,16 +1010,9 @@ function WeekView({
           </div>
         </div>
       )}
-      {isMobile && (
-        <WeekDateStrip
-          jobs={jobs}
-          currentDate={currentDate}
-          dayMinWidthPx={dayMinWidthPx}
-          onDateChange={handleStripDateChange}
-        />
-      )}
       <div
         ref={hScrollRef}
+        onScroll={handleScroll}
         className={cn(
           "overflow-y-hidden overscroll-x-contain",
           isFit ? "overflow-x-hidden" : "overflow-x-auto"
@@ -956,42 +1025,64 @@ function WeekView({
         }}
       >
         <div style={{ minWidth: `${56 + dayMinWidthPx * days.length}px` }}>
-          {!isMobile && (
-            <div className="flex border-b bg-muted/30 relative">
-              <div className="w-14 shrink-0 border-r" />
-              {days.map((d) => {
-                const headerDayJobs = jobsOnDate(jobs, d);
-                const dayTotal = formatDayTotal(headerDayJobs);
-                return (
+          {/* Date header — lives inside the same horizontal scroller as the
+              time columns so the date label is always locked above its column. */}
+          <div className="flex border-b bg-muted/30 relative">
+            <div className="w-14 shrink-0 border-r sticky left-0 z-10 bg-muted/30" />
+            {days.map((d) => {
+              const headerDayJobs = jobsOnDate(jobs, d);
+              const dayTotal = formatDayTotal(headerDayJobs);
+              const selected = isMobile && isSameDay(d, currentDate);
+              const headerInner = (
+                <>
+                  <div className="text-[10px] uppercase text-muted-foreground font-semibold leading-tight">
+                    {format(d, "EEE")}
+                  </div>
                   <div
-                    key={d.toISOString()}
-                    style={{ minWidth: `${dayMinWidthPx}px` }}
                     className={cn(
-                      "flex-1 px-2 py-2 text-center border-r last:border-r-0",
-                      isToday(d) && "bg-primary/10"
+                      "text-sm font-semibold leading-tight",
+                      (isToday(d) || selected) && "text-primary"
                     )}
                   >
-                    <div className="text-[10px] uppercase text-muted-foreground font-semibold">
-                      {format(d, "EEE")}
-                    </div>
-                    <div
-                      className={cn(
-                        "text-sm font-semibold",
-                        isToday(d) && "text-primary"
-                      )}
-                    >
-                      {format(d, "d")}
-                    </div>
-                    {dayTotal && (
-                      <div className="text-[10px] font-semibold text-primary mt-0.5 truncate">
-                        {dayTotal}
-                      </div>
-                    )}
+                    {format(d, "d")}
                   </div>
-                );
-              })}
-            </div>
-          )}
+                  {dayTotal && !isMobile && (
+                    <div className="text-[10px] font-semibold text-primary mt-0.5 truncate">
+                      {dayTotal}
+                    </div>
+                  )}
+                  {isMobile && headerDayJobs.length > 0 && (
+                    <div className="mx-auto mt-0.5 h-1 w-1 rounded-full bg-primary" aria-hidden />
+                  )}
+                </>
+              );
+              const className = cn(
+                "flex-1 px-2 py-2 text-center border-r last:border-r-0 transition-colors",
+                isToday(d) && !selected && "bg-primary/10",
+                selected && "bg-primary/20"
+              );
+              return isMobile ? (
+                <button
+                  type="button"
+                  key={d.toISOString()}
+                  onClick={() => onDateChange?.(d)}
+                  style={{ minWidth: `${dayMinWidthPx}px`, scrollSnapAlign: "start" }}
+                  className={className}
+                  aria-pressed={selected}
+                >
+                  {headerInner}
+                </button>
+              ) : (
+                <div
+                  key={d.toISOString()}
+                  style={{ minWidth: `${dayMinWidthPx}px` }}
+                  className={className}
+                >
+                  {headerInner}
+                </div>
+              );
+            })}
+          </div>
           <div className="relative flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
             <TimeAxis />
             {days.map((d) => {
