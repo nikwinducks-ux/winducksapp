@@ -144,16 +144,18 @@ export default function SPDetail() {
       </div>
 
       <Tabs defaultValue="profile">
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="jobs">Jobs ({spJobs.length})</TabsTrigger>
-          <TabsTrigger value="competency">Competency</TabsTrigger>
-          <TabsTrigger value="availability">Availability</TabsTrigger>
-          <TabsTrigger value="compliance">Compliance</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="reviews">Reviews</TabsTrigger>
-          <TabsTrigger value="login">Login & Access</TabsTrigger>
-        </TabsList>
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <TabsList className="w-max">
+            <TabsTrigger value="profile">Profile</TabsTrigger>
+            <TabsTrigger value="jobs">Jobs ({spJobs.length})</TabsTrigger>
+            <TabsTrigger value="competency">Competency</TabsTrigger>
+            <TabsTrigger value="availability">Availability</TabsTrigger>
+            <TabsTrigger value="compliance">Compliance</TabsTrigger>
+            <TabsTrigger value="performance">Performance</TabsTrigger>
+            <TabsTrigger value="reviews">Reviews</TabsTrigger>
+            <TabsTrigger value="login">Login & Access</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="profile">
           <div className="metric-card space-y-3 mt-4">
