@@ -800,78 +800,100 @@ function WeekView({
   const totalWeekJobs = days.reduce((sum, d) => sum + jobsOnDate(jobs, d).length, 0);
   const showEmpty = totalWeekJobs === 0 && (nearestPrevious || nearestNext);
 
+  const isMobile = useIsMobile();
+  // Per-day min width on desktop guarantees real horizontal overflow so
+  // trackpad swipes scroll the calendar instead of triggering browser back/forward.
+  const dayMinWidthPx = isMobile ? 88 : 160;
+
+  const hScrollRef = useRef<HTMLDivElement>(null);
+  useHorizontalWheelScroll(hScrollRef, !isMobile);
+
   return (
     <div className="rounded-lg border bg-card overflow-hidden" data-no-ptr="true">
-      <div className="flex border-b bg-muted/30">
-        <div className="w-14 shrink-0 border-r" />
-        {days.map((d) => {
-          const headerDayJobs = jobsOnDate(jobs, d);
-          const dayTotal = formatDayTotal(headerDayJobs);
-          return (
-            <div
-              key={d.toISOString()}
-              className={cn(
-                "flex-1 min-w-0 px-2 py-2 text-center border-r last:border-r-0",
-                isToday(d) && "bg-primary/10"
-              )}
-            >
-              <div className="text-[10px] uppercase text-muted-foreground font-semibold">
-                {format(d, "EEE")}
-              </div>
-              <div
-                className={cn(
-                  "text-sm font-semibold",
-                  isToday(d) && "text-primary"
-                )}
-              >
-                {format(d, "d")}
-              </div>
-              {dayTotal && (
-                <div className="text-[10px] font-semibold text-primary mt-0.5 truncate">
-                  {dayTotal}
+      <div
+        ref={hScrollRef}
+        className="overflow-x-auto overflow-y-hidden overscroll-x-contain"
+        style={{ touchAction: "pan-x pan-y" }}
+      >
+        <div style={{ minWidth: `${56 + dayMinWidthPx * days.length}px` }}>
+          <div className="flex border-b bg-muted/30">
+            <div className="w-14 shrink-0 border-r" />
+            {days.map((d) => {
+              const headerDayJobs = jobsOnDate(jobs, d);
+              const dayTotal = formatDayTotal(headerDayJobs);
+              return (
+                <div
+                  key={d.toISOString()}
+                  style={{ minWidth: `${dayMinWidthPx}px` }}
+                  className={cn(
+                    "flex-1 px-2 py-2 text-center border-r last:border-r-0",
+                    isToday(d) && "bg-primary/10"
+                  )}
+                >
+                  <div className="text-[10px] uppercase text-muted-foreground font-semibold">
+                    {format(d, "EEE")}
+                  </div>
+                  <div
+                    className={cn(
+                      "text-sm font-semibold",
+                      isToday(d) && "text-primary"
+                    )}
+                  >
+                    {format(d, "d")}
+                  </div>
+                  {dayTotal && (
+                    <div className="text-[10px] font-semibold text-primary mt-0.5 truncate">
+                      {dayTotal}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <div className="relative flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
-        <TimeAxis />
-        {days.map((d) => {
-          const dayJobs = jobsOnDate(jobs, d);
-          const dayBlocks = blocksOnDate(unavailableBlocks, d);
-          return (
-            <DayColumn
-              key={d.toISOString()}
-              date={d}
-              jobs={dayJobs}
-              blocks={dayBlocks}
-              getSpName={getSpName}
-              getSpColorFor={getSpColorFor}
-              showSp={mode === "admin"}
-              compact
-              showDebug={showDebug}
-              colorMode={colorMode}
-              onJobClick={onJobClick}
-              onUnavailableClick={onUnavailableClick}
-              onCreateUnavailable={onCreateUnavailable}
-              onEmptyDayClick={onEmptyDayClick}
-              showAddAffordance={mode === "admin" && !!onEmptyDayClick}
-              dnd={dnd}
-              mode={mode}
-            />
-          );
-        })}
-        {showEmpty && (
-          <EmptyRangeOverlay
-            message="No scheduled jobs in this week"
-            nearestPrevious={nearestPrevious}
-            nearestNext={nearestNext}
-            nearestPreviousLabel={nearestPreviousLabel}
-            nearestNextLabel={nearestNextLabel}
-            onJumpToDate={onJumpToDate}
-          />
-        )}
+              );
+            })}
+          </div>
+          <div className="relative flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
+            <TimeAxis />
+            {days.map((d) => {
+              const dayJobs = jobsOnDate(jobs, d);
+              const dayBlocks = blocksOnDate(unavailableBlocks, d);
+              return (
+                <div
+                  key={d.toISOString()}
+                  style={{ minWidth: `${dayMinWidthPx}px` }}
+                  className="flex-1 flex"
+                >
+                  <DayColumn
+                    date={d}
+                    jobs={dayJobs}
+                    blocks={dayBlocks}
+                    getSpName={getSpName}
+                    getSpColorFor={getSpColorFor}
+                    showSp={mode === "admin"}
+                    compact
+                    showDebug={showDebug}
+                    colorMode={colorMode}
+                    onJobClick={onJobClick}
+                    onUnavailableClick={onUnavailableClick}
+                    onCreateUnavailable={onCreateUnavailable}
+                    onEmptyDayClick={onEmptyDayClick}
+                    showAddAffordance={mode === "admin" && !!onEmptyDayClick}
+                    dnd={dnd}
+                    mode={mode}
+                  />
+                </div>
+              );
+            })}
+            {showEmpty && (
+              <EmptyRangeOverlay
+                message="No scheduled jobs in this week"
+                nearestPrevious={nearestPrevious}
+                nearestNext={nearestNext}
+                nearestPreviousLabel={nearestPreviousLabel}
+                nearestNextLabel={nearestNextLabel}
+                onJumpToDate={onJumpToDate}
+              />
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
