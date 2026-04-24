@@ -1,14 +1,18 @@
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useCustomer, useJobs } from "@/hooks/useSupabaseData";
 import { formatAddress } from "@/data/mockData";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MapPin, Pencil } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { CustomerActivityLog } from "@/components/CustomerActivityLog";
+import { ArrowLeft, MapPin, Pencil, History } from "lucide-react";
 
 export default function CustomerDetail() {
   const { id } = useParams();
   const { data: customer, isLoading } = useCustomer(id);
   const { data: jobs = [] } = useJobs();
+  const [logOpen, setLogOpen] = useState(false);
 
   if (isLoading) return <div className="py-20 text-center text-muted-foreground">Loading...</div>;
 
@@ -34,10 +38,26 @@ export default function CustomerDetail() {
           <h1 className="page-header">{customer.name}</h1>
           <p className="text-sm text-muted-foreground">{customer.email} · {customer.phone}</p>
         </div>
-        <Link to={`/admin/customers/${customer.id}/edit`}>
-          <Button variant="outline" size="sm"><Pencil className="h-4 w-4 mr-2" />Edit</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setLogOpen(true)}>
+            <History className="h-4 w-4 mr-2" />Log
+          </Button>
+          <Link to={`/admin/customers/${customer.id}/edit`}>
+            <Button variant="outline" size="sm"><Pencil className="h-4 w-4 mr-2" />Edit</Button>
+          </Link>
+        </div>
       </div>
+
+      <Sheet open={logOpen} onOpenChange={setLogOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-xl flex flex-col">
+          <SheetHeader>
+            <SheetTitle>{customer.name} — Activity Log</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 min-h-0 mt-4">
+            <CustomerActivityLog customerId={customer.id} />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {customer.tags.length > 0 && (
         <div className="flex gap-2">

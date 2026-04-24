@@ -1290,3 +1290,34 @@ export function useSeedData() {
     })();
   }, [qc]);
 }
+
+// ===== Customer Activity Log =====
+
+export interface CustomerActivityLogEntry {
+  id: string;
+  customer_id: string;
+  job_id: string | null;
+  event_type: string;
+  summary: string;
+  details: any;
+  actor_user_id: string | null;
+  actor_email: string;
+  actor_role: string;
+  created_at: string;
+}
+
+export function useCustomerActivityLog(customerId: string | undefined) {
+  return useQuery({
+    queryKey: ["customer-activity", customerId],
+    enabled: !!customerId,
+    queryFn: async (): Promise<CustomerActivityLogEntry[]> => {
+      const { data, error } = await (supabase as any)
+        .from("customer_activity_log")
+        .select("*")
+        .eq("customer_id", customerId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as CustomerActivityLogEntry[];
+    },
+  });
+}
