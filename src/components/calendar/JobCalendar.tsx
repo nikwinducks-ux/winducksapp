@@ -86,6 +86,19 @@ function parseLocalDate(s: string): Date {
   return new Date(year, month - 1, day);
 }
 
+const dayTotalFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
+
+function formatDayTotal(jobs: Job[]): string | null {
+  if (!jobs.length) return null;
+  const total = jobs.reduce((sum, j) => sum + (Number(j.payout) || 0), 0);
+  if (total <= 0) return null;
+  return dayTotalFormatter.format(total);
+}
+
 function jobsOnDate(jobs: Job[], date: Date) {
   return jobs
     .filter((j) => j.scheduledDate && isSameDay(parseLocalDate(j.scheduledDate), date))
