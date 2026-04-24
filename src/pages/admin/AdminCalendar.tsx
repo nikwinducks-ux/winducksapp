@@ -616,6 +616,7 @@ export default function AdminCalendar() {
           unavailableBlocks={visibleBlocks}
           onUnavailableClick={setUnavailableDetail}
           onDayClick={(date) => { setCurrentDate(date); setView("day"); }}
+          onNavigateWeek={navigate}
         />
       )}
 
