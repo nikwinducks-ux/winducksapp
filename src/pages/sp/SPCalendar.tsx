@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   addDays, addMonths, addWeeks, format, startOfWeek, endOfWeek,
@@ -6,6 +6,7 @@ import {
   subDays, subMonths, subWeeks,
 } from "date-fns";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useJobs, useServiceProviders, useUpdateJobStatus } from "@/hooks/useSupabaseData";
 import { useSpOffers, useAcceptOffer, useDeclineOffer } from "@/hooks/useOfferData";
 import {
@@ -52,11 +53,17 @@ export default function SPCalendar() {
   const updateBlock = useUpdateSpUnavailable();
   const deleteBlock = useDeleteSpUnavailable();
 
+  const isMobile = useIsMobile();
   const [view, setView] = useState<CalendarView | "availability">("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogInitial, setDialogInitial] = useState<UnavailableDialogValue | null>(null);
+
+  // Default to "day" on mobile (week/month grids are unusable on small screens).
+  useEffect(() => {
+    if (isMobile && view === "week") setView("day");
+  }, [isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pending-offer job ids for this SP
   const pendingOfferJobIds = useMemo(

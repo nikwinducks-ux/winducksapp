@@ -4,10 +4,11 @@ import { useJobs, useServiceProviders, useActiveServiceCategories, useUpdateJobS
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, FileText, Briefcase, Users, Star } from "lucide-react";
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, FileText, Briefcase, Users, Star, Navigation } from "lucide-react";
 import { useMemo } from "react";
 import { computeProximityResult, DISTANCE_SOURCE_LABELS } from "@/lib/proximity";
 import { JobPhotosCard } from "@/components/JobPhotosCard";
+import { openInMaps } from "@/lib/geolocation";
 
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 
@@ -111,9 +112,21 @@ export default function SPJobDetail() {
             <User className="h-4 w-4 text-muted-foreground" />
             <div><p className="text-xs text-muted-foreground">Customer</p><p className="font-medium">{job.customerName}</p></div>
           </div>
-          <div className="flex items-center gap-3">
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-            <div><p className="text-xs text-muted-foreground">Address</p><p className="font-medium">{job.address}</p></div>
+          <div className="flex items-start gap-3">
+            <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-muted-foreground">Address</p>
+              <p className="font-medium break-words">{job.address}</p>
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-xs text-primary"
+                onClick={() => openInMaps(job.address)}
+              >
+                <Navigation className="mr-1 h-3 w-3" /> Open in Maps
+              </Button>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -203,30 +216,64 @@ export default function SPJobDetail() {
       {/* Photos */}
       <JobPhotosCard jobId={id} />
 
-      {/* Status Update Actions */}
+      {/* Status Update Actions — sticky on mobile, inline on desktop */}
       {isMyJob && (canMarkInProgress || canMarkCompleted) && (
-        <div className="metric-card space-y-4">
-          <h2 className="section-title">Update Status</h2>
-          <div className="flex gap-3">
-            {canMarkInProgress && (
-              <Button
-                variant="outline"
-                onClick={() => handleStatusUpdate("InProgress")}
-                disabled={updateStatus.isPending}
-              >
-                {updateStatus.isPending ? "Updating..." : "Mark In Progress"}
-              </Button>
-            )}
-            {canMarkCompleted && (
-              <Button
-                onClick={() => handleStatusUpdate("Completed")}
-                disabled={updateStatus.isPending}
-              >
-                {updateStatus.isPending ? "Updating..." : "Mark Completed"}
-              </Button>
-            )}
+        <>
+          <div className="metric-card space-y-4 hidden lg:block">
+            <h2 className="section-title">Update Status</h2>
+            <div className="flex gap-3">
+              {canMarkInProgress && (
+                <Button
+                  variant="outline"
+                  onClick={() => handleStatusUpdate("InProgress")}
+                  disabled={updateStatus.isPending}
+                >
+                  {updateStatus.isPending ? "Updating..." : "Mark In Progress"}
+                </Button>
+              )}
+              {canMarkCompleted && (
+                <Button
+                  onClick={() => handleStatusUpdate("Completed")}
+                  disabled={updateStatus.isPending}
+                >
+                  {updateStatus.isPending ? "Updating..." : "Mark Completed"}
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
+
+          {/* Mobile sticky bottom CTA — sits above the bottom tab bar */}
+          <div
+            className="fixed inset-x-0 z-30 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 p-3 lg:hidden"
+            style={{ bottom: "calc(env(safe-area-inset-bottom) + 56px)" }}
+          >
+            <div className="mx-auto flex max-w-3xl gap-2">
+              {canMarkInProgress && (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="flex-1"
+                  onClick={() => handleStatusUpdate("InProgress")}
+                  disabled={updateStatus.isPending}
+                >
+                  {updateStatus.isPending ? "..." : "In Progress"}
+                </Button>
+              )}
+              {canMarkCompleted && (
+                <Button
+                  size="lg"
+                  className="flex-1"
+                  onClick={() => handleStatusUpdate("Completed")}
+                  disabled={updateStatus.isPending}
+                >
+                  {updateStatus.isPending ? "..." : "Mark Completed"}
+                </Button>
+              )}
+            </div>
+          </div>
+          {/* Spacer so content isn't hidden behind sticky bar on mobile */}
+          <div className="h-20 lg:hidden" aria-hidden />
+        </>
       )}
 
       {job.status === "Completed" && (
