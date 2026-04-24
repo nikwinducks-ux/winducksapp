@@ -4,6 +4,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { JobServicesSummary } from "@/components/JobServicesDisplay";
 import { SPVisibilityDiagnostics } from "@/components/sp/SPVisibilityDiagnostics";
+import { CrewTeammates } from "@/components/sp/CrewTeammates";
 import { MapPin, Clock, DollarSign, Calendar, FileText, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -89,6 +90,9 @@ export default function MyJobs() {
                     <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /><ScheduleText job={job} /></span>
                     <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{job.estimatedDuration || "—"}</span>
                   </div>
+                  {isCrew && (
+                    <CrewTeammates jobId={job.dbId} excludeSpId={user?.spId} variant="inline" />
+                  )}
                   {job.notes && (
                     <p className="text-xs text-muted-foreground flex items-start gap-1 mt-1">
                       <FileText className="h-3 w-3 mt-0.5 shrink-0" />

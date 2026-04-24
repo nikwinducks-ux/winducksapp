@@ -15,6 +15,7 @@ import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, User, AlertCircle, Info
 import { useState, useMemo } from "react";
 import { computeProximityResult, PROXIMITY_TOOLTIP, DISTANCE_SOURCE_LABELS } from "@/lib/proximity";
 import { JobPhotosCard } from "@/components/JobPhotosCard";
+import { CrewTeammates } from "@/components/sp/CrewTeammates";
 
 function ScheduleDisplay({ job }: { job: any }) {
   const urgency = job.urgency || "Scheduled";
@@ -162,6 +163,9 @@ export default function JobOfferDetail() {
           <JobServicesDisplay services={job.services} categories={allCategories} />
         </div>
       )}
+
+      {/* Crew on this job (if any teammates besides me) */}
+      <CrewTeammates jobId={job.dbId} excludeSpId={user.spId} variant="card" showPhone />
 
       {/* Job Notes */}
       {job.notes && (
