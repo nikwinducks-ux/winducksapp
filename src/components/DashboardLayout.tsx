@@ -155,7 +155,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   }, [location.pathname]);
 
   const handleRefresh = async () => {
-    await queryClient.invalidateQueries();
+    // Force-refetch all active queries (invalidate alone won't refetch inactive ones,
+    // and on some browsers the returned promise resolves before refetches finish).
+    await queryClient.refetchQueries({ type: "active" });
   };
 
   const ptrEnabled = isMobile;
