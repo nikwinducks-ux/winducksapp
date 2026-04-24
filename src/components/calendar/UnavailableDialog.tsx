@@ -54,25 +54,36 @@ export default function UnavailableDialog({
     }
   }, [open, initial]);
 
-  function toMin(t: string) {
-    const [h, m] = t.split(":").map(Number);
-    return h * 60 + m;
-  }
-
   function handleSave() {
-    if (!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)) {
-      setError("Start and end times must be in HH:MM format.");
-      return;
-    }
-    if (toMin(end) - toMin(start) < 15) {
-      setError("Time off must be at least 15 minutes.");
-      return;
-    }
     setError(null);
     onSave({ id: initial?.id, date, start, end, reason: reason.trim() });
   }
 
   const isEdit = !!initial?.id;
+
+  function formatTime12(t: string): string {
+    if (!/^\d{2}:\d{2}$/.test(t)) return t;
+    const [h, m] = t.split(":").map(Number);
+    const period = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+  }
+
+  function formatDateLabel(d: string): string {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    const [y, mo, da] = d.split("-").map(Number);
+    const dt = new Date(y, mo - 1, da);
+    return dt.toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  const summary =
+    date && start && end
+      ? `${formatDateLabel(date)} · ${formatTime12(start)} – ${formatTime12(end)}`
+      : "";
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -85,28 +96,11 @@ export default function UnavailableDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="ua-start">Start</Label>
-              <Input
-                id="ua-start"
-                type="time"
-                step={900}
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
-              />
+          {summary && (
+            <div className="rounded-md bg-muted px-3 py-2 text-sm font-medium text-foreground">
+              {summary}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="ua-end">End</Label>
-              <Input
-                id="ua-end"
-                type="time"
-                step={900}
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
-              />
-            </div>
-          </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="ua-reason">Reason (optional)</Label>
             <Textarea
