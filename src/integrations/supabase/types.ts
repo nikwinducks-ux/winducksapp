@@ -927,6 +927,39 @@ export type Database = {
         }
         Relationships: []
       }
+      service_category_line_items: {
+        Row: {
+          active: boolean
+          category_id: string
+          created_at: string
+          description: string
+          display_order: number
+          id: string
+          price: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category_id: string
+          created_at?: string
+          description: string
+          display_order?: number
+          id?: string
+          price?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category_id?: string
+          created_at?: string
+          description?: string
+          display_order?: number
+          id?: string
+          price?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       service_providers: {
         Row: {
           acceptance_rate: number
