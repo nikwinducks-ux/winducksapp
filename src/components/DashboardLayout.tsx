@@ -189,7 +189,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         )}
         <main
           ref={mobileMainRef}
-          className="flex-1 overflow-auto overscroll-contain"
+          className="flex-1 overflow-auto overscroll-y-contain overscroll-x-none"
           style={{ touchAction: "pan-y" }}
         >
           <div className="mx-auto max-w-7xl p-4 sm:p-6">
