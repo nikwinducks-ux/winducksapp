@@ -139,7 +139,8 @@ export default function SPCalendar() {
   async function handleAccept() {
     if (!selectedOffer) return;
     await acceptOffer.mutateAsync({ offerId: selectedOffer.id });
-    setSelectedJob(null);
+    // Keep the sheet open so the SP sees the new "Assigned" status and the
+    // "Start Job" CTA without an extra tap.
   }
 
   async function handleReject() {
