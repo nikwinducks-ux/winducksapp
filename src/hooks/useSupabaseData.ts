@@ -176,6 +176,83 @@ export function useUpdateServiceCategory() {
   });
 }
 
+// ===== Service Category Line Items =====
+
+export interface ServiceCategoryLineItem {
+  id: string;
+  category_id: string;
+  description: string;
+  price: number;
+  display_order: number;
+  active: boolean;
+}
+
+export function useCategoryLineItems(categoryId: string | undefined) {
+  return useQuery({
+    queryKey: ["service_category_line_items", categoryId],
+    queryFn: async () => {
+      if (!categoryId) return [];
+      const { data, error } = await supabase
+        .from("service_category_line_items" as any)
+        .select("*")
+        .eq("category_id", categoryId)
+        .order("display_order", { ascending: true })
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as unknown as ServiceCategoryLineItem[];
+    },
+    enabled: !!categoryId,
+  });
+}
+
+export function useCreateLineItem() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (form: { category_id: string; description: string; price: number; display_order?: number }) => {
+      const { error } = await supabase.from("service_category_line_items" as any).insert(form);
+      if (error) throw error;
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ["service_category_line_items", vars.category_id] });
+      toast({ title: "Line item added" });
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+}
+
+export function useUpdateLineItem() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ id, category_id, ...fields }: { id: string; category_id: string; description?: string; price?: number; active?: boolean; display_order?: number }) => {
+      const { error } = await supabase.from("service_category_line_items" as any).update(fields).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ["service_category_line_items", vars.category_id] });
+      toast({ title: "Line item updated" });
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+}
+
+export function useDeleteLineItem() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ id, category_id }: { id: string; category_id: string }) => {
+      const { error } = await supabase.from("service_category_line_items" as any).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ["service_category_line_items", vars.category_id] });
+      toast({ title: "Line item deleted" });
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+}
+
 // ===== Hooks =====
 
 export function useCustomers() {

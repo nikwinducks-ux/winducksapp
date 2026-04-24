@@ -42,6 +42,7 @@ import JobForm from "./pages/admin/JobForm";
 import JobDetail from "./pages/admin/JobDetail";
 import UserManagement from "./pages/admin/UserManagement";
 import ServiceCategories from "./pages/admin/ServiceCategories";
+import CategoryDetail from "./pages/admin/CategoryDetail";
 import LaunchReadiness from "./pages/admin/LaunchReadiness";
 import OwnerSetup from "./pages/admin/OwnerSetup";
 import AdminCalendar from "./pages/admin/AdminCalendar";
@@ -130,6 +131,7 @@ function AppRoutes() {
         <Route path="/admin/integrations" element={isAdmin ? <Integrations /> : <Navigate to="/" replace />} />
         <Route path="/admin/users" element={isAdmin ? <UserManagement /> : <Navigate to="/" replace />} />
         <Route path="/admin/categories" element={isAdmin ? <ServiceCategories /> : <Navigate to="/" replace />} />
+        <Route path="/admin/categories/:id" element={isAdmin ? <CategoryDetail /> : <Navigate to="/" replace />} />
         <Route path="/admin/readiness" element={isAdmin ? <LaunchReadiness /> : <Navigate to="/" replace />} />
         <Route path="/admin/owner-setup" element={isAdmin ? <OwnerSetup /> : <Navigate to="/" replace />} />
         <Route path="/admin/calendar" element={isAdmin ? <AdminCalendar /> : <Navigate to="/" replace />} />
