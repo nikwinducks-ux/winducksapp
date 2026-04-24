@@ -118,13 +118,17 @@ export default function CustomerDetail() {
         ) : (
           <div className="space-y-2">
             {customerJobs.map((j) => (
-              <div key={j.id} className="flex items-center justify-between rounded-lg bg-secondary/50 p-3 text-sm">
+              <Link
+                key={j.id}
+                to={`/admin/jobs/${j.dbId}`}
+                className="flex items-center justify-between rounded-lg bg-secondary/50 p-3 text-sm hover:bg-secondary transition-colors"
+              >
                 <div>
-                  <span className="font-medium">{j.id}</span>
+                  <span className="font-medium text-primary">{j.id}</span>
                   <span className="text-muted-foreground ml-2">{j.serviceCategory} · {j.scheduledDate}</span>
                 </div>
                 <StatusBadge label={j.status === "InProgress" ? "In Progress" : j.status} variant={j.status === "Completed" ? "valid" : j.status === "Created" ? "neutral" : "info"} />
-              </div>
+              </Link>
             ))}
           </div>
         )}
