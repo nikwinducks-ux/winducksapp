@@ -21,6 +21,7 @@ import UnavailableDialog, { type UnavailableDialogValue } from "@/components/cal
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import AvailabilitySettings from "@/pages/sp/AvailabilitySettings";
 import { SPVisibilityDiagnostics } from "@/components/sp/SPVisibilityDiagnostics";
 import {
   Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
@@ -51,7 +52,7 @@ export default function SPCalendar() {
   const updateBlock = useUpdateSpUnavailable();
   const deleteBlock = useDeleteSpUnavailable();
 
-  const [view, setView] = useState<CalendarView>("week");
+  const [view, setView] = useState<CalendarView | "availability">("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -209,95 +210,106 @@ export default function SPCalendar() {
 
   const isPendingOffer = selectedJob ? pendingOfferJobIds.has(selectedJob.dbId) && selectedJob.assignedSpId !== spId : false;
 
+  const isAvailability = view === "availability";
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">My Calendar</h1>
           <p className="text-sm text-muted-foreground">
-            Your scheduled jobs and pending offers. Drag empty time to mark yourself unavailable.
+            {isAvailability
+              ? "Manage your weekly schedule, time off, and auto-accept rules."
+              : "Your scheduled jobs and pending offers. Drag empty time to mark yourself unavailable."}
           </p>
         </div>
-        <Tabs value={view} onValueChange={(v) => setView(v as CalendarView)}>
+        <Tabs value={view} onValueChange={(v) => setView(v as CalendarView | "availability")}>
           <TabsList>
             <TabsTrigger value="day">Day</TabsTrigger>
             <TabsTrigger value="week">Week</TabsTrigger>
             <TabsTrigger value="month">Month</TabsTrigger>
+            <TabsTrigger value="availability">Availability</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
-      <SPVisibilityDiagnostics
-        jobs={jobs}
-        context="calendar"
-        queryState={jobsStatus as any}
-        queryError={jobsError ? (jobsError as any).message ?? String(jobsError) : null}
-      />
-
-      <div className="flex items-center gap-1">
-        <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
-          Today
-        </Button>
-        <Button variant="outline" size="icon" onClick={() => navigate(1)}>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-        <span className="ml-3 text-sm font-medium">{rangeLabel()}</span>
-      </div>
-
-      {isLoading ? (
-        <div className="text-center py-12 text-muted-foreground">Loading calendar...</div>
+      {isAvailability ? (
+        <AvailabilitySettings />
       ) : (
-        <JobCalendar
-          jobs={myCalendarJobs}
-          providers={providers}
-          view={view}
-          currentDate={currentDate}
-          onJobClick={setSelectedJob}
-          mode="sp"
-          unavailableBlocks={unavailableBlocks}
-          onUnavailableClick={handleClickBlock}
-          onCreateUnavailable={handleCreateUnavailable}
-        />
-      )}
+        <>
+          <SPVisibilityDiagnostics
+            jobs={jobs}
+            context="calendar"
+            queryState={jobsStatus as any}
+            queryError={jobsError ? (jobsError as any).message ?? String(jobsError) : null}
+          />
 
-      {!isLoading && offRangeJobs.length > 0 && (
-        <div className="rounded-md border bg-muted/30 p-3 space-y-2">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <p className="text-sm font-medium">
-              Other scheduled jobs not in this view
-              <span className="ml-2 text-muted-foreground font-normal">({offRangeJobs.length})</span>
-            </p>
-            {inRangeCount === 0 && (
-              <Button size="sm" variant="outline" onClick={() => jumpToJob(offRangeJobs[0])}>
-                Jump to next ({format(parseISO(offRangeJobs[0].scheduledDate!), "MMM d")})
-              </Button>
-            )}
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
+              Today
+            </Button>
+            <Button variant="outline" size="icon" onClick={() => navigate(1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <span className="ml-3 text-sm font-medium">{rangeLabel()}</span>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {offRangeJobs.map((j) => (
-              <button
-                key={j.dbId}
-                onClick={() => jumpToJob(j)}
-                className="inline-flex items-center gap-1.5 rounded-full border bg-background px-2.5 py-1 text-xs hover:border-primary/50 hover:bg-accent transition-colors"
-                title={`${j.customerName} · ${j.address}`}
-              >
-                <span className="font-medium">{j.id}</span>
-                <span className="text-muted-foreground">
-                  {format(parseISO(j.scheduledDate!), "MMM d")}{j.scheduledTime ? ` · ${j.scheduledTime}` : ""}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {!isLoading && myCalendarJobs.length === 0 && (
-        <div className="rounded-md border bg-card p-6 text-center text-sm text-muted-foreground">
-          No scheduled jobs or pending offers yet.
-        </div>
+          {isLoading ? (
+            <div className="text-center py-12 text-muted-foreground">Loading calendar...</div>
+          ) : (
+            <JobCalendar
+              jobs={myCalendarJobs}
+              providers={providers}
+              view={view as CalendarView}
+              currentDate={currentDate}
+              onJobClick={setSelectedJob}
+              mode="sp"
+              unavailableBlocks={unavailableBlocks}
+              onUnavailableClick={handleClickBlock}
+              onCreateUnavailable={handleCreateUnavailable}
+            />
+          )}
+
+          {!isLoading && offRangeJobs.length > 0 && (
+            <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-sm font-medium">
+                  Other scheduled jobs not in this view
+                  <span className="ml-2 text-muted-foreground font-normal">({offRangeJobs.length})</span>
+                </p>
+                {inRangeCount === 0 && (
+                  <Button size="sm" variant="outline" onClick={() => jumpToJob(offRangeJobs[0])}>
+                    Jump to next ({format(parseISO(offRangeJobs[0].scheduledDate!), "MMM d")})
+                  </Button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {offRangeJobs.map((j) => (
+                  <button
+                    key={j.dbId}
+                    onClick={() => jumpToJob(j)}
+                    className="inline-flex items-center gap-1.5 rounded-full border bg-background px-2.5 py-1 text-xs hover:border-primary/50 hover:bg-accent transition-colors"
+                    title={`${j.customerName} · ${j.address}`}
+                  >
+                    <span className="font-medium">{j.id}</span>
+                    <span className="text-muted-foreground">
+                      {format(parseISO(j.scheduledDate!), "MMM d")}{j.scheduledTime ? ` · ${j.scheduledTime}` : ""}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!isLoading && myCalendarJobs.length === 0 && (
+            <div className="rounded-md border bg-card p-6 text-center text-sm text-muted-foreground">
+              No scheduled jobs or pending offers yet.
+            </div>
+          )}
+        </>
       )}
 
       <UnavailableDialog

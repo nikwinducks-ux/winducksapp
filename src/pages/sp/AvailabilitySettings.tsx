@@ -1,6 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useServiceProviders } from "@/hooks/useSupabaseData";
 import SPAvailabilityEditor from "@/components/admin/SPAvailabilityEditor";
+import { AutoAcceptSection } from "./AutoAcceptSettings";
 
 export default function AvailabilitySettings() {
   const { user } = useAuth();
@@ -14,10 +15,13 @@ export default function AvailabilitySettings() {
   return (
     <div className="space-y-8 animate-fade-in max-w-2xl">
       <div>
-        <h1 className="page-header">Availability Settings</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Configure your weekly schedule and capacity</p>
+        <h1 className="page-header">Availability</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Configure your weekly schedule, capacity, and auto-accept rules</p>
       </div>
       <SPAvailabilityEditor spId={sp.id} />
+      <div className="border-t pt-8">
+        <AutoAcceptSection />
+      </div>
     </div>
   );
 }
