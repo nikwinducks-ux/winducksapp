@@ -30,42 +30,6 @@ function formatPhone(phone: string): string {
   return phone;
 }
 
-/**
- * Trigger a tel:/sms: URL by synthesising a real anchor click on the top
- * document. Inline <a href="tel:..."> can be silently swallowed inside
- * sandboxed iframes; a programmatic click on a freshly inserted anchor
- * gets dispatched as a true user navigation by every major browser.
- */
-function openContactUrl(url: string) {
-  try {
-    const doc = (window.top && window.top.document) || document;
-    const a = doc.createElement("a");
-    a.href = url;
-    a.rel = "noopener";
-    // Some browsers require the anchor to be in the DOM to honour the click.
-    a.style.position = "fixed";
-    a.style.opacity = "0";
-    a.style.pointerEvents = "none";
-    doc.body.appendChild(a);
-    a.click();
-    doc.body.removeChild(a);
-  } catch {
-    // Cross-origin top access blocked — fall back to current frame.
-    try {
-      const a = document.createElement("a");
-      a.href = url;
-      a.rel = "noopener";
-      a.style.position = "fixed";
-      a.style.opacity = "0";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } catch {
-      window.location.href = url;
-    }
-  }
-}
-
 async function copyToClipboard(text: string): Promise<boolean> {
   try {
     if (navigator.clipboard?.writeText) {
@@ -91,42 +55,28 @@ async function copyToClipboard(text: string): Promise<boolean> {
 }
 
 interface ContactIconButtonProps {
-  scheme: "tel" | "sms";
-  phone: string;
+  href: string;
   label: string;
   tooltip: string;
   children: React.ReactNode;
 }
 
 function ContactIconButton({
-  scheme, phone, label, tooltip, children,
+  href, label, tooltip, children,
 }: ContactIconButtonProps) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="h-8 w-8"
-          aria-label={label}
-          onClick={async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            // Always copy first so the SP has the number even if no handler is
-            // registered on this device (common on desktop without FaceTime /
-            // Phone Link). Then trigger the protocol so mobile dials/composes.
-            const copied = await copyToClipboard(phone);
-            openContactUrl(`${scheme}:${phone}`);
-            const verb = scheme === "tel" ? "Calling" : "Texting";
-            toast.success(`${verb} ${formatPhone(phone)}`, {
-              description: copied
-                ? "Number copied to clipboard if your device can't dial directly."
-                : undefined,
-            });
-          }}
-        >
-          {children}
+        <Button asChild variant="outline" size="icon" className="h-8 w-8">
+          <a
+            href={href}
+            aria-label={label}
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            {children}
+          </a>
         </Button>
       </TooltipTrigger>
       <TooltipContent>{tooltip}</TooltipContent>
@@ -174,14 +124,16 @@ export function CustomerContactActions({
   }
 
   const pretty = formatPhone(phone);
+  const tel = `tel:${phone}`;
+  const sms = `sms:${phone}`;
 
   const buttons = (
     <TooltipProvider delayDuration={200}>
       <div className="flex items-center gap-1.5 shrink-0">
-        <ContactIconButton scheme="tel" phone={phone} label={`Call ${firstName}`} tooltip={`Call ${firstName}`}>
+        <ContactIconButton href={tel} label={`Call ${firstName}`} tooltip={`Call ${firstName}`}>
           <Phone className="h-4 w-4" />
         </ContactIconButton>
-        <ContactIconButton scheme="sms" phone={phone} label={`Text ${firstName}`} tooltip={`Text ${firstName}`}>
+        <ContactIconButton href={sms} label={`Text ${firstName}`} tooltip={`Text ${firstName}`}>
           <MessageSquare className="h-4 w-4" />
         </ContactIconButton>
       </div>
