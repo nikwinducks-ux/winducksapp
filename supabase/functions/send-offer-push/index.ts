@@ -102,9 +102,9 @@ async function makeVapidJWT(audience: string, subject: string, publicKeyB64: str
 
 // ─── HKDF helper using Web Crypto ───
 async function hkdf(salt: Uint8Array, ikm: Uint8Array, info: Uint8Array, length: number): Promise<Uint8Array> {
-  const baseKey = await crypto.subtle.importKey("raw", ikm, "HKDF", false, ["deriveBits"]);
+  const baseKey = await crypto.subtle.importKey("raw", ikm as BufferSource, "HKDF", false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits(
-    { name: "HKDF", hash: "SHA-256", salt, info },
+    { name: "HKDF", hash: "SHA-256", salt: salt as BufferSource, info: info as BufferSource },
     baseKey,
     length * 8
   );
@@ -131,7 +131,7 @@ async function encryptPayload(
   // Import UA public key
   const uaPubKey = await crypto.subtle.importKey(
     "raw",
-    uaPublic,
+    uaPublic as BufferSource,
     { name: "ECDH", namedCurve: "P-256" },
     false,
     []
@@ -165,9 +165,9 @@ async function encryptPayload(
   // Plaintext + 0x02 padding delimiter (single record, no extra padding)
   const plaintext = concat(enc.encode(payload), new Uint8Array([0x02]));
 
-  const aesKey = await crypto.subtle.importKey("raw", cek, { name: "AES-GCM" }, false, ["encrypt"]);
+  const aesKey = await crypto.subtle.importKey("raw", cek as BufferSource, { name: "AES-GCM" }, false, ["encrypt"]);
   const ciphertext = new Uint8Array(
-    await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, aesKey, plaintext)
+    await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce as BufferSource }, aesKey, plaintext as BufferSource)
   );
 
   // Build aes128gcm header: salt(16) | rs(4 BE) | idlen(1) | keyid(asPublicRaw, 65)
