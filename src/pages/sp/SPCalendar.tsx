@@ -212,7 +212,21 @@ export default function SPCalendar() {
     );
   }
 
-  const isPendingOffer = selectedJob ? pendingOfferJobIds.has(selectedJob.dbId) && selectedJob.assignedSpId !== spId : false;
+  // An offer is "respondable" if we have a pending offer record for it OR the job
+  // is still in an Offered state and isn't already assigned to me. This guards
+  // against transient race conditions where the offer record briefly drops out
+  // of the pending list (e.g. realtime refresh) but the job is clearly awaiting
+  // my response.
+  const offerForSelected = useMemo(() => {
+    if (!selectedJob) return null;
+    return spOffers.find((o) => o.job_id === selectedJob.dbId) ?? null;
+  }, [selectedJob, spOffers]);
+
+  const isPendingOffer = selectedJob
+    ? (pendingOfferJobIds.has(selectedJob.dbId) ||
+        (selectedJob.status === "Offered" && selectedJob.assignedSpId !== spId)) &&
+      selectedJob.assignedSpId !== spId
+    : false;
   const me = providers.find((p) => p.id === spId);
   const autoAcceptOn = !!me?.autoAccept;
 
