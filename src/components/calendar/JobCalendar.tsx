@@ -837,6 +837,118 @@ function DayView({
   );
 }
 
+
+// ===== Week Date Strip (mobile, infinite scroll) =====
+interface WeekDateStripProps {
+  jobs: Job[];
+  currentDate: Date;
+  dayMinWidthPx: number;
+  onDateChange?: (d: Date) => void;
+}
+
+function WeekDateStrip({ jobs, currentDate, dayMinWidthPx, onDateChange }: WeekDateStripProps) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const settleTimer = useRef<number | null>(null);
+  const suppressSettle = useRef(false);
+  // Anchor + half-window. We render days from `anchor - half` to `anchor + half`
+  // and grow the half-window when the user scrolls near either edge.
+  const [anchor] = useState(() => currentDate);
+  const [half, setHalf] = useState(28);
+
+  const cells = useMemo(() => {
+    const start = addDays(anchor, -half);
+    const end = addDays(anchor, half);
+    return eachDayOfInterval({ start, end });
+  }, [anchor, half]);
+
+  const indexOf = (d: Date) => half + differenceInCalendarDays(d, anchor);
+
+  // Center the scroller on the active date. Uses `auto` on first paint, then
+  // `smooth` for subsequent external jumps (Today, navigation arrows, etc.).
+  const didInitialCenter = useRef(false);
+  useLayoutEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const idx = indexOf(currentDate);
+    if (idx < 0 || idx >= cells.length) return;
+    const target = idx * dayMinWidthPx + dayMinWidthPx / 2 - el.clientWidth / 2;
+    suppressSettle.current = true;
+    el.scrollTo({ left: Math.max(0, target), behavior: didInitialCenter.current ? "smooth" : "auto" });
+    didInitialCenter.current = true;
+    requestAnimationFrame(() => requestAnimationFrame(() => { suppressSettle.current = false; }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentDate, dayMinWidthPx]);
+
+  function onScroll() {
+    const el = scrollerRef.current;
+    if (!el) return;
+    if (settleTimer.current) window.clearTimeout(settleTimer.current);
+    settleTimer.current = window.setTimeout(() => {
+      if (suppressSettle.current) return;
+      const center = el.scrollLeft + el.clientWidth / 2;
+      const idx = Math.max(0, Math.min(cells.length - 1, Math.round(center / dayMinWidthPx - 0.5)));
+      const d = cells[idx];
+      if (d && !isSameDay(d, currentDate)) {
+        onDateChange?.(d);
+      }
+      // Grow the window when we get near either edge so scrolling stays "infinite".
+      if (idx < 7 || idx > cells.length - 8) {
+        setHalf((h) => h + 28);
+      }
+    }, 110);
+  }
+
+  return (
+    <div
+      ref={scrollerRef}
+      onScroll={onScroll}
+      className="overflow-x-auto overflow-y-hidden overscroll-x-contain border-b bg-muted/30"
+      style={{
+        touchAction: "pan-x",
+        WebkitOverflowScrolling: "touch",
+        scrollSnapType: "x proximity",
+      }}
+    >
+      <div className="flex" style={{ minWidth: `${cells.length * dayMinWidthPx}px` }}>
+        {cells.map((d) => {
+          const dayJobs = jobsOnDate(jobs, d);
+          const total = dayJobs.length;
+          const selected = isSameDay(d, currentDate);
+          return (
+            <button
+              type="button"
+              key={d.toISOString()}
+              onClick={() => onDateChange?.(d)}
+              style={{ minWidth: `${dayMinWidthPx}px`, scrollSnapAlign: "center" }}
+              className={cn(
+                "flex-1 px-1 py-2 text-center border-r last:border-r-0 transition-colors",
+                isToday(d) && !selected && "bg-primary/10",
+                selected && "bg-primary/20"
+              )}
+              aria-pressed={selected}
+            >
+              <div className="text-[10px] uppercase text-muted-foreground font-semibold leading-tight">
+                {format(d, "EEE")}
+              </div>
+              <div
+                className={cn(
+                  "text-sm font-semibold leading-tight",
+                  (isToday(d) || selected) && "text-primary"
+                )}
+              >
+                {format(d, "d")}
+              </div>
+              {total > 0 && (
+                <div className="mx-auto mt-0.5 h-1 w-1 rounded-full bg-primary" aria-hidden />
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ===== Week View =====
 function WeekView({
   jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug,
