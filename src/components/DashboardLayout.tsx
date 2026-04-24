@@ -15,8 +15,6 @@ const spLinks = [
 { to: "/my-jobs", icon: ClipboardList, label: "My Jobs" },
 { to: "/calendar", icon: CalendarDays, label: "Calendar" },
 { to: "/jobs", icon: Briefcase, label: "Job Offers" },
-{ to: "/availability", icon: Calendar, label: "Availability" },
-{ to: "/auto-accept", icon: Zap, label: "Auto-Accept" },
 { to: "/performance", icon: TrendingUp, label: "Performance" },
 { to: "/account", icon: Settings, label: "Account" }];
 
