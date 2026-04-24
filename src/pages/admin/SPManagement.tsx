@@ -18,9 +18,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Search, Plus, Eye, Pencil, Archive, Ban, CheckCircle, RotateCcw } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function SPManagement() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"active" | "archived">("active");
   const { data: providers = [], isLoading } = useServiceProviders();
@@ -151,7 +152,20 @@ export default function SPManagement() {
                 const login = loginMap.get(sp.id);
                 const availSummary = availMap.get(sp.id);
                 return (
-                  <tr key={sp.id} className="border-b last:border-0">
+                  <tr
+                    key={sp.id}
+                    className="border-b last:border-0 cursor-pointer transition-colors hover:bg-muted/50"
+                    onClick={() => navigate(`/admin/providers/${sp.id}`)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        navigate(`/admin/providers/${sp.id}`);
+                      }
+                    }}
+                    aria-label={`View profile for ${sp.name}`}
+                  >
                     <td className="py-3 font-medium">
                       <div className="flex items-center gap-2">
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs">
@@ -198,7 +212,7 @@ export default function SPManagement() {
                         variant={sp.complianceStatus === "Valid" ? "valid" : sp.complianceStatus === "Expiring" ? "warning" : "error"}
                       />
                     </td>
-                    <td className="py-3">
+                    <td className="py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         <Link to={`/admin/providers/${sp.id}`}>
                           <Button size="sm" variant="ghost" title="View"><Eye className="h-4 w-4" /></Button>
