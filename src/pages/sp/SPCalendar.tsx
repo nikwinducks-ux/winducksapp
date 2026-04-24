@@ -224,7 +224,7 @@ export default function SPCalendar() {
           <p className="text-sm text-muted-foreground">
             {isAvailability
               ? "Manage your weekly schedule, time off, and auto-accept rules."
-              : "Your scheduled jobs and pending offers. Drag empty time to mark yourself unavailable."}
+              : "Your scheduled jobs and pending offers. Tap empty time to mark yourself unavailable."}
           </p>
         </div>
         <Tabs
