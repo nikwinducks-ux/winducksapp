@@ -277,6 +277,7 @@ export default function SPCalendar() {
               unavailableBlocks={unavailableBlocks}
               onUnavailableClick={handleClickBlock}
               onCreateUnavailable={handleCreateUnavailable}
+              onDayClick={(date) => { setCurrentDate(date); setView("day"); }}
             />
           )}
 
