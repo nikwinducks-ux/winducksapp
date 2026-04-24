@@ -213,6 +213,8 @@ export default function SPManagement() {
                       />
                     </td>
                     <td className="py-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1">
+                        <Link to={`/admin/providers/${sp.id}`}>
                           <Button size="sm" variant="ghost" title="View"><Eye className="h-4 w-4" /></Button>
                         </Link>
                         {isArchivedView ? (
