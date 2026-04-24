@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/sheet";
 import { statusLabel } from "@/components/calendar/JobBlock";
 import { CrewTeammates } from "@/components/sp/CrewTeammates";
+import { CustomerContactActions } from "@/components/sp/CustomerContactActions";
 import type { Job } from "@/data/mockData";
 
 function dateToISO(d: Date): string {
@@ -487,6 +488,12 @@ export default function SPCalendar() {
                     </div>
                   </div>
                 )}
+
+                <CustomerContactActions
+                  customerId={selectedJob.customerId}
+                  customerName={selectedJob.customerName}
+                  variant="card"
+                />
 
                 <CrewTeammates jobId={selectedJob.dbId} excludeSpId={spId} variant="card" showPhone />
 
