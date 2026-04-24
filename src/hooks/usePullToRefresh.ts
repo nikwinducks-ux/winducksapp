@@ -88,26 +88,37 @@ export function usePullToRefresh<T extends HTMLElement>(
 
     const onTouchEnd = async () => {
       const dist = pullDistanceRef.current;
+      const wasActive = activeRef.current;
       startYRef.current = null;
       activeRef.current = false;
-      if (dist >= threshold && !isRefreshing) {
+      if (wasActive && dist >= threshold && !isRefreshing) {
         setIsRefreshing(true);
         setPullDistance(threshold);
         try {
+          const result = onRefresh();
           await Promise.race([
-            Promise.resolve(onRefresh()),
+            Promise.resolve(result),
             new Promise((r) => setTimeout(r, 10000)),
           ]);
+        } catch (err) {
+          console.error("[PullToRefresh] onRefresh threw:", err);
         } finally {
-          setIsRefreshing(false);
-          setPullDistance(0);
+          // Small delay so the user sees the spin complete
+          setTimeout(() => {
+            setIsRefreshing(false);
+            setPullDistance(0);
+          }, 300);
         }
       } else {
         setPullDistance(0);
       }
     };
 
-    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    // touchstart non-passive on iOS so we can preventDefault from move reliably
+    const startOpts: AddEventListenerOptions = iosRef.current
+      ? { passive: false }
+      : { passive: true };
+    el.addEventListener("touchstart", onTouchStart, startOpts);
     el.addEventListener("touchmove", onTouchMove, { passive: false });
     el.addEventListener("touchend", onTouchEnd, { passive: true });
     el.addEventListener("touchcancel", onTouchEnd, { passive: true });
