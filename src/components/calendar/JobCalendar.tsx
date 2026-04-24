@@ -86,6 +86,19 @@ function parseLocalDate(s: string): Date {
   return new Date(year, month - 1, day);
 }
 
+const dayTotalFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
+
+function formatDayTotal(jobs: Job[]): string | null {
+  if (!jobs.length) return null;
+  const total = jobs.reduce((sum, j) => sum + (Number(j.payout) || 0), 0);
+  if (total <= 0) return null;
+  return dayTotalFormatter.format(total);
+}
+
 function jobsOnDate(jobs: Job[], date: Date) {
   return jobs
     .filter((j) => j.scheduledDate && isSameDay(parseLocalDate(j.scheduledDate), date))
@@ -758,14 +771,21 @@ function DayView({
   const showEmpty = dayJobs.length === 0 && (nearestPrevious || nearestNext);
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
-      <div className="border-b px-4 py-2 flex items-center justify-between">
-        <div className="text-sm font-medium">
+      <div className="border-b px-4 py-2 flex items-center justify-between gap-2">
+        <div className="text-sm font-medium min-w-0 truncate">
           {format(currentDate, "EEEE, MMMM d, yyyy")}
           {isToday(currentDate) && (
             <span className="ml-2 text-xs text-primary font-semibold">Today</span>
           )}
         </div>
-        <div className="text-xs text-muted-foreground">{dayJobs.length} job(s)</div>
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="text-xs text-muted-foreground">{dayJobs.length} job(s)</div>
+          {formatDayTotal(dayJobs) && (
+            <div className="text-xs font-semibold text-foreground bg-primary/10 text-primary rounded-md px-2 py-0.5">
+              {formatDayTotal(dayJobs)}
+            </div>
+          )}
+        </div>
       </div>
       <div className="relative flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
         <TimeAxis />
@@ -821,27 +841,36 @@ function WeekView({
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="flex border-b bg-muted/30">
         <div className="w-14 shrink-0 border-r" />
-        {days.map((d) => (
-          <div
-            key={d.toISOString()}
-            className={cn(
-              "flex-1 min-w-0 px-2 py-2 text-center border-r last:border-r-0",
-              isToday(d) && "bg-primary/10"
-            )}
-          >
-            <div className="text-[10px] uppercase text-muted-foreground font-semibold">
-              {format(d, "EEE")}
-            </div>
+        {days.map((d) => {
+          const headerDayJobs = jobsOnDate(jobs, d);
+          const dayTotal = formatDayTotal(headerDayJobs);
+          return (
             <div
+              key={d.toISOString()}
               className={cn(
-                "text-sm font-semibold",
-                isToday(d) && "text-primary"
+                "flex-1 min-w-0 px-2 py-2 text-center border-r last:border-r-0",
+                isToday(d) && "bg-primary/10"
               )}
             >
-              {format(d, "d")}
+              <div className="text-[10px] uppercase text-muted-foreground font-semibold">
+                {format(d, "EEE")}
+              </div>
+              <div
+                className={cn(
+                  "text-sm font-semibold",
+                  isToday(d) && "text-primary"
+                )}
+              >
+                {format(d, "d")}
+              </div>
+              {dayTotal && (
+                <div className="text-[10px] font-semibold text-primary mt-0.5 truncate">
+                  {dayTotal}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div className="relative flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
         <TimeAxis />
@@ -980,14 +1009,21 @@ function MonthCell({
         isOver && "bg-primary/10 ring-2 ring-primary ring-inset"
       )}
     >
-      <div
-        className={cn(
-          "text-xs font-semibold px-1",
-          !inMonth && "text-muted-foreground",
-          isToday(date) && "text-primary"
+      <div className="flex items-center justify-between gap-1 px-1">
+        <div
+          className={cn(
+            "text-xs font-semibold",
+            !inMonth && "text-muted-foreground",
+            isToday(date) && "text-primary"
+          )}
+        >
+          {format(date, "d")}
+        </div>
+        {formatDayTotal(dayJobs) && (
+          <div className="text-[10px] font-semibold text-primary truncate">
+            {formatDayTotal(dayJobs)}
+          </div>
         )}
-      >
-        {format(date, "d")}
       </div>
       {visible.map((job) => (
         <JobBlock
