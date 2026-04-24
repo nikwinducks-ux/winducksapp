@@ -213,6 +213,8 @@ export default function SPCalendar() {
   }
 
   const isPendingOffer = selectedJob ? pendingOfferJobIds.has(selectedJob.dbId) && selectedJob.assignedSpId !== spId : false;
+  const me = providers.find((p) => p.id === spId);
+  const autoAcceptOn = !!me?.autoAccept;
 
   const isAvailability = view === "availability";
 
@@ -348,7 +350,7 @@ export default function SPCalendar() {
 
               <div className="space-y-4 mt-4">
                 {/* Primary actions — promoted to top so SPs can start/end jobs in one tap */}
-                {isPendingOffer && selectedOffer && (
+                {isPendingOffer && selectedOffer && !autoAcceptOn && (
                   <div className="rounded-md border bg-card p-3 space-y-2">
                     <h3 className="text-sm font-semibold">Respond to Offer</h3>
                     <div className="flex gap-2">
@@ -370,6 +372,19 @@ export default function SPCalendar() {
                         Reject
                       </Button>
                     </div>
+                  </div>
+                )}
+
+                {isPendingOffer && selectedOffer && autoAcceptOn && (
+                  <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-1.5">
+                    <h3 className="text-sm font-semibold">Auto-Accept is ON</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Offers are handled automatically.{" "}
+                      <Link to="/auto-accept" className="text-primary hover:underline">
+                        Turn it off
+                      </Link>{" "}
+                      to respond manually.
+                    </p>
                   </div>
                 )}
 
