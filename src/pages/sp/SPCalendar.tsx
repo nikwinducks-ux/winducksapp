@@ -57,7 +57,14 @@ export default function SPCalendar() {
   const isMobile = useIsMobile();
   const [view, setView] = useState<CalendarView | "availability">("week");
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  // Always read live job from refetched jobs list so the sheet reflects the
+  // current status (e.g. "Assigned" right after the SP accepts an offer).
+  const selectedJob = useMemo<Job | null>(
+    () => (selectedJobId ? jobs.find((j) => j.dbId === selectedJobId) ?? null : null),
+    [selectedJobId, jobs]
+  );
+  const setSelectedJob = (j: Job | null) => setSelectedJobId(j?.dbId ?? null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogInitial, setDialogInitial] = useState<UnavailableDialogValue | null>(null);
 
