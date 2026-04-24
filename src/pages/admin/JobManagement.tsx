@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { formatCAD } from "@/lib/currency";
 import { useJobs, useServiceProviders, useServiceCategories, useDeleteJob, useStopBroadcast, useAssignJob, useUnassignJob } from "@/hooks/useSupabaseData";
 import { useGenerateBroadcastOffers } from "@/hooks/useOfferData";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -725,7 +726,7 @@ export default function JobManagement() {
                   <td className="py-3">
                     <JobServicesCodesSummary services={job.services} categories={categories} fallbackCategory={job.serviceCategory} />
                   </td>
-                  <td className="py-3 font-medium">${job.payout}</td>
+                  <td className="py-3 font-medium">{formatCAD(job.payout)}</td>
                   <td className="py-3 text-muted-foreground">{job.jobAddress.city}</td>
                   <td className="py-3"><UrgencyBadge urgency={job.urgency} /></td>
                   <td className="py-3">

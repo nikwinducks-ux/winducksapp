@@ -181,6 +181,7 @@ export function useUpdateServiceCategory() {
 export interface ServiceCategoryLineItem {
   id: string;
   category_id: string;
+  title: string;
   description: string;
   price: number;
   display_order: number;
@@ -209,7 +210,7 @@ export function useCreateLineItem() {
   const qc = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: async (form: { category_id: string; description: string; price: number; display_order?: number }) => {
+    mutationFn: async (form: { category_id: string; title: string; description?: string; price: number; display_order?: number }) => {
       const { error } = await supabase.from("service_category_line_items" as any).insert(form);
       if (error) throw error;
     },
@@ -225,7 +226,7 @@ export function useUpdateLineItem() {
   const qc = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: async ({ id, category_id, ...fields }: { id: string; category_id: string; description?: string; price?: number; active?: boolean; display_order?: number }) => {
+    mutationFn: async ({ id, category_id, ...fields }: { id: string; category_id: string; title?: string; description?: string; price?: number; active?: boolean; display_order?: number }) => {
       const { error } = await supabase.from("service_category_line_items" as any).update(fields).eq("id", id);
       if (error) throw error;
     },

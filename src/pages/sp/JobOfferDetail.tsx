@@ -1,4 +1,5 @@
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
+import { formatCAD } from "@/lib/currency";
 import { useServiceProviders, useJobs, useActiveServiceCategories, useServiceCategories } from "@/hooks/useSupabaseData";
 import { JobServicesDisplay } from "@/components/JobServicesDisplay";
 import { useAcceptOffer, useDeclineOffer, useOffers } from "@/hooks/useOfferData";
@@ -129,7 +130,7 @@ export default function JobOfferDetail() {
             <div><p className="text-xs text-muted-foreground">Schedule</p><ScheduleDisplay job={job} /></div>
           </div>
           <div className="flex items-center gap-3"><Clock className="h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Duration</p><p className="font-medium">{job.estimatedDuration}</p></div></div>
-          <div className="flex items-center gap-3"><DollarSign className="h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Payout</p><p className="text-xl font-bold text-primary">${job.payout}</p></div></div>
+          <div className="flex items-center gap-3"><DollarSign className="h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Payout</p><p className="text-xl font-bold text-primary">{formatCAD(job.payout)}</p></div></div>
           <div className="flex items-center gap-3">
             <MapPin className="h-4 w-4 text-muted-foreground" />
             <div>

@@ -1,4 +1,5 @@
 import { useDraggable } from "@dnd-kit/core";
+import { formatCAD } from "@/lib/currency";
 import type { Job } from "@/data/mockData";
 import { cn } from "@/lib/utils";
 import { ScheduleDebugBadge } from "./ScheduleDebug";
@@ -219,7 +220,7 @@ export function JobBlock({
             </span>
           )}
         </span>
-        <span className="font-semibold shrink-0">${job.payout}</span>
+        <span className="font-semibold shrink-0">{formatCAD(job.payout)}</span>
       </div>
       {!compact && (
         <>

@@ -1,4 +1,5 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
+import { formatCAD } from "@/lib/currency";
 import { JobServicesDisplay } from "@/components/JobServicesDisplay";
 import { useJobs, useServiceProviders, useAssignJob, useActiveServiceCategories, useServiceCategories, useJobCrew, useAddCrewMember, useRemoveCrewMember, useSetCrewLead } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
@@ -271,7 +272,7 @@ export default function JobDetail() {
           </div>
           <div className="flex items-center gap-3">
             <DollarSign className="h-4 w-4 text-muted-foreground" />
-            <div><p className="text-xs text-muted-foreground">Payout</p><p className="text-xl font-bold text-primary">${job.payout}</p></div>
+            <div><p className="text-xs text-muted-foreground">Payout</p><p className="text-xl font-bold text-primary">{formatCAD(job.payout)}</p></div>
           </div>
         </div>
       </div>
@@ -463,7 +464,7 @@ export default function JobDetail() {
           </h2>
           {crew.length > 1 && (
             <p className="text-xs text-muted-foreground">
-              ${(job.payout / crew.length).toFixed(2)} per SP (= ${job.payout} ÷ {crew.length})
+              {formatCAD(job.payout / crew.length)} per SP (= {formatCAD(job.payout)} ÷ {crew.length})
             </p>
           )}
         </div>
@@ -574,8 +575,8 @@ export default function JobDetail() {
               const cat = allCategories.find(c => c.name === s.service_category);
               return cat?.code || s.service_category;
             }).join(", ") || "—"}</p>
-            <p><strong>payout:</strong> ${job.payout}</p>
-            <p><strong>line_totals sum:</strong> ${directJobServices.reduce((s, svc) => s + svc.line_total, 0).toFixed(2)}</p>
+            <p><strong>payout:</strong> {formatCAD(job.payout)}</p>
+            <p><strong>line_totals sum:</strong> {formatCAD(directJobServices.reduce((s, svc) => s + svc.line_total, 0))}</p>
             <p><strong>pending offers:</strong> {jobOffers.filter(o => o.status === "Pending").length}</p>
             <p><strong>total offers:</strong> {jobOffers.length}</p>
           </div>

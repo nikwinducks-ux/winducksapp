@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { formatCAD } from "@/lib/currency";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   addDays, addMonths, addWeeks, format, startOfWeek, endOfWeek,
@@ -659,7 +660,7 @@ export default function AdminCalendar() {
                 <div className="text-sm space-y-1">
                   <div><span className="text-muted-foreground">Address:</span> {selectedJob.address}</div>
                   <div><span className="text-muted-foreground">Service:</span> {selectedJob.serviceCategory}</div>
-                  <div><span className="text-muted-foreground">Payout:</span> ${selectedJob.payout}</div>
+                  <div><span className="text-muted-foreground">Payout:</span> {formatCAD(selectedJob.payout)}</div>
                   <div><span className="text-muted-foreground">Duration:</span> {selectedJob.estimatedDuration}</div>
                 </div>
 
