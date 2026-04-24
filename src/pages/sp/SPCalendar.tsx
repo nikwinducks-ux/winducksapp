@@ -426,8 +426,6 @@ export default function SPCalendar() {
 
                 <CrewTeammates jobId={selectedJob.dbId} excludeSpId={spId} variant="card" showPhone />
 
-                <div className="border-t pt-4 space-y-2">
-
                 <div className="border-t pt-4">
                   <Link
                     to={isPendingOffer ? `/jobs/${selectedJob.dbId}` : `/sp/jobs/${selectedJob.dbId}`}
