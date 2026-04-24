@@ -1,11 +1,21 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useServiceCategories, useCreateServiceCategory, useUpdateServiceCategory } from "@/hooks/useSupabaseData";
+import { useServiceCategories, useCreateServiceCategory, useUpdateServiceCategory, useDeleteServiceCategory } from "@/hooks/useSupabaseData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Plus, Pencil, X, Check, ChevronRight } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Plus, Pencil, X, Check, ChevronRight, Trash2 } from "lucide-react";
 
 export default function ServiceCategories() {
   const { data: categories = [], isLoading } = useServiceCategories();
