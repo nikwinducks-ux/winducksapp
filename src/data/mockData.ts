@@ -34,16 +34,16 @@ export interface CustomerContact {
 export interface Customer {
   id: string;
   name: string;
-  firstName: string;
-  lastName: string;
-  companyName: string;
-  displayAs: "person" | "company";
+  firstName?: string;
+  lastName?: string;
+  companyName?: string;
+  displayAs?: "person" | "company";
   phone: string;
   email: string;
   /** Convenience: pointer to the primary property's address (kept in sync via DB trigger) */
   serviceAddress: Address;
-  properties: CustomerProperty[];
-  contacts: CustomerContact[];
+  properties?: CustomerProperty[];
+  contacts?: CustomerContact[];
   notes: string;
   tags: string[];
   lastJobDate?: string;
