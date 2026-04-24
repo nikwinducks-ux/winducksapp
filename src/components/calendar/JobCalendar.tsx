@@ -898,7 +898,7 @@ function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, 
   );
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
+    <div className="rounded-lg border bg-card overflow-hidden" data-no-ptr="true">
       <div className="grid grid-cols-7 border-b bg-muted/30">
         {weekdays.map((w, i) => (
           <div
