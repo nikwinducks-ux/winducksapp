@@ -233,8 +233,8 @@ export default function SPCalendar() {
         <Tabs value={view} onValueChange={(v) => setView(v as CalendarView | "availability")}>
           <TabsList>
             <TabsTrigger value="day">Day</TabsTrigger>
-            <TabsTrigger value="week">Week</TabsTrigger>
-            <TabsTrigger value="month">Month</TabsTrigger>
+            {!isMobile && <TabsTrigger value="week">Week</TabsTrigger>}
+            {!isMobile && <TabsTrigger value="month">Month</TabsTrigger>}
             <TabsTrigger value="availability">Availability</TabsTrigger>
           </TabsList>
         </Tabs>
