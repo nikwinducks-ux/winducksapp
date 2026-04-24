@@ -966,8 +966,6 @@ function WeekView({
           scrollBehavior: "smooth",
         }}
       >
-
-      >
         <div style={{ minWidth: `${56 + dayMinWidthPx * days.length}px` }}>
           <div
             className={cn(
