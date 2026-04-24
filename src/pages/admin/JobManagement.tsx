@@ -67,6 +67,8 @@ function formatScheduleToast(date: string, time: string) {
 
 export default function JobManagement() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get("tab") === "past" ? "past" : "active";
   const [search, setSearch] = useState("");
   const [urgencyFilter, setUrgencyFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
