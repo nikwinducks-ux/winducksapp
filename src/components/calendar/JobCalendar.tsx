@@ -610,23 +610,8 @@ function DayGridDroppable({
         );
       })}
 
-      {/* In-progress drag overlay */}
-      {drag && (
-        <div
-          className="absolute left-0.5 right-0.5 z-[6] rounded-md border border-foreground/40 pointer-events-none"
-          style={{
-            top: drag.startMin - DAY_START_HOUR * 60,
-            height: drag.endMin - drag.startMin,
-            backgroundColor: "hsl(var(--muted-foreground) / 0.18)",
-            backgroundImage:
-              "repeating-linear-gradient(135deg, hsl(var(--muted-foreground) / 0.18) 0 6px, transparent 6px 12px)",
-          }}
-        >
-          <div className="px-1.5 py-0.5 text-[10px] font-semibold text-foreground">
-            Unavailable · {formatGhostTime(drag.startMin)} – {formatGhostTime(drag.endMin)}
-          </div>
-        </div>
-      )}
+
+
 
       {/* Now line */}
       {showNowLine && (
