@@ -124,13 +124,19 @@ export default function JobManagement() {
     [providers]
   );
 
-  let filtered = jobs.filter(
+  // Partition by tab: Active = everything except Completed/Cancelled; Past = Completed only
+  const tabFiltered = jobs.filter((j) =>
+    tab === "past"
+      ? j.status === "Completed"
+      : j.status !== "Completed" && j.status !== "Cancelled"
+  );
+
+  let filtered = tabFiltered.filter(
     (j) =>
-      j.status !== "Cancelled" &&
-      (j.id.toLowerCase().includes(search.toLowerCase()) ||
-        j.customerName.toLowerCase().includes(search.toLowerCase()) ||
-        j.serviceCategory.toLowerCase().includes(search.toLowerCase()) ||
-        j.jobAddress.city.toLowerCase().includes(search.toLowerCase()))
+      j.id.toLowerCase().includes(search.toLowerCase()) ||
+      j.customerName.toLowerCase().includes(search.toLowerCase()) ||
+      j.serviceCategory.toLowerCase().includes(search.toLowerCase()) ||
+      j.jobAddress.city.toLowerCase().includes(search.toLowerCase())
   );
 
   if (urgencyFilter !== "all") {
