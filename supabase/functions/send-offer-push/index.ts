@@ -215,34 +215,48 @@ Deno.serve(async (req) => {
 
   try {
     const payload: WebhookPayload = await req.json();
-    if (payload.table !== "offers") {
-      return new Response(JSON.stringify({ skipped: true, reason: "wrong_table" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const offer = payload.record;
-    const old = payload.old_record;
 
     let title = "";
     let bodyText = "";
     let url = "/";
+    let spId = "";
+    let tag = "";
 
-    if (payload.type === "INSERT" && offer.status === "Pending") {
-      title = "New job offer";
-      bodyText = "Tap to review the offer in Winducks.";
-      url = `/jobs/${offer.job_id}?offer=${offer.id}`;
-    } else if (
-      payload.type === "UPDATE" &&
-      offer.status === "Accepted" &&
-      old?.status !== "Accepted" &&
-      offer.acceptance_source === "AutoAccept"
-    ) {
-      title = "Auto-accepted job";
-      bodyText = "We accepted this offer for you.";
-      url = `/jobs/${offer.job_id}`;
+    if (payload.table === "offers") {
+      const offer = payload.record as OfferRecord;
+      const old = payload.old_record as OfferRecord | null;
+      spId = offer.sp_id;
+      tag = `offer-${offer.id}`;
+
+      if (payload.type === "INSERT" && offer.status === "Pending") {
+        title = "New job offer";
+        bodyText = "Tap to review the offer in Winducks.";
+        url = `/jobs/${offer.job_id}?offer=${offer.id}`;
+      } else if (
+        payload.type === "UPDATE" &&
+        offer.status === "Accepted" &&
+        old?.status !== "Accepted" &&
+        offer.acceptance_source === "AutoAccept"
+      ) {
+        title = "Auto-accepted job";
+        bodyText = "We accepted this offer for you.";
+        url = `/jobs/${offer.job_id}`;
+      } else {
+        return new Response(JSON.stringify({ skipped: true, reason: "no_match" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else if (payload.table === "job_crew_members" && payload.type === "INSERT") {
+      const crew = payload.record as CrewRecord;
+      spId = crew.sp_id;
+      tag = `assignment-${crew.job_id}-${crew.sp_id}`;
+      title = crew.is_lead ? "New job assigned" : "Added to job crew";
+      bodyText = crew.is_lead
+        ? "You've been assigned a new job. Tap to view details."
+        : "You've been added to a job crew. Tap to view details.";
+      url = `/jobs/${crew.job_id}`;
     } else {
-      return new Response(JSON.stringify({ skipped: true, reason: "no_match" }), {
+      return new Response(JSON.stringify({ skipped: true, reason: "wrong_table_or_op" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -266,7 +280,7 @@ Deno.serve(async (req) => {
     const { data: subs, error: subsErr } = await admin
       .from("push_subscriptions")
       .select("endpoint, p256dh, auth")
-      .eq("sp_id", offer.sp_id);
+      .eq("sp_id", spId);
 
     if (subsErr) {
       console.error("subscriptions fetch error", subsErr);
@@ -285,7 +299,7 @@ Deno.serve(async (req) => {
       title,
       body: bodyText,
       url,
-      tag: `offer-${offer.id}`,
+      tag,
     });
 
     const results = await Promise.all(
