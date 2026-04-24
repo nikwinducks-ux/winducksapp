@@ -714,16 +714,44 @@ export default function JobManagement() {
             {filtered.map((job) => {
               const checked = selectedIds.has(job.dbId);
               return (
-                <tr key={job.id} className={`border-b last:border-0 ${checked ? "bg-primary/5" : ""}`}>
-                  <td className="py-3 pr-2">
+                <tr
+                  key={job.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/admin/jobs/${job.dbId}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate(`/admin/jobs/${job.dbId}`);
+                    }
+                  }}
+                  className={`border-b last:border-0 cursor-pointer hover:bg-muted/40 transition-colors ${checked ? "bg-primary/5" : ""}`}
+                >
+                  <td className="py-3 pr-2" onClick={(e) => e.stopPropagation()}>
                     <Checkbox
                       checked={checked}
                       onCheckedChange={(v) => toggleOne(job.dbId, !!v)}
                       aria-label={`Select ${job.id}`}
                     />
                   </td>
-                  <td className="py-3 font-medium">{job.id}</td>
-                  <td className="py-3">{job.customerName}</td>
+                  <td className="py-3 font-medium">
+                    <Link
+                      to={`/admin/jobs/${job.dbId}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-primary hover:underline"
+                    >
+                      {job.id}
+                    </Link>
+                  </td>
+                  <td className="py-3">
+                    <Link
+                      to={`/admin/jobs/${job.dbId}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="hover:underline"
+                    >
+                      {job.customerName}
+                    </Link>
+                  </td>
                   <td className="py-3">
                     <JobServicesCodesSummary services={job.services} categories={categories} fallbackCategory={job.serviceCategory} />
                   </td>
@@ -733,7 +761,7 @@ export default function JobManagement() {
                   <td className="py-3">
                     <StatusBadge label={statusLabel(job.status)} variant={statusVariant(job.status) as any} />
                   </td>
-                  <td className="py-3">
+                  <td className="py-3" onClick={(e) => e.stopPropagation()}>
                     {NON_BROADCASTABLE.has(job.status) ? (
                       <Badge variant="outline" className="text-muted-foreground">N/A</Badge>
                     ) : (
