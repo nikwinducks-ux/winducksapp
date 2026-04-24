@@ -1,71 +1,44 @@
-## Goal
+## Problem
 
-In the mobile week view, the date header row currently scrolls together with the time-grid below it, bounded to the current 7 days. Make the date header a separate, **infinitely scrollable** strip (past + future) that drives the visible week, and tighten the overall scroll feel of the week view.
+On mobile week view the date header (`WeekDateStrip`) is its own horizontal scroller with ~57 days, while the time grid below only renders the 7 days of the current week. Swiping the date header slides the date labels independently of the time columns underneath, so the date "Tue 23" no longer sits above the Tue 23 time column. The user wants the date label and its time column to move together.
 
-## Problems today
+## Root cause
 
-1. The header row sits inside the same horizontal scroll container as the time grid, so it cannot scroll past the current week — it just snaps within 7 days.
-2. The header pointer-handler treats any swipe ≥ 50px as a discrete week jump, which feels jumpy and competes with native scroll.
-3. `scroll-snap: x mandatory` combined with `scroll-behavior: smooth` on the grid produces a sluggish, sticky feel when flicking; snap fights momentum scroll on iOS.
+The strip and the grid live in two separate scroll containers and render different ranges:
+- Strip: windowed ±28 days, scrolls freely.
+- Grid: only the 7 days around `currentDate`, scrolls within those 7.
 
-## Plan
+There is no per-pixel link between them — only a debounced "settle" callback that re-anchors the week.
 
-### 1. New `WeekDateStrip` component (mobile only)
+## Fix: render dates inline above each time column
 
-A standalone horizontal scroller above the time grid that is virtually infinite.
+Remove the independent strip and bring the date header back inside the same horizontal scroll container as the time grid, on mobile as well as desktop. To preserve the "infinite past/future scroll" behavior the strip provided, widen the grid's rendered range to the same windowed ±N days, and let one shared scroller move both header and columns in lockstep.
 
-- Render a windowed range of days around `currentDate` (e.g. `currentDate - 28 days … currentDate + 28 days`, ~57 cells).
-- Each day cell uses the same `dayMinWidthPx` as the grid columns so visual rhythm matches.
-- Use native horizontal scroll with `scroll-snap-type: x proximity` and `scroll-snap-align: center` on each cell — proximity (not mandatory) keeps momentum flicks smooth.
-- On scroll-end (debounced via `scrollend` with rAF fallback for Safari), determine the day closest to viewport center and call `onJumpToDate(thatDay)` so the grid below re-renders for the matching week.
-- When `currentDate` changes (from grid snap, navigation buttons, or a settle), recenter the strip around it. If the user scrolls near either edge of the rendered window (within ~10 days), extend the window by another 28 days in that direction — giving true "infinite" scroll.
-- Highlight today and the currently-selected day; tapping a cell jumps to that day.
-- Remove the existing pointer-swipe-to-change-week handlers from the header — replaced by this scroller.
+### Changes in `src/components/calendar/JobCalendar.tsx`
 
-### 2. Decouple header from grid
+1. **Delete `WeekDateStrip`** and its mobile-only render block.
+2. **In `WeekView`**, replace `days = eachDayOfInterval(start..end of week)` (mobile only) with a windowed range anchored on `currentDate`:
+   - `windowedDays`: `addDays(currentDate, -half)` … `addDays(currentDate, +half)` with `half` starting at 28.
+   - Keep desktop on the existing 7-day week.
+3. **Render a single header row** (mobile + desktop) inside the existing `hScrollRef` container, above the time grid, using the same `dayMinWidthPx` and the same `days` array as the columns. Each header cell is a button that calls `onDateChange?.(d)` so tapping a date still selects it. This guarantees the header cell and its time column share the same x-position because they live in the same flex row width.
+4. **Infinite scroll**: on mobile, attach a debounced scroll handler to `hScrollRef`. When the centered column index falls within ~7 of either end of `windowedDays`, grow `half` by 28 and adjust `scrollLeft` to compensate so the visible position does not jump. On settle, call `onDateChange?.(centeredDay)` so the parent's `currentDate` follows the user's position (used for the navigation label and "Today" button).
+5. **Initial centering**: on mount and whenever `currentDate` changes from outside (Today button, arrows), use `scrollTo({ left: targetLeft })` on `hScrollRef` to center the matching column. Suppress the settle callback briefly so the programmatic scroll does not echo back into `onDateChange`.
+6. **Scroll feel**: keep `scroll-snap-type: x proximity` and `scroll-padding-left: 56px` on the shared container. Drop `scrollSnapAlign` on day cells in favor of `scroll-snap-align: start` so a single flick lands cleanly on a day boundary. Keep the existing zoom buttons (`fit` / `comfortable` / `large`) — `fit` mode disables horizontal scroll the same way it does today.
+7. **`useHorizontalWheelScroll`**: enable on mobile too now that there is a real horizontal scroller for the windowed range (still no-op when `isFit`).
 
-- The grid below keeps its current 7-day horizontal scroll for time slots, but the header is no longer rendered inside that container.
-- This means the header sits in its own div with its own scroll, while the time-grid stays as-is for vertical time scrolling and intra-week horizontal panning.
+### Net behavior
 
-### 3. Improve grid scroll feel
+- Header cell "Tue 23" and the time column for Tue 23 are the same flex item width inside the same scroll container — they cannot detach.
+- Swiping the header swipes the columns (and vice-versa) because there is one scroller.
+- Past/future is still effectively infinite via window growth on edge approach.
+- Navigation arrows, "Today", zoom in/out, and tap-to-select all keep working.
 
-- Change grid `scroll-snap-type` from `x mandatory` to `x proximity` so flicks aren't interrupted mid-swing.
-- Remove `scroll-behavior: smooth` from the grid container — it interferes with native momentum on iOS. Keep smooth behavior only for programmatic `scrollIntoView` calls (e.g. snapping to "today" on mount).
-- Add `overscroll-behavior-x: contain` (already present via class) and `scroll-padding-left: 56px` so snapped columns line up past the time-axis gutter.
-- Use `requestAnimationFrame` throttling on the grid scroll handler if/where one exists; otherwise no JS scroll handlers needed.
+### Files
 
-### 4. Wire `onJumpToDate`
-
-Both `AdminCalendar` and `SPCalendar` already track `currentDate` and have a `setCurrentDate` setter. Pass a new `onDateChange` prop into `JobCalendar` → `WeekView` → `WeekDateStrip` so the strip can update the parent's date when the user scrolls or taps a day.
-
-## Technical details
-
-**Files**
-
-- `src/components/calendar/JobCalendar.tsx`
-  - Extract a new `WeekDateStrip` component (mobile-only) handling the windowed infinite scroller.
-  - In `WeekView`: render `WeekDateStrip` above the grid container on mobile; keep the existing in-grid header on desktop.
-  - Remove the `onHeaderPointerDown/Move/Up/Cancel` handlers and the pointer-swipe affordance arrows — superseded by the strip.
-  - Update grid scroll styles: `scroll-snap-type: x proximity`, drop `scroll-behavior: smooth`, add `scroll-padding-left: 56px`.
-  - Add a new optional prop `onDateChange?: (d: Date) => void` to `JobCalendar` and thread it to `WeekView`.
-- `src/pages/admin/AdminCalendar.tsx` and `src/pages/sp/SPCalendar.tsx`
-  - Pass `onDateChange={setCurrentDate}` to `<JobCalendar />`.
-
-**Strip implementation sketch**
-
-- State: `windowStart: Date`, `windowEnd: Date` (default ±28 days from `currentDate`).
-- Memoized `cells = eachDayOfInterval({ start: windowStart, end: windowEnd })`.
-- After mount and when `currentDate` changes externally, scroll the cell matching `currentDate` to center using `scrollTo({ left: targetLeft })` (no smooth on initial mount; smooth on subsequent external changes).
-- `onScroll`: schedule rAF; on settle (no scroll for ~120ms or `scrollend`), find centered cell and call `onDateChange(cellDate)` if it differs from `currentDate`.
-- Edge detection in the same settle handler: if centered cell index is within 10 of either end, extend `windowStart -= 28d` or `windowEnd += 28d` and adjust `scrollLeft` to compensate so the visible position doesn't jump.
-
-**Why this approach**
-
-- Native scroll + windowed virtualization is far smoother than synthesized swipes.
-- `scroll-snap: proximity` preserves flick momentum while still snapping to day boundaries when the user lets go near one.
-- Decoupling header from grid is required for the header to scroll past the current week.
+- `src/components/calendar/JobCalendar.tsx` — remove `WeekDateStrip`, restructure `WeekView` per above.
+- No changes needed in `AdminCalendar.tsx` / `SPCalendar.tsx` — `onDateChange` wiring stays the same.
 
 ## Out of scope
 
-- Month and Day views (no changes).
-- Desktop week view: keeps current header inside the grid container — desktop already has wheel/trackpad horizontal scroll via `useHorizontalWheelScroll` and infinite scrolling there can be handled separately if requested.
+- Desktop week view layout (already inline; only gains windowed range if we choose to — kept on 7-day week for now to avoid changing desktop UX).
+- Day and Month views.
