@@ -46,6 +46,13 @@ export function usePullToRefresh<T extends HTMLElement>(
 
     const onTouchStart = (e: TouchEvent) => {
       if (isRefreshing) return;
+      // Allow descendants (e.g. the calendar grid) to opt out of PTR so their
+      // own scrolling/gesture handling takes precedence.
+      const target = e.target as Element | null;
+      if (target && target.closest && target.closest('[data-no-ptr="true"]')) {
+        startYRef.current = null;
+        return;
+      }
       if (!atTop()) {
         startYRef.current = null;
         return;
