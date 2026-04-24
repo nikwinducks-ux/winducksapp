@@ -21,6 +21,7 @@ import { Search, Plus, Eye, Pencil, Archive, Ban, CheckCircle, RotateCcw } from 
 import { Link, useNavigate } from "react-router-dom";
 
 export default function SPManagement() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"active" | "archived">("active");
   const { data: providers = [], isLoading } = useServiceProviders();
