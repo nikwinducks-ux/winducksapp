@@ -2,9 +2,7 @@ import { NavLink, useLocation, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOfferRealtime } from "@/hooks/useOfferRealtime";
 import { NotificationsBanner } from "@/components/NotificationsBanner";
-import { MobileTopBar } from "@/components/MobileTopBar";
-import { MobileBottomNav } from "@/components/MobileBottomNav";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { MobileTopNav } from "@/components/MobileTopNav";
 import {
   LayoutDashboard, Briefcase, Calendar, Zap, TrendingUp,
   Sliders, Scale, Users, FlaskConical, GitBranch, Plug, Tag,
@@ -46,20 +44,17 @@ function SidebarBody({
   isAdmin,
   user,
   signOut,
-  onNavigate,
 }: {
   links: typeof spLinks;
   collapsed: boolean;
   isAdmin: boolean;
   user: any;
   signOut: () => void;
-  onNavigate?: () => void;
 }) {
   const location = useLocation();
   const role = user?.role ?? "sp";
   return (
     <>
-      {/* Logo */}
       <div className="flex h-14 items-center gap-2 border-b border-sidebar-border px-4">
         <img
           src="/assets/branding/winducks-iconw.png"
@@ -73,7 +68,6 @@ function SidebarBody({
         )}
       </div>
 
-      {/* User info */}
       <div className="border-b border-sidebar-border p-3">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-accent-foreground text-xs font-bold bg-accent">
@@ -88,7 +82,6 @@ function SidebarBody({
         </div>
       </div>
 
-      {/* Nav Links */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
         {links.map((link) => {
           const isActive =
@@ -99,7 +92,6 @@ function SidebarBody({
             <NavLink
               key={link.to}
               to={link.to}
-              onClick={onNavigate}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 isActive
                   ? "bg-sidebar-accent text-sidebar-primary"
@@ -114,7 +106,6 @@ function SidebarBody({
 
         <Link
           to="/install"
-          onClick={onNavigate}
           className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ${
             collapsed ? "justify-center" : ""
           }`}
@@ -124,7 +115,6 @@ function SidebarBody({
         </Link>
       </nav>
 
-      {/* Logout */}
       <button
         onClick={signOut}
         className="flex items-center gap-2 px-4 py-2 text-xs text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors border-t border-sidebar-border"
@@ -139,13 +129,11 @@ function SidebarBody({
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
   const role = user?.role ?? "sp";
   const isAdmin = role === "admin" || role === "owner";
   const links = isAdmin ? adminLinks : spLinks;
 
-  // Realtime offer notifications for SPs
   useOfferRealtime(!isAdmin ? user?.spId ?? null : null);
 
   const pageTitle = useMemo(() => {
@@ -160,9 +148,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen w-full">
-      {/* Desktop sidebar */}
+      {/* Desktop sidebar (xl+) */}
       <aside
-        className={`sticky top-0 hidden h-screen flex-col border-r bg-sidebar text-sidebar-foreground transition-all duration-300 lg:flex ${
+        className={`sticky top-0 hidden h-screen flex-col border-r bg-sidebar text-sidebar-foreground transition-all duration-300 xl:flex ${
           collapsed ? "w-16" : "w-60"
         }`}
       >
@@ -181,39 +169,20 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </button>
       </aside>
 
-      {/* Mobile drawer sidebar */}
-      <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <SheetContent
-          side="left"
-          className="w-72 p-0 bg-sidebar text-sidebar-foreground border-sidebar-border"
-        >
-          <div className="flex h-full flex-col">
-            <SidebarBody
-              links={links}
-              collapsed={false}
-              isAdmin={isAdmin}
-              user={user}
-              signOut={() => {
-                setDrawerOpen(false);
-                signOut();
-              }}
-              onNavigate={() => setDrawerOpen(false)}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
-
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        <MobileTopBar title={pageTitle} onOpenMenu={() => setDrawerOpen(true)} />
-        <div className="mx-auto max-w-7xl p-4 pb-24 sm:p-6 lg:p-8 lg:pb-8">
+        <MobileTopNav
+          title={pageTitle}
+          links={links}
+          isAdmin={isAdmin}
+          user={user}
+          signOut={signOut}
+        />
+        <div className="mx-auto max-w-7xl p-4 sm:p-6 xl:p-8">
           {!isAdmin && user?.spId && <NotificationsBanner />}
           {children}
         </div>
       </main>
-
-      {/* Mobile bottom tab bar */}
-      <MobileBottomNav isAdmin={isAdmin} />
     </div>
   );
 }
