@@ -57,6 +57,18 @@ export default function UnavailableDialog({
 
   function handleSave() {
     setError(null);
+    if (!/^\d{2}:\d{2}$/.test(end)) {
+      setError("Please enter a valid end time.");
+      return;
+    }
+    const [sh, sm] = start.split(":").map(Number);
+    const [eh, em] = end.split(":").map(Number);
+    const startMin = sh * 60 + sm;
+    const endMin = eh * 60 + em;
+    if (endMin - startMin < 15) {
+      setError("End time must be at least 15 minutes after start time.");
+      return;
+    }
     onSave({ id: initial?.id, date, start, end, reason: reason.trim() });
   }
 
