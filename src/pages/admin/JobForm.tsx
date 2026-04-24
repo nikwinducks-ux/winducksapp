@@ -216,6 +216,7 @@ export default function JobForm() {
 
     const payload: any = {
       customerId: form.customerId,
+      customerPropertyId: form.customerPropertyId,
       serviceCategory: primaryCategory,
       payout: finalPayout,
       street: form.street,
