@@ -1,44 +1,40 @@
+# Fix customer contact icons not opening phone/SMS
+
 ## Problem
 
-On mobile week view the date header (`WeekDateStrip`) is its own horizontal scroller with ~57 days, while the time grid below only renders the 7 days of the current week. Swiping the date header slides the date labels independently of the time columns underneath, so the date "Tue 23" no longer sits above the Tue 23 time column. The user wants the date label and its time column to move together.
+The Phone and Message icons render correctly in the SP calendar's job sheet, but clicking them only shows the focus state ("turn orange") and never opens the phone dialer or SMS app.
 
-## Root cause
+Root cause: the buttons use `<Button asChild><a href="tel:..."></a></Button>`. Inside the Lovable preview iframe (and many sandboxed iframes), navigating to non-`http(s)` schemes like `tel:` / `sms:` from an inline `<a>` is silently blocked. The teammate buttons in `CrewTeammates` have the same latent issue but aren't usually noticed because users test them less.
 
-The strip and the grid live in two separate scroll containers and render different ranges:
-- Strip: windowed ±28 days, scrolls freely.
-- Grid: only the 7 days around `currentDate`, scrolls within those 7.
+The fix is to (a) intercept the click and explicitly route the navigation to the top-level window, and (b) surface the phone number itself so the user has a fallback to copy.
 
-There is no per-pixel link between them — only a debounced "settle" callback that re-anchors the week.
+## Changes
 
-## Fix: render dates inline above each time column
+### `src/components/sp/CustomerContactActions.tsx` (rewrite)
 
-Remove the independent strip and bring the date header back inside the same horizontal scroll container as the time grid, on mobile as well as desktop. To preserve the "infinite past/future scroll" behavior the strip provided, widen the grid's rendered range to the same windowed ±N days, and let one shared scroller move both header and columns in lockstep.
+- Replace the `<Button asChild><a href>` pattern with real `<button>` elements that handle the click via JS.
+- New helper `openContactUrl(url)` that:
+  1. Tries `window.top.location.href = url` (escapes the preview iframe).
+  2. Falls back to `window.open(url, "_top")`.
+  3. Final fallback: `window.location.href = url`.
+- Wrap each icon in a small `ContactIconButton` that calls `openContactUrl` with `tel:` / `sms:` and stops event propagation so the surrounding Sheet doesn't swallow it.
+- Display the resolved phone number under the customer name so the SP can copy it manually if their device can't follow the link.
+- When no phone is on file, render a clear "no phone on file" state instead of nothing (so the SP knows why icons are absent).
+- Keep the same public API (`customerId`, `customerName`, `variant`) so the existing `SPCalendar.tsx` integration keeps working with no changes.
 
-### Changes in `src/components/calendar/JobCalendar.tsx`
+## Technical detail
 
-1. **Delete `WeekDateStrip`** and its mobile-only render block.
-2. **In `WeekView`**, replace `days = eachDayOfInterval(start..end of week)` (mobile only) with a windowed range anchored on `currentDate`:
-   - `windowedDays`: `addDays(currentDate, -half)` … `addDays(currentDate, +half)` with `half` starting at 28.
-   - Keep desktop on the existing 7-day week.
-3. **Render a single header row** (mobile + desktop) inside the existing `hScrollRef` container, above the time grid, using the same `dayMinWidthPx` and the same `days` array as the columns. Each header cell is a button that calls `onDateChange?.(d)` so tapping a date still selects it. This guarantees the header cell and its time column share the same x-position because they live in the same flex row width.
-4. **Infinite scroll**: on mobile, attach a debounced scroll handler to `hScrollRef`. When the centered column index falls within ~7 of either end of `windowedDays`, grow `half` by 28 and adjust `scrollLeft` to compensate so the visible position does not jump. On settle, call `onDateChange?.(centeredDay)` so the parent's `currentDate` follows the user's position (used for the navigation label and "Today" button).
-5. **Initial centering**: on mount and whenever `currentDate` changes from outside (Today button, arrows), use `scrollTo({ left: targetLeft })` on `hScrollRef` to center the matching column. Suppress the settle callback briefly so the programmatic scroll does not echo back into `onDateChange`.
-6. **Scroll feel**: keep `scroll-snap-type: x proximity` and `scroll-padding-left: 56px` on the shared container. Drop `scrollSnapAlign` on day cells in favor of `scroll-snap-align: start` so a single flick lands cleanly on a day boundary. Keep the existing zoom buttons (`fit` / `comfortable` / `large`) — `fit` mode disables horizontal scroll the same way it does today.
-7. **`useHorizontalWheelScroll`**: enable on mobile too now that there is a real horizontal scroller for the windowed range (still no-op when `isFit`).
+```tsx
+function openContactUrl(url: string) {
+  try {
+    if (window.top && window.top !== window) {
+      window.top.location.href = url;
+      return;
+    }
+  } catch { /* cross-origin top — fall through */ }
+  const opened = window.open(url, "_top");
+  if (!opened) window.location.href = url;
+}
+```
 
-### Net behavior
-
-- Header cell "Tue 23" and the time column for Tue 23 are the same flex item width inside the same scroll container — they cannot detach.
-- Swiping the header swipes the columns (and vice-versa) because there is one scroller.
-- Past/future is still effectively infinite via window growth on edge approach.
-- Navigation arrows, "Today", zoom in/out, and tap-to-select all keep working.
-
-### Files
-
-- `src/components/calendar/JobCalendar.tsx` — remove `WeekDateStrip`, restructure `WeekView` per above.
-- No changes needed in `AdminCalendar.tsx` / `SPCalendar.tsx` — `onDateChange` wiring stays the same.
-
-## Out of scope
-
-- Desktop week view layout (already inline; only gains windowed range if we choose to — kept on 7-day week for now to avoid changing desktop UX).
-- Day and Month views.
+No other files need to change — `SPCalendar.tsx` already renders `<CustomerContactActions />` and the props stay the same.
