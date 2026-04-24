@@ -213,6 +213,8 @@ export default function SPCalendar() {
   }
 
   const isPendingOffer = selectedJob ? pendingOfferJobIds.has(selectedJob.dbId) && selectedJob.assignedSpId !== spId : false;
+  const me = providers.find((p) => p.id === spId);
+  const autoAcceptOn = !!me?.autoAccept;
 
   const isAvailability = view === "availability";
 

@@ -1,67 +1,46 @@
 ## Goal
 
-Make it easy for SPs to start/end jobs from the Calendar, and add a dedicated "Past Jobs" page (completed jobs) for both the SP "My Jobs" area and the Admin "Jobs" area.
+Let Service Providers accept or decline pending job offers directly from the **Calendar** (mobile + desktop) — but only when **Auto-Accept is OFF** in their account. When Auto-Accept is ON, the system handles offers automatically and manual accept/decline buttons should not appear.
 
 ---
 
-## 1. SP Calendar — Start/End jobs from the calendar
+## Current state
 
-`src/pages/sp/SPCalendar.tsx` already opens a side sheet when an SP taps a job, with "Mark In Progress" and "Mark Completed" buttons. They are functional but cramped. Improvements:
+`src/pages/sp/SPCalendar.tsx` already opens a side sheet when an SP taps a job block. For pending offers it already shows **Accept** and **Reject** buttons, wired to `useAcceptOffer` / `useDeclineOffer`. What's missing is the **auto-accept gating**.
 
-- Promote the action buttons into a clearly labeled **"Update Status"** section at the top of the sheet (above details), so they're the first thing visible.
-- Replace the small `size="sm"` buttons with full-width `size="lg"` buttons, mirroring the pattern in `SPJobDetail.tsx`.
-- Show a clear **"Start Job"** label (instead of "Mark In Progress") and **"End Job"** label (instead of "Mark Completed") for clarity, but keep underlying status transitions (`Assigned/Accepted → InProgress → Completed`) unchanged.
-- After starting a job, keep the sheet open and immediately swap the button to **"End Job"** so the SP can complete in one flow.
-- On `Completed`, show a success confirmation block in the sheet and auto-close after 1.5s.
-- Toast confirmation on each transition (already wired through `useUpdateJobStatus`).
-
-No backend changes — `enforce_sp_job_update` already allows `Assigned/Accepted → InProgress → Completed` transitions for the assigned SP / crew members.
+The SP's `autoAccept` flag is already loaded via `useServiceProviders()` (we read `providers` in the calendar) and is mapped from `service_providers.auto_accept`.
 
 ---
 
-## 2. SP Portal — "Past Jobs" sub-page under My Jobs
+## Changes (one file)
 
-Currently `src/pages/sp/MyJobs.tsx` shows both "Active Jobs" and a small "Past Jobs" section on one page. Split this into two tab views:
+**`src/pages/sp/SPCalendar.tsx`**
 
-- Add a tabbed UI at the top of `MyJobs.tsx`: **Active** and **Past**.
-  - Active = jobs not in `Completed` / `Cancelled`
-  - Past = jobs in `Completed` (and Cancelled, optionally — see open question below; default: only `Completed` per the user request).
-- Keep on a single route `/my-jobs` with `?tab=active|past` query param so deep links work.
-- Use the existing card layouts (active = full card, past = compact row).
-- Add count badges on each tab (e.g., "Active (3)", "Past (12)").
-- Empty state per tab.
-- Works on both mobile and desktop (Tabs component is already responsive).
+1. Look up the current SP record from the already-loaded `providers` list:
+   ```ts
+   const me = providers.find((p) => p.id === spId);
+   const autoAcceptOn = !!me?.autoAccept;
+   ```
+2. In the sheet's "Respond to Offer" block, render the Accept / Reject buttons **only when `!autoAcceptOn`**.
+3. When auto-accept IS on and the job is a pending offer, replace the action block with an **info banner** explaining the situation, with a link to Auto-Accept Settings:
+   > "Auto-Accept is ON — offers are handled automatically. Turn it off in Account → Auto-Accept to respond manually."
+   (Includes a `Link` to `/sp/auto-accept`.)
+4. Apply the same `!autoAcceptOn` gate so accidental taps while auto-accept is on cannot manually accept/decline.
 
-No new route is needed; the bottom nav and side nav still link to `/my-jobs`.
-
----
-
-## 3. Admin Jobs — "Past Jobs" view
-
-`src/pages/admin/JobManagement.tsx` currently filters out `Cancelled` and shows everything else (including completed). Restructure into two tabs at the top of the page:
-
-- **Active Jobs** (default): all statuses **except** `Completed` and `Cancelled`.
-- **Past Jobs**: all `Completed` jobs (Cancelled stays excluded to match current behavior).
-- Sync via `?tab=active|past` query param.
-- Both tabs reuse the same table component, search bar, sort, and existing row actions. The status filter dropdown stays available within each tab (in Past, it effectively only contains Completed).
-- Bulk actions that don't make sense for Completed jobs (Broadcast, Assign, Schedule) are hidden in the Past tab; Delete remains.
-- Tab labels include counts.
+No layout changes elsewhere; the sheet already works on mobile and desktop. No new routes, no DB changes, no new hooks. Status update buttons (Start Job / End Job) are unaffected.
 
 ---
 
-## Technical details
+## Edge cases
 
-**Files edited**
-- `src/pages/sp/SPCalendar.tsx` — restructure sheet content; rename actions to Start / End Job; full-width buttons; success state.
-- `src/pages/sp/MyJobs.tsx` — wrap content in `<Tabs>` (Active / Past) with URL sync via `useSearchParams`.
-- `src/pages/admin/JobManagement.tsx` — add Active/Past tabs above the filter row; partition `filtered` based on tab; hide irrelevant bulk actions in Past tab.
-
-**No new files, no routes, no schema changes.** All status data already lives on `jobs.status`.
-
-**State-machine note**: Status transitions remain governed by `enforce_sp_job_update` (DB trigger). The SP can only move `Assigned/Accepted → InProgress → Completed`. Admin can do anything. No DB migration required.
+- **SP record not yet loaded**: treat as auto-accept ON (hide buttons) until known, to avoid flashing the wrong UI. Optional: render a small "Loading…" placeholder.
+- **Offer becomes stale** (expired/cancelled before tap): existing `selectedOffer` lookup already returns `null`, so the block won't render.
+- **Job is assigned to me, not a pending offer**: unaffected — Start/End Job UI continues to render regardless of auto-accept state.
 
 ---
 
-## Open question
+## Out of scope
 
-Should the SP "Past Jobs" tab include **Cancelled** jobs too, or only **Completed**? Current plan: only Completed (matches user's wording: "All completed jobs"). Cancelled jobs will continue to be hidden from the SP's My Jobs view entirely. Let me know if you want Cancelled there as well.
+- Job Offers page (already supports manual accept/decline) — no change.
+- Auto-Accept Settings page — no change.
+- Admin views — no change.
