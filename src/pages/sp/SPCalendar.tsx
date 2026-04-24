@@ -234,7 +234,7 @@ export default function SPCalendar() {
           <TabsList>
             <TabsTrigger value="day">Day</TabsTrigger>
             {!isMobile && <TabsTrigger value="week">Week</TabsTrigger>}
-            {!isMobile && <TabsTrigger value="month">Month</TabsTrigger>}
+            <TabsTrigger value="month">Month</TabsTrigger>
             <TabsTrigger value="availability">Availability</TabsTrigger>
           </TabsList>
         </Tabs>
