@@ -98,6 +98,15 @@ function formatDayTotal(jobs: Job[]): string | null {
   return formatCADWhole(total);
 }
 
+function formatCompactCAD(jobs: Job[]): string | null {
+  if (!jobs.length) return null;
+  const total = jobs.reduce((sum, j) => sum + (Number(j.payout) || 0), 0);
+  if (total <= 0) return null;
+  if (total < 1000) return `$${Math.round(total)}`;
+  if (total < 10000) return `$${(total / 1000).toFixed(1)}k`;
+  return `$${Math.round(total / 1000)}k`;
+}
+
 function jobsOnDate(jobs: Job[], date: Date) {
   return jobs
     .filter((j) => j.scheduledDate && isSameDay(parseLocalDate(j.scheduledDate), date))
@@ -1007,6 +1016,7 @@ function MonthCell({
   });
 
   const dayTotal = formatDayTotal(dayJobs);
+  const dayTotalCompact = formatCompactCAD(dayJobs);
   const clickable = !!onDayClick;
   const mobileDots = dayJobs.slice(0, 2);
   const mobileOverflow = dayJobs.length - mobileDots.length;
@@ -1035,7 +1045,12 @@ function MonthCell({
         clickable && "cursor-pointer hover:bg-accent/40 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset"
       )}
     >
-      <div className="flex items-center justify-between gap-1 px-0.5 sm:px-1">
+      <div className={cn(
+        "px-0.5 sm:px-1",
+        isMobile
+          ? "flex flex-col items-start gap-0"
+          : "flex items-center justify-between gap-1"
+      )}>
         <div
           className={cn(
             "text-xs font-semibold",
@@ -1045,14 +1060,17 @@ function MonthCell({
         >
           {format(date, "d")}
         </div>
-        {dayTotal && (
-          <div className={cn(
-            "font-semibold text-primary truncate",
-            isMobile ? "text-[9px]" : "text-[10px]"
-          )}>
-            {dayTotal}
-          </div>
-        )}
+        {isMobile
+          ? dayTotalCompact && (
+              <div className="font-semibold text-primary text-[9px] leading-tight w-full">
+                {dayTotalCompact}
+              </div>
+            )
+          : dayTotal && (
+              <div className="font-semibold text-primary truncate text-[10px]">
+                {dayTotal}
+              </div>
+            )}
       </div>
 
       {isMobile ? (

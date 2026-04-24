@@ -5,24 +5,48 @@ interface Options {
   onRefresh: () => Promise<void> | void;
   threshold?: number;
   maxPull?: number;
+  activationThreshold?: number;
 }
+
+const isIOS = (): boolean => {
+  if (typeof navigator === "undefined") return false;
+  return /iP(hone|ad|od)/.test(navigator.userAgent);
+};
 
 export function usePullToRefresh<T extends HTMLElement>(
   targetRef: React.RefObject<T>,
-  { enabled, onRefresh, threshold = 70, maxPull = 120 }: Options,
+  {
+    enabled,
+    onRefresh,
+    threshold = 70,
+    maxPull = 120,
+    activationThreshold = 6,
+  }: Options,
 ) {
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const startYRef = useRef<number | null>(null);
   const activeRef = useRef(false);
+  const pullDistanceRef = useRef(0);
+  const iosRef = useRef(false);
+
+  useEffect(() => {
+    iosRef.current = isIOS();
+  }, []);
+
+  useEffect(() => {
+    pullDistanceRef.current = pullDistance;
+  }, [pullDistance]);
 
   useEffect(() => {
     const el = targetRef.current;
     if (!enabled || !el) return;
 
+    const atTop = () => el.scrollTop <= 0;
+
     const onTouchStart = (e: TouchEvent) => {
       if (isRefreshing) return;
-      if (el.scrollTop > 0) {
+      if (!atTop()) {
         startYRef.current = null;
         return;
       }
@@ -33,21 +57,33 @@ export function usePullToRefresh<T extends HTMLElement>(
     const onTouchMove = (e: TouchEvent) => {
       if (isRefreshing || startYRef.current === null) return;
       const dy = e.touches[0].clientY - startYRef.current;
+
       if (dy <= 0) {
         if (activeRef.current) setPullDistance(0);
         activeRef.current = false;
         return;
       }
-      if (el.scrollTop > 0) {
+
+      if (!atTop() && !activeRef.current) {
         startYRef.current = null;
         setPullDistance(0);
-        activeRef.current = false;
         return;
       }
+
+      // Claim the gesture early — before iOS can start the rubber-band animation.
+      if (!activeRef.current && dy < activationThreshold) {
+        // On iOS, preventDefault as soon as we see downward intent at top
+        // to suppress native bounce that would otherwise hijack the gesture.
+        if (iosRef.current && e.cancelable) e.preventDefault();
+        return;
+      }
+
       activeRef.current = true;
       const damped = Math.min(maxPull, dy * 0.5);
       setPullDistance(damped);
-      if (e.cancelable && damped > 5) e.preventDefault();
+
+      // Always preventDefault while gesture is active to stop iOS bounce.
+      if (e.cancelable) e.preventDefault();
     };
 
     const onTouchEnd = async () => {
@@ -83,13 +119,7 @@ export function usePullToRefresh<T extends HTMLElement>(
       el.removeEventListener("touchcancel", onTouchEnd);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, isRefreshing, onRefresh, threshold, maxPull]);
-
-  // Mirror pullDistance into a ref so onTouchEnd sees latest without re-binding listeners.
-  const pullDistanceRef = useRef(0);
-  useEffect(() => {
-    pullDistanceRef.current = pullDistance;
-  }, [pullDistance]);
+  }, [enabled, isRefreshing, onRefresh, threshold, maxPull, activationThreshold]);
 
   return { pullDistance, isRefreshing, threshold };
 }

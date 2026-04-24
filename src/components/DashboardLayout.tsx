@@ -185,7 +185,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             threshold={mobilePtr.threshold}
           />
         )}
-        <main ref={mobileMainRef} className="flex-1 overflow-auto">
+        <main
+          ref={mobileMainRef}
+          className="flex-1 overflow-auto overscroll-contain"
+          style={{ touchAction: "pan-y" }}
+        >
           <div className="mx-auto max-w-7xl p-4 sm:p-6">
             {!isAdmin && user?.spId && <NotificationsBanner />}
             {children}
@@ -224,7 +228,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           threshold={desktopPtr.threshold}
         />
       )}
-      <main ref={desktopMainRef} className="flex-1 overflow-auto">
+      <main
+        ref={desktopMainRef}
+        className="flex-1 overflow-auto overscroll-contain"
+        style={{ touchAction: "pan-y" }}
+      >
         <div className="sticky top-0 z-20 flex h-10 items-center justify-end gap-2 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
           <Button
             variant="ghost"

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   addDays, addMonths, addWeeks, format, startOfWeek, endOfWeek,
@@ -61,10 +61,6 @@ export default function SPCalendar() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogInitial, setDialogInitial] = useState<UnavailableDialogValue | null>(null);
 
-  // Week grid is unusable on small screens — bump to day if mobile lands on week.
-  useEffect(() => {
-    if (isMobile && view === "week") setView("day");
-  }, [isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pending-offer job ids for this SP
   const pendingOfferJobIds = useMemo(
@@ -238,7 +234,7 @@ export default function SPCalendar() {
         >
           <TabsList className="w-full sm:w-auto overflow-x-auto justify-start sm:justify-center">
             <TabsTrigger value="day">Day</TabsTrigger>
-            {!isMobile && <TabsTrigger value="week">Week</TabsTrigger>}
+            <TabsTrigger value="week">Week</TabsTrigger>
             <TabsTrigger value="month">Month</TabsTrigger>
             <TabsTrigger value="availability">
               <span className="sm:hidden">Avail.</span>

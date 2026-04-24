@@ -22,6 +22,7 @@ export function PullToRefreshIndicator({ pullDistance, isRefreshing, threshold }
         transform: `translate(-50%, ${translateY}px)`,
         opacity,
         transition: isRefreshing ? "transform 200ms ease" : "none",
+        willChange: "transform",
       }}
       aria-hidden="true"
     >
