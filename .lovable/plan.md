@@ -1,24 +1,36 @@
 
 
-## Add daily total payout to calendar headers
+## Add line items to Service Categories
 
-Show a clean **$ total of all jobs scheduled on each day** at the top of every day column, across Day / Week / Month views — same logic for admin and SP, same logic on mobile and desktop (the calendar component is shared, so one change covers every viewport).
+Make each row in `/admin/categories` clickable, opening a detail page where admins manage reusable **line items** (description + price) for that category. These can later be picked when building jobs.
 
 ### What you'll see
 
-- **Day view**: existing header (`Monday, April 28, 2025 · 3 job(s)`) gains a right-aligned `$1,240` chip.
-- **Week view**: each weekday header cell shows the weekday + date as today, plus a small `$` total on a third line. Days with no jobs show nothing (no `$0`).
-- **Month view**: each cell shows the date number top-left and a small muted `$` total top-right when there are jobs.
+- **List page (`/admin/categories`)**: each category row becomes clickable (chevron on the right). Click → navigates to the category detail page. Edit / Activate / Deactivate buttons keep working and stop click propagation.
+- **Detail page (`/admin/categories/:id`)**: header with category name + code + back link. Below: a **Line Items** section listing each item (description, price), with inline add/edit/delete. Empty state prompts "Add your first line item."
 
-### How totals are computed
+### Data model
 
-Sum `job.payout` across all jobs returned by the existing `jobsOnDate(jobs, date)` helper for that day. Format with `Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })` so `$1,240` (not `$1,240.00`) — keeps the chip compact on narrow week columns.
+New table `service_category_line_items`:
+- `id uuid pk`
+- `category_id uuid` (references `service_categories.id`, not enforced as FK per project convention)
+- `description text not null`
+- `price numeric not null default 0`
+- `display_order int not null default 0`
+- `active boolean not null default true`
+- `created_at`, `updated_at timestamptz`
 
-A tiny `formatDayTotal(jobs: Job[]): string | null` helper lives at the top of `JobCalendar.tsx` and returns `null` when the list is empty so views can skip rendering the chip.
+RLS: same pattern as `service_categories` — `Admin full access` (admin/owner) + `SP select active` so SPs can read items for active categories during job flows later.
 
-### Files touched
+### Files
 
-- `src/components/calendar/JobCalendar.tsx` — add `formatDayTotal` helper; render the total in `DayView` header, `WeekView` weekday header cells, and `MonthCell`.
+- **Migration**: create `service_category_line_items` + RLS + `update_updated_at_column` trigger.
+- **`src/hooks/useSupabaseData.ts`**: add `ServiceCategoryLineItem` type and hooks `useCategoryLineItems(categoryId)`, `useCreateLineItem()`, `useUpdateLineItem()`, `useDeleteLineItem()`.
+- **`src/pages/admin/ServiceCategories.tsx`**: wrap each row in a `Link` to `/admin/categories/:id`; keep edit/toggle buttons with `e.stopPropagation()`; add a `ChevronRight`.
+- **`src/pages/admin/CategoryDetail.tsx`** (new): header + back link + line-item editor (add row, inline edit description/price, delete, currency formatting).
+- **`src/App.tsx`**: register route `/admin/categories/:id` → `CategoryDetail` (admin/owner only).
 
-No other files change. Admin Calendar, SP Calendar, mobile shell, and desktop shell all consume this single component, so the totals appear everywhere automatically.
+### Out of scope (for a follow-up if wanted)
+
+- Wiring line items into the Job multi-service editor as a "pick from catalog" picker (today line items in `JobServiceLineItems` are free-form). Happy to add this next.
 
