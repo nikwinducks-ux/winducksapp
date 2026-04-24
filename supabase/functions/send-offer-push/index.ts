@@ -102,9 +102,9 @@ async function makeVapidJWT(audience: string, subject: string, publicKeyB64: str
 
 // ─── HKDF helper using Web Crypto ───
 async function hkdf(salt: Uint8Array, ikm: Uint8Array, info: Uint8Array, length: number): Promise<Uint8Array> {
-  const baseKey = await crypto.subtle.importKey("raw", ikm, "HKDF", false, ["deriveBits"]);
+  const baseKey = await crypto.subtle.importKey("raw", ikm as BufferSource, "HKDF", false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits(
-    { name: "HKDF", hash: "SHA-256", salt, info },
+    { name: "HKDF", hash: "SHA-256", salt: salt as BufferSource, info: info as BufferSource },
     baseKey,
     length * 8
   );
