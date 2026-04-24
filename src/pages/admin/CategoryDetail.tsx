@@ -11,8 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+import { formatCAD } from "@/lib/currency";
 
 export default function CategoryDetail() {
   const { id } = useParams<{ id: string }>();
@@ -24,10 +23,12 @@ export default function CategoryDetail() {
   const deleteItem = useDeleteLineItem();
 
   const [showAdd, setShowAdd] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newPrice, setNewPrice] = useState("");
 
   const [editId, setEditId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editPrice, setEditPrice] = useState("");
 
@@ -43,13 +44,20 @@ export default function CategoryDetail() {
   }
 
   const handleAdd = () => {
-    const desc = newDesc.trim();
-    if (!desc) return;
+    const title = newTitle.trim();
+    if (!title) return;
     const priceNum = parseFloat(newPrice) || 0;
     createItem.mutate(
-      { category_id: category.id, description: desc, price: priceNum, display_order: items.length + 1 },
+      {
+        category_id: category.id,
+        title,
+        description: newDesc.trim(),
+        price: priceNum,
+        display_order: items.length + 1,
+      },
       {
         onSuccess: () => {
+          setNewTitle("");
           setNewDesc("");
           setNewPrice("");
           setShowAdd(false);
@@ -60,15 +68,16 @@ export default function CategoryDetail() {
 
   const startEdit = (item: typeof items[number]) => {
     setEditId(item.id);
-    setEditDesc(item.description);
+    setEditTitle(item.title || item.description || "");
+    setEditDesc(item.description || "");
     setEditPrice(String(item.price));
   };
 
   const handleUpdate = (itemId: string) => {
-    const desc = editDesc.trim();
-    if (!desc) return;
+    const title = editTitle.trim();
+    if (!title) return;
     updateItem.mutate(
-      { id: itemId, category_id: category.id, description: desc, price: parseFloat(editPrice) || 0 },
+      { id: itemId, category_id: category.id, title, description: editDesc.trim(), price: parseFloat(editPrice) || 0 },
       { onSuccess: () => setEditId(null) }
     );
   };
@@ -106,21 +115,25 @@ export default function CategoryDetail() {
 
         {showAdd && (
           <div className="metric-card space-y-3">
+            <div className="space-y-1.5">
+              <Label>Title</Label>
+              <Input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="e.g. Standard window cleaning" />
+            </div>
             <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
               <div className="space-y-1.5">
-                <Label>Description</Label>
-                <Input value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="e.g. Standard window cleaning (per window)" />
+                <Label>Description <span className="text-xs text-muted-foreground">(optional)</span></Label>
+                <Input value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="e.g. Per window, exterior only" />
               </div>
               <div className="space-y-1.5">
-                <Label>Price (USD)</Label>
+                <Label>Price <span className="text-xs text-muted-foreground">(CAD)</span></Label>
                 <Input type="number" step="0.01" min="0" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} placeholder="0.00" />
               </div>
             </div>
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleAdd} disabled={!newDesc.trim() || createItem.isPending}>
+              <Button size="sm" onClick={handleAdd} disabled={!newTitle.trim() || createItem.isPending}>
                 {createItem.isPending ? "Saving..." : "Save"}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => { setShowAdd(false); setNewDesc(""); setNewPrice(""); }}>
+              <Button size="sm" variant="outline" onClick={() => { setShowAdd(false); setNewTitle(""); setNewDesc(""); setNewPrice(""); }}>
                 Cancel
               </Button>
             </div>
@@ -139,31 +152,38 @@ export default function CategoryDetail() {
         ) : (
           <div className="space-y-2">
             {items.map((item) => (
-              <div key={item.id} className="metric-card flex items-center gap-3">
+              <div key={item.id} className="metric-card">
                 {editId === item.id ? (
-                  <div className="flex-1 flex items-center gap-2">
-                    <Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="flex-1" />
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={editPrice}
-                      onChange={(e) => setEditPrice(e.target.value)}
-                      className="max-w-[120px]"
-                    />
-                    <Button size="sm" variant="ghost" onClick={() => handleUpdate(item.id)}>
-                      <Check className="h-4 w-4" />
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setEditId(null)}>
-                      <X className="h-4 w-4" />
-                    </Button>
+                  <div className="space-y-2">
+                    <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Title" />
+                    <Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="Description (optional)" />
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editPrice}
+                        onChange={(e) => setEditPrice(e.target.value)}
+                        className="max-w-[140px]"
+                        placeholder="Price (CAD)"
+                      />
+                      <Button size="sm" variant="ghost" onClick={() => handleUpdate(item.id)}>
+                        <Check className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditId(null)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ) : (
-                  <>
+                  <div className="flex items-center gap-3">
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{item.description}</p>
+                      <p className="font-medium truncate">{item.title || item.description}</p>
+                      {item.description && item.title && (
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">{item.description}</p>
+                      )}
                     </div>
-                    <p className="font-mono text-sm shrink-0">{currency.format(Number(item.price) || 0)}</p>
+                    <p className="font-mono text-sm shrink-0">{formatCAD(Number(item.price) || 0)}</p>
                     <div className="flex items-center gap-1 shrink-0">
                       <Button size="sm" variant="ghost" onClick={() => startEdit(item)}>
                         <Pencil className="h-3.5 w-3.5" />
@@ -172,7 +192,7 @@ export default function CategoryDetail() {
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
             ))}
