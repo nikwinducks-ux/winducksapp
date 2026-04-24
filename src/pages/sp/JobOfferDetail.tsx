@@ -1,4 +1,5 @@
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
+import { formatCAD } from "@/lib/currency";
 import { useServiceProviders, useJobs, useActiveServiceCategories, useServiceCategories } from "@/hooks/useSupabaseData";
 import { JobServicesDisplay } from "@/components/JobServicesDisplay";
 import { useAcceptOffer, useDeclineOffer, useOffers } from "@/hooks/useOfferData";

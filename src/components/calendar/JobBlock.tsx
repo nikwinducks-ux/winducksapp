@@ -1,4 +1,5 @@
 import { useDraggable } from "@dnd-kit/core";
+import { formatCAD } from "@/lib/currency";
 import type { Job } from "@/data/mockData";
 import { cn } from "@/lib/utils";
 import { ScheduleDebugBadge } from "./ScheduleDebug";

@@ -1,4 +1,5 @@
 import type { JobService } from "@/data/mockData";
+import { formatCAD } from "@/lib/currency";
 import type { ServiceCategory } from "@/hooks/useSupabaseData";
 import { Briefcase } from "lucide-react";
 

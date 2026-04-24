@@ -1,4 +1,5 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
+import { formatCAD } from "@/lib/currency";
 import { JobServicesDisplay } from "@/components/JobServicesDisplay";
 import { useJobs, useServiceProviders, useAssignJob, useActiveServiceCategories, useServiceCategories, useJobCrew, useAddCrewMember, useRemoveCrewMember, useSetCrewLead } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";

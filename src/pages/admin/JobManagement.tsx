@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { formatCAD } from "@/lib/currency";
 import { useJobs, useServiceProviders, useServiceCategories, useDeleteJob, useStopBroadcast, useAssignJob, useUnassignJob } from "@/hooks/useSupabaseData";
 import { useGenerateBroadcastOffers } from "@/hooks/useOfferData";
 import { StatusBadge } from "@/components/StatusBadge";

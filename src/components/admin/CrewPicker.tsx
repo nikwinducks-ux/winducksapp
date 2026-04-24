@@ -1,4 +1,5 @@
 import { Star } from "lucide-react";
+import { formatCAD } from "@/lib/currency";
 import type { ServiceProvider } from "@/data/mockData";
 import { Label } from "@/components/ui/label";
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { formatCAD } from "@/lib/currency";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useCustomers, useCreateJob, useUpdateJob, useActiveServiceCategories, useJobServices, useSaveJobServices, useJobPhotos, useSaveJobPhotos, useJobCrew, useAssignCrew, useServiceProviders } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
