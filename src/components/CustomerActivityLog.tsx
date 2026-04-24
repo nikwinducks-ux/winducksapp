@@ -4,78 +4,32 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import {
-  Plus, Pencil, Trash2, Calendar, UserCheck, UserMinus, CheckCircle2, XCircle,
-  DollarSign, MapPin, FileText, AlertTriangle, Image, Package, User, ChevronDown, History,
-} from "lucide-react";
+import { ChevronDown } from "lucide-react";
+import { ACTIVITY_EVENT_GROUPS, getActivityIcon, relativeTime, type ActivityFilterKey } from "@/components/activityLogIcons";
 
 interface Props {
   customerId: string;
 }
 
-type FilterKey = "all" | "jobs" | "services" | "photos" | "profile";
+type FilterKey = Exclude<ActivityFilterKey, "customers"> | "profile";
 
-const EVENT_GROUPS: Record<FilterKey, string[]> = {
+const LOCAL_GROUPS: Record<FilterKey, string[]> = {
   all: [],
-  jobs: [
-    "job_created", "job_scheduled", "job_rescheduled", "job_assigned", "job_unassigned",
-    "job_status_changed", "job_completed", "job_cancelled", "job_deleted",
-    "job_payout_changed", "job_address_changed", "job_notes_changed", "job_urgency_changed",
-  ],
-  services: ["service_added", "service_updated", "service_removed"],
-  photos: ["photo_added", "photo_removed"],
-  profile: ["customer_created", "customer_updated"],
+  jobs: ACTIVITY_EVENT_GROUPS.jobs,
+  services: ACTIVITY_EVENT_GROUPS.services,
+  photos: ACTIVITY_EVENT_GROUPS.photos,
+  profile: ACTIVITY_EVENT_GROUPS.customers,
 };
-
-function eventIcon(type: string) {
-  const cls = "h-4 w-4";
-  switch (type) {
-    case "job_created": return <Plus className={cls} />;
-    case "job_scheduled":
-    case "job_rescheduled": return <Calendar className={cls} />;
-    case "job_assigned": return <UserCheck className={cls} />;
-    case "job_unassigned": return <UserMinus className={cls} />;
-    case "job_completed": return <CheckCircle2 className={cls} />;
-    case "job_cancelled":
-    case "job_deleted": return <XCircle className={cls} />;
-    case "job_status_changed":
-    case "job_urgency_changed": return <AlertTriangle className={cls} />;
-    case "job_payout_changed": return <DollarSign className={cls} />;
-    case "job_address_changed": return <MapPin className={cls} />;
-    case "job_notes_changed": return <FileText className={cls} />;
-    case "service_added":
-    case "service_updated":
-    case "service_removed": return <Package className={cls} />;
-    case "photo_added":
-    case "photo_removed": return <Image className={cls} />;
-    case "customer_created":
-    case "customer_updated": return <User className={cls} />;
-    default: return <History className={cls} />;
-  }
-}
-
-function relativeTime(iso: string): string {
-  const d = new Date(iso);
-  const diffMs = Date.now() - d.getTime();
-  const sec = Math.floor(diffMs / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  if (day < 30) return `${day}d ago`;
-  return d.toLocaleDateString();
-}
 
 function ActivityItem({ entry }: { entry: CustomerActivityLogEntry }) {
   const [open, setOpen] = useState(false);
   const hasDetails = entry.details && Object.keys(entry.details).length > 0;
+  const Icon = getActivityIcon(entry.event_type);
 
   return (
     <div className="flex gap-3 pb-4 border-b border-border last:border-0">
       <div className="mt-0.5 h-8 w-8 shrink-0 rounded-full bg-secondary flex items-center justify-center text-muted-foreground">
-        {eventIcon(entry.event_type)}
+        <Icon className="h-4 w-4" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground">{entry.summary}</p>
@@ -117,7 +71,7 @@ export function CustomerActivityLog({ customerId }: Props) {
 
   const filtered = useMemo(() => {
     if (filter === "all") return entries;
-    const allowed = EVENT_GROUPS[filter];
+    const allowed = LOCAL_GROUPS[filter];
     return entries.filter((e) => allowed.includes(e.event_type));
   }, [entries, filter]);
 
