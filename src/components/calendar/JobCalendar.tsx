@@ -64,6 +64,8 @@ interface JobCalendarProps {
   onUnavailableClick?: (block: SpUnavailableBlock) => void;
   /** SP-only: drag empty grid space to create an unavailable block. */
   onCreateUnavailable?: (date: Date, start: string, end: string) => void;
+  /** Tap a day in month view to drill into Day view. */
+  onDayClick?: (date: Date) => void;
 }
 
 
