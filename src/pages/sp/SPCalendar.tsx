@@ -489,6 +489,12 @@ export default function SPCalendar() {
                   </div>
                 )}
 
+                <CustomerContactActions
+                  customerId={selectedJob.customerId}
+                  customerName={selectedJob.customerName}
+                  variant="card"
+                />
+
                 <CrewTeammates jobId={selectedJob.dbId} excludeSpId={spId} variant="card" showPhone />
 
                 <div className="border-t pt-4">
