@@ -1,47 +1,50 @@
 
 
-## Mobile-friendly Month view for SP Calendar
+## Republish + verify SP Month tab
 
-Enable the **Month** tab on mobile for the SP calendar, optimize the month grid for narrow screens, and make tapping a day jump into the **Day** view for that date. Day totals (already implemented in `MonthCell`) will remain visible.
+### Issue 1 — Published URL is stale
 
-### What you'll see (mobile, SP `/calendar`)
+Frontend changes (including the new Month-on-mobile + day drill-down work) only go live on `winducksapp.lovable.app` after you click **Publish → Update** in the editor. The preview URL (`id-preview--…lovable.app`) always shows the latest code, but the published URL is a separate snapshot.
 
-- **Day / Month / Availability** tabs (Week stays desktop-only — its 7-column hourly grid is unusable at <768px).
-- **Month grid** sized for small screens:
-  - Smaller cell min-height (~64px instead of 110px) so the full month fits without huge vertical scroll.
-  - Day number top-left, **dollar total top-right** (e.g. `$420`) in primary color when the day has jobs.
-  - Up to **2 colored dots** per day (one per job, status-colored) instead of full job blocks; `+N` if more. Keeps cells legible at ~50px wide.
-  - Today highlighted; out-of-month days dimmed.
-  - Weekday header shortened to single letters (M T W T F S S) on mobile.
-- **Tap a day** → switches to `Day` view for that date (works on both mobile and desktop). Tapping a job dot still opens the existing job sheet.
-- The existing "Other scheduled jobs not in this view" chip strip continues to work.
+**Action for you:** Click **Publish** (top-right) → **Update**. No code change needed for this.
 
-### Implementation
+### Issue 2 — "Month tab not visible for SP account"
 
-**`src/components/calendar/JobCalendar.tsx`**
-- Add an optional `onDayClick?: (date: Date) => void` prop on `JobCalendarProps`, threaded through `MonthView` → `MonthCell`.
-- `MonthCell`:
-  - Wrap the cell in a `button` (or add an `onClick` to the root div with `role="button"`) that calls `onDayClick(date)` when provided. Stop propagation on inner job-dot clicks so they still call `onJobClick`.
-  - Use `useIsMobile()` to switch rendering:
-    - Desktop: keep current `JobBlock` rows (up to 3) + `+N more`.
-    - Mobile: render a row of small status-colored dots (max 2) + `+N` text. Use `getJobAppearance(job)` for the color class (reuse status palette already used by `JobBlock`).
-  - Reduce `min-h-[110px]` to `min-h-[64px] sm:min-h-[110px]`, tighten padding to `p-0.5 sm:p-1`.
-  - Day total: keep `formatDayTotal(dayJobs)` chip; on mobile shrink to `text-[9px]` and truncate.
-- `MonthView` weekday header: render `["M","T","W","T","F","S","S"]` on mobile, full `Mon…Sun` on desktop (via `useIsMobile`).
+I checked `src/pages/sp/SPCalendar.tsx` and the Month tab is already rendered for SPs on every viewport (only `Week` is gated to desktop):
 
-**`src/pages/sp/SPCalendar.tsx`**
-- Remove the `!isMobile` guard on the `<TabsTrigger value="month">` so Month is selectable on mobile. Keep Week desktop-only.
-- Remove the `useEffect` that forces `view="day"` when on mobile + week (replace with: only force off `week` if mobile, leave `month` alone).
-- Pass `onDayClick={(date) => { setCurrentDate(date); setView("day"); }}` to `<JobCalendar>`.
+```tsx
+<TabsList>
+  <TabsTrigger value="day">Day</TabsTrigger>
+  {!isMobile && <TabsTrigger value="week">Week</TabsTrigger>}
+  <TabsTrigger value="month">Month</TabsTrigger>
+  <TabsTrigger value="availability">Availability</TabsTrigger>
+</TabsList>
+```
 
-**`src/pages/admin/AdminCalendar.tsx`** (small parity win, no behavior change for admin desktop)
-- Also pass `onDayClick` so admins on mobile/tablet can drill in the same way. Optional but trivial — keeps the prop consistent.
+So in code it's there. The two realistic reasons you're not seeing it:
+
+1. **Published URL is stale** (covered above) — most likely cause.
+2. **TabsList overflow at narrow widths.** The header row is `flex-wrap` with the title on the left and `TabsList` on the right. With 4 triggers (`Day · Week · Month · Availability`) on a tablet-width SP layout, the list can wrap or push past the viewport edge so Month/Availability scroll out of view without an obvious scrollbar.
+
+### Small fix to make tabs always reachable
+
+Make the SP `TabsList` horizontally scrollable and full-width on small screens so all triggers are always tappable:
+
+- `src/pages/sp/SPCalendar.tsx` — wrap `<TabsList>` in an overflow container and let it shrink:
+  ```tsx
+  <Tabs value={view} onValueChange={...} className="w-full sm:w-auto">
+    <TabsList className="w-full sm:w-auto overflow-x-auto justify-start sm:justify-center">
+      …
+    </TabsList>
+  </Tabs>
+  ```
+- Shorten the `Availability` trigger label to `Avail.` on mobile (optional) so all four fit without scrolling on most phones.
 
 ### Files touched
 
-- **Edited**: `src/components/calendar/JobCalendar.tsx` (MonthView/MonthCell mobile rendering, new `onDayClick` prop, weekday header)
-- **Edited**: `src/pages/sp/SPCalendar.tsx` (enable Month on mobile, wire `onDayClick` → switch to Day)
-- **Edited**: `src/pages/admin/AdminCalendar.tsx` (optional: pass `onDayClick` for parity)
+- **Edited**: `src/pages/sp/SPCalendar.tsx` (TabsList overflow + responsive width; optional shorter mobile label)
 
-No schema, hook, or data-model changes. Day totals already render in `MonthCell` via the existing `formatDayTotal` helper.
+No schema, hook, or business-logic changes.
+
+**After approval**, click **Publish → Update** so the change reaches `winducksapp.lovable.app`.
 
