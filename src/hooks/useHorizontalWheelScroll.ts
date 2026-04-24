@@ -19,28 +19,25 @@ export function useHorizontalWheelScroll<T extends HTMLElement>(
     const onWheel = (e: WheelEvent) => {
       const absX = Math.abs(e.deltaX);
       const absY = Math.abs(e.deltaY);
-      // Only act on predominantly-horizontal intent.
-      if (absX <= absY || absX < 1) return;
+      const dominantHorizontal = absX > absY * 0.65;
+      // Capture clear horizontal trackpad intent and shift+wheel desktop scrolling.
+      if ((!dominantHorizontal && !e.shiftKey) || (absX < 1 && Math.abs(e.deltaY) < 1)) return;
 
       const max = el.scrollWidth - el.clientWidth;
       if (max <= 0) return;
 
       const current = el.scrollLeft;
-      const next = current + e.deltaX;
-
-      // If the user is trying to swipe further past an edge, let the browser
-      // decide (still suppressed globally by overscroll-behavior-x: none).
-      const atLeftEdge = current <= 0 && e.deltaX < 0;
-      const atRightEdge = current >= max && e.deltaX > 0;
-      if (atLeftEdge || atRightEdge) return;
+      const delta = absX >= 1 ? e.deltaX : e.deltaY;
+      const next = current + delta;
 
       e.preventDefault();
+      e.stopPropagation();
       el.scrollLeft = Math.max(0, Math.min(max, next));
     };
 
-    el.addEventListener("wheel", onWheel, { passive: false });
+    el.addEventListener("wheel", onWheel, { passive: false, capture: true });
     return () => {
-      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("wheel", onWheel, { capture: true });
     };
   }, [enabled, targetRef]);
 }
