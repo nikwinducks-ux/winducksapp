@@ -71,6 +71,8 @@ interface JobCalendarProps {
   onDayClick?: (date: Date) => void;
   /** Mobile swipe on the week-view date header advances to next/prev week. */
   onNavigateWeek?: (direction: -1 | 1) => void;
+  /** Notifies parent when the user navigates to a new date via the week-view date strip. */
+  onDateChange?: (date: Date) => void;
 }
 
 
