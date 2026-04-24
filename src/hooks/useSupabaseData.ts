@@ -1325,7 +1325,7 @@ export function useCustomerActivityLog(customerId: string | undefined) {
 export function useGlobalActivityLog(limit = 200) {
   const queryClient = useQueryClient();
 
-  React.useEffect(() => {
+  useEffect(() => {
     const channel = (supabase as any)
       .channel("global-activity-log")
       .on(
