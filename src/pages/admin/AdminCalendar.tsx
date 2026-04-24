@@ -615,6 +615,7 @@ export default function AdminCalendar() {
           onDragBlocked={handleDragBlocked}
           unavailableBlocks={visibleBlocks}
           onUnavailableClick={setUnavailableDetail}
+          onDayClick={(date) => { setCurrentDate(date); setView("day"); }}
         />
       )}
 

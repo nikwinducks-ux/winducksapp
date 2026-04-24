@@ -60,7 +60,7 @@ export default function SPCalendar() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogInitial, setDialogInitial] = useState<UnavailableDialogValue | null>(null);
 
-  // Default to "day" on mobile (week/month grids are unusable on small screens).
+  // Week grid is unusable on small screens — bump to day if mobile lands on week.
   useEffect(() => {
     if (isMobile && view === "week") setView("day");
   }, [isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -234,7 +234,7 @@ export default function SPCalendar() {
           <TabsList>
             <TabsTrigger value="day">Day</TabsTrigger>
             {!isMobile && <TabsTrigger value="week">Week</TabsTrigger>}
-            {!isMobile && <TabsTrigger value="month">Month</TabsTrigger>}
+            <TabsTrigger value="month">Month</TabsTrigger>
             <TabsTrigger value="availability">Availability</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -277,6 +277,7 @@ export default function SPCalendar() {
               unavailableBlocks={unavailableBlocks}
               onUnavailableClick={handleClickBlock}
               onCreateUnavailable={handleCreateUnavailable}
+              onDayClick={(date) => { setCurrentDate(date); setView("day"); }}
             />
           )}
 
