@@ -1,38 +1,46 @@
 
 
-## Mobile nav: sticky top menu bar (replace hamburger drawer)
+## Add a Desktop / Mobile layout toggle
 
 ### Goal
 
-On mobile (`<lg`, i.e. <1024px), replace the hamburger-opens-side-drawer pattern with a **sticky top bar** that exposes navigation directly — and **also raise the mobile breakpoint** so tablets and small laptops get the mobile shell.
+Stop tying the layout to viewport width. Always render the **desktop sidebar layout** by default on every screen, and let the user opt into the **mobile top-bar layout** via a toggle in the top-right corner. The choice persists across reloads.
 
-### Changes
+### How it works
 
-**1. Raise the mobile/desktop breakpoint**
-- Swap every `lg:` in `DashboardLayout.tsx`, `MobileTopBar.tsx`, and `MobileBottomNav.tsx` from `lg` (1024px) → `xl` (1280px). That way iPad-class and small laptop widths (like your current 1035px preview) get the mobile shell, and only true desktops keep the side rail.
+1. **New `LayoutModeContext`** (`src/contexts/LayoutModeContext.tsx`)
+   - State: `mode: "desktop" | "mobile"`, `setMode`, `toggle`.
+   - Default: `"desktop"` for everyone (previous width-based auto-switch is removed).
+   - Persisted to `localStorage` under `winducks:layoutMode`. Hydrates on mount.
 
-**2. New `MobileTopNav` component (`src/components/MobileTopNav.tsx`)**
-- Sticky at top (`sticky top-0 z-30`), respects `env(safe-area-inset-top)`.
-- Two rows:
-  - **Row 1 (header)**: Winducks logo + page title (left), History button for admins + profile/account avatar (right). No hamburger.
-  - **Row 2 (nav)**: horizontally scrollable pill/tab strip with every link from `spLinks` or `adminLinks` (Dashboard, Jobs, Calendar, Offers, etc.). Active tab is highlighted with the primary color underline; tap to navigate. Uses `overflow-x-auto` + `scroll-smooth` + snap so all items remain reachable on narrow screens without a drawer.
-- Logout moves into a small dropdown on the avatar (top-right).
+2. **Wrap app** in `LayoutModeProvider` inside `src/App.tsx` (above the router so every page sees it).
 
-**3. Remove the bottom tab bar on mobile**
-- With nav now at the top, `MobileBottomNav` becomes redundant. Delete its render from `DashboardLayout` (keep the file for now in case you want to revert). Page padding `pb-24` on mobile drops back to normal.
+3. **`DashboardLayout` becomes mode-driven, not breakpoint-driven** (`src/components/DashboardLayout.tsx`)
+   - Read `mode` from context.
+   - `mode === "desktop"`: render the existing left sidebar + main content. Sidebar visible at all widths (no `xl:` gating).
+   - `mode === "mobile"`: render `MobileTopNav` + main content, no sidebar. Visible at all widths.
+   - Remove the `xl:hidden` / `xl:flex` width-based switches.
 
-**4. Remove the side drawer**
-- The `Sheet`-based drawer in `DashboardLayout` and the hamburger button in the old `MobileTopBar` are no longer needed; both removed.
+4. **Layout toggle button**
+   - Lives in the **top-right corner of every page**, in both layouts:
+     - **Desktop layout**: small floating header strip at the top of `<main>` (right-aligned) containing the toggle. Sits above page content, doesn't disturb existing pages.
+     - **Mobile layout**: added into `MobileTopNav` Row 1, just left of the avatar.
+   - Icon-only button: `Monitor` icon when in mobile mode (click → switch to desktop), `Smartphone` icon when in desktop mode (click → switch to mobile). Tooltip: "Switch to mobile view" / "Switch to desktop view".
 
-**5. Tablet/desktop unchanged**
-- At `xl` and above, the existing collapsible left sidebar continues to render exactly as today.
+5. **Cleanup**
+   - Drop the `xl:` breakpoint gymnastics added last round in `DashboardLayout.tsx` and `MobileTopNav.tsx` (`xl:hidden` on the header). The mode context decides visibility now.
+   - `MobileTopBar.tsx` and `MobileBottomNav.tsx` remain unused (kept on disk for reference).
 
 ### Files touched
-- `src/components/DashboardLayout.tsx` — swap `lg:` → `xl:`, drop drawer + bottom nav, mount new `MobileTopNav`.
-- `src/components/MobileTopNav.tsx` — **new**.
-- `src/components/MobileTopBar.tsx` — deprecated/removed.
-- `src/components/MobileBottomNav.tsx` — no longer rendered (file kept).
 
-### How to preview after the change
-Use the device toolbar above the Lovable preview (phone/tablet icon) or resize the preview narrower than 1280px to see the new top nav. On a real phone it will always show.
+- `src/contexts/LayoutModeContext.tsx` — **new**.
+- `src/App.tsx` — wrap with `LayoutModeProvider`.
+- `src/components/DashboardLayout.tsx` — mode-driven render; add desktop-mode top-right toggle strip.
+- `src/components/MobileTopNav.tsx` — drop `xl:hidden`; add toggle button next to avatar.
+
+### Result
+
+- Default experience on any device: the familiar **desktop sidebar layout**.
+- One tap on the top-right toggle switches to the **mobile sticky top-bar layout** (and back). Choice is remembered.
+- No automatic switching based on screen width — the user is in control.
 
