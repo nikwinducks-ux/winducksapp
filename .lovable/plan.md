@@ -1,44 +1,49 @@
 
 
-## Root cause
+## Restructure SP navigation: merge Auto-Accept into Availability, and Availability into Calendar
 
-The `useJobs` hook is **gated** on `useCustomers()` resolving:
+Consolidate three SP pages into a single tabbed Calendar hub so scheduling, weekly availability, and auto-accept rules live together.
 
-```ts
-enabled: customersReady || customersError
+### Final SP sidebar
+
+```text
+Dashboard
+My Jobs
+Calendar          ← now hosts Day | Week | Month | Availability tabs
+Job Offers
+Auto-Accept       ← REMOVED from sidebar (moved into Availability page body)
+Availability      ← REMOVED from sidebar (moved into Calendar as a tab)
+Performance
+Account
 ```
 
-When SPB loads the page, `useCustomers` is briefly in the `loading` state (neither success nor error). During that window, `useJobs` is **disabled**, so React Query returns empty data with `isLoading=false`. The diagnostic strip then reports `jobs returned by query: 0` — not because RLS blocked anything, but because the query never ran.
+### Calendar page (`src/pages/sp/SPCalendar.tsx`)
 
-There's also a secondary risk: the `customers` SELECT policy for SPs only returns customers tied to jobs they're already assigned to. That's a circular dependency — fine in steady state, but fragile.
+- Replace the existing `Day | Week | Month` view switcher with a `Tabs` of four values: `day`, `week`, `month`, `availability`.
+- For `day` / `week` / `month`: render the existing calendar UI exactly as today (navigation arrows, off-range chips, sheet, unavailable dialog, diagnostics).
+- For `availability`: render the existing `<AvailabilitySettings />` page body (weekly hours, capacity, blackout dates, time-off section, **and** the merged auto-accept block — see below). Hide the date-navigation row + diagnostics when this tab is active.
+- Keep the page heading "My Calendar"; the subtitle adapts per tab.
 
-## Fix
+### Availability page (`src/pages/sp/AvailabilitySettings.tsx`)
 
-**1. Decouple `useJobs` from `useCustomers`**
+- Keep the existing weekly schedule + time-off editor (`SPAvailabilityEditor`).
+- Append the full Auto-Accept settings UI **inline below the availability editor** (toggle, criteria card, allowed categories, fairness override, Save). Reuse the existing logic verbatim by extracting `AutoAcceptSettings` markup into a self-contained section component, or simply rendering `<AutoAcceptSettings />` underneath with its own page header trimmed to a section title ("Auto-Accept").
+- Net result: visiting `/availability` shows Availability + Auto-Accept stacked. Since `/availability` is no longer in the sidebar, this page is reached only via the Calendar tab (which mounts the same component).
 
-Remove the `enabled` gate. Run jobs immediately. Resolve `customerName` from whatever customers data is available at render time; if customers haven't arrived yet, fall back to the address city (or "Loading…") instead of "Unknown". When customers data updates, React Query re-renders the consumer and names fill in.
+### Sidebar (`src/components/DashboardLayout.tsx`)
 
-**2. Make customer name resolution non-blocking**
+- Remove the `Availability` and `Auto-Accept` entries from `spLinks`. Keep their routes registered in `App.tsx` so deep links and the Calendar tab still work.
 
-Move `dbToJob`'s customer lookup out of the query function and into a derived selector inside `useJobs`, so a late-arriving `customers` query immediately repaints names without refetching jobs.
+### Routes (`src/App.tsx`)
 
-**3. Keep diagnostics + add fetch-state line**
+- No changes. `/availability` and `/auto-accept` remain valid routes; the Calendar tab simply renders the Availability+Auto-Accept content in place rather than navigating away.
 
-Update `SPVisibilityDiagnostics` to also show:
-- `query state` (idle / loading / success / error)
-- last error message (if any)
+### Files touched
 
-So if this ever recurs we see `state=idle` (disabled) vs `state=success, count=0` (RLS) vs `state=error` (network/policy throw).
+- `src/pages/sp/SPCalendar.tsx` — extend Tabs with an `Availability` value; render the merged availability/auto-accept content when active; suppress calendar chrome on that tab.
+- `src/pages/sp/AvailabilitySettings.tsx` — append Auto-Accept section below the existing availability editor.
+- `src/pages/sp/AutoAcceptSettings.tsx` — extract its content into an exportable `AutoAcceptSection` (no page header) consumed by `AvailabilitySettings`; keep default export rendering a wrapper with the page header so the standalone `/auto-accept` route still works.
+- `src/components/DashboardLayout.tsx` — remove `Availability` and `Auto-Accept` from `spLinks`.
 
-**4. Verify on live URL**
-
-After Publish, SPB should see all 4 jobs (JOB-1003 Offered, JOB-1027 Assigned, JOB-1026 Assigned, JOB-1004 Completed) — 3 active + 1 past in My Jobs, and the two on Apr 24 + two on Apr 27 in Calendar.
-
-## Files touched
-
-- `src/hooks/useSupabaseData.ts` — remove `enabled` gate on `useJobs`; resolve `customerName` in a `select` transform that re-runs when `customers` updates.
-- `src/components/sp/SPVisibilityDiagnostics.tsx` — add query-state + error fields (accepts optional `queryState` / `queryError` props).
-- `src/pages/sp/MyJobs.tsx` and `src/pages/sp/SPCalendar.tsx` — pass the new diagnostic props through.
-
-No DB / RLS changes needed — the policies are correct.
+No backend, schema, or data-fetching changes.
 
