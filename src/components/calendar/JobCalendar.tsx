@@ -927,14 +927,6 @@ function WeekView({
           </div>
         </div>
       )}
-      {isMobile && (
-        <WeekDateStrip
-          jobs={jobs}
-          currentDate={currentDate}
-          dayMinWidthPx={dayMinWidthPx}
-          onDateChange={onDateChange}
-        />
-      )}
       <div
         ref={hScrollRef}
         className={cn(
@@ -944,47 +936,261 @@ function WeekView({
         style={{
           touchAction: isFit ? "pan-y" : "pan-x pan-y",
           WebkitOverflowScrolling: "touch",
-          scrollSnapType: isMobile && !isFit ? "x proximity" : undefined,
-          scrollPaddingLeft: isMobile ? 56 : undefined,
+          scrollSnapType: isMobile && !isFit ? "x mandatory" : undefined,
+          scrollBehavior: "smooth",
         }}
       >
         <div style={{ minWidth: `${56 + dayMinWidthPx * days.length}px` }}>
-          {!isMobile && (
-            <div className="flex border-b bg-muted/30 relative">
-              <div className="w-14 shrink-0 border-r" />
-              {days.map((d) => {
-                const headerDayJobs = jobsOnDate(jobs, d);
-                const dayTotal = formatDayTotal(headerDayJobs);
-                return (
+          <div
+            className={cn(
+              "flex border-b bg-muted/30 relative",
+              onNavigateWeek && isMobile && "cursor-grab"
+            )}
+            onPointerDown={onNavigateWeek && isMobile ? onHeaderPointerDown : undefined}
+            onPointerMove={onNavigateWeek && isMobile ? onHeaderPointerMove : undefined}
+            onPointerUp={onNavigateWeek && isMobile ? onHeaderPointerUp : undefined}
+            onPointerCancel={onNavigateWeek && isMobile ? onHeaderPointerCancel : undefined}
+            style={onNavigateWeek && isMobile ? { touchAction: "pan-y" } : undefined}
+          >
+            <div className="w-14 shrink-0 border-r" />
+            {days.map((d) => {
+              const headerDayJobs = jobsOnDate(jobs, d);
+              const dayTotal = formatDayTotal(headerDayJobs);
+              return (
+                <div
+                  key={d.toISOString()}
+                  style={{ minWidth: `${dayMinWidthPx}px`, scrollSnapAlign: isMobile ? "start" : undefined }}
+                  className={cn(
+                    "flex-1 px-2 py-2 text-center border-r last:border-r-0",
+                    isToday(d) && "bg-primary/10"
+                  )}
+                >
+                  <div className="text-[10px] uppercase text-muted-foreground font-semibold">
+                    {format(d, "EEE")}
+                  </div>
                   <div
-                    key={d.toISOString()}
-                    style={{ minWidth: `${dayMinWidthPx}px` }}
                     className={cn(
-                      "flex-1 px-2 py-2 text-center border-r last:border-r-0",
-                      isToday(d) && "bg-primary/10"
+                      "text-sm font-semibold",
+                      isToday(d) && "text-primary"
                     )}
                   >
-                    <div className="text-[10px] uppercase text-muted-foreground font-semibold">
-                      {format(d, "EEE")}
-                    </div>
-                    <div
-                      className={cn(
-                        "text-sm font-semibold",
-                        isToday(d) && "text-primary"
-                      )}
-                    >
-                      {format(d, "d")}
-                    </div>
-                    {dayTotal && (
-                      <div className="text-[10px] font-semibold text-primary mt-0.5 truncate">
-                        {dayTotal}
-                      </div>
-                    )}
+                    {format(d, "d")}
                   </div>
-                );
-              })}
-            </div>
+                  {dayTotal && (
+                    <div className="text-[10px] font-semibold text-primary mt-0.5 truncate">
+                      {dayTotal}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {onNavigateWeek && isMobile && (
+              <div className="pointer-events-none absolute inset-y-0 left-14 right-0 flex items-center justify-between px-1 text-[10px] text-muted-foreground/50">
+                <span aria-hidden>‹</span>
+                <span aria-hidden>›</span>
+              </div>
+            )}
+          </div>
+          <div className="relative flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
+            <TimeAxis />
+            {days.map((d) => {
+              const dayJobs = jobsOnDate(jobs, d);
+              const dayBlocks = blocksOnDate(unavailableBlocks, d);
+              return (
+                <div
+                  key={d.toISOString()}
+                  style={{ minWidth: `${dayMinWidthPx}px`, scrollSnapAlign: isMobile ? "start" : undefined }}
+                  className="flex-1 flex"
+                >
+                  <DayColumn
+                    date={d}
+                    jobs={dayJobs}
+                    blocks={dayBlocks}
+                    getSpName={getSpName}
+                    getSpColorFor={getSpColorFor}
+                    showSp={mode === "admin"}
+                    compact
+                    showDebug={showDebug}
+                    colorMode={colorMode}
+                    onJobClick={onJobClick}
+                    onUnavailableClick={onUnavailableClick}
+                    onCreateUnavailable={onCreateUnavailable}
+                    onEmptyDayClick={onEmptyDayClick}
+                    showAddAffordance={mode === "admin" && !!onEmptyDayClick}
+                    dnd={dnd}
+                    mode={mode}
+                  />
+                </div>
+              );
+            })}
+            {showEmpty && (
+              <EmptyRangeOverlay
+                message="No scheduled jobs in this week"
+                nearestPrevious={nearestPrevious}
+                nearestNext={nearestNext}
+                nearestPreviousLabel={nearestPreviousLabel}
+                nearestNextLabel={nearestNextLabel}
+                onJumpToDate={onJumpToDate}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== Month View =====
+function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, onDayClick, mode, showDebug, dnd }: ViewProps) {
+  const getSpName = spNameLookup(providers);
+  const getSpColorFor = spColorLookup(providers);
+  const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
+  const monthStart = startOfMonth(currentDate);
+  const monthEnd = endOfMonth(currentDate);
+  const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+  const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
+  const dndEnabled = !!dnd?.enabled;
+  const isMobile = useIsMobile();
+
+  const weekdays = useMemo(
+    () =>
+      isMobile
+        ? ["M", "T", "W", "T", "F", "S", "S"]
+        : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    [isMobile]
+  );
+
+  return (
+    <div className="rounded-lg border bg-card overflow-hidden" data-no-ptr="true">
+      <div className="grid grid-cols-7 border-b bg-muted/30">
+        {weekdays.map((w, i) => (
+          <div
+            key={`${w}-${i}`}
+            className="px-1 sm:px-2 py-2 text-center text-[10px] uppercase text-muted-foreground font-semibold border-r last:border-r-0"
+          >
+            {w}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 auto-rows-fr">
+        {days.map((d) => {
+          const dayJobs = jobsOnDate(jobs, d);
+          const inMonth = isSameMonth(d, currentDate);
+          const visible = dayJobs.slice(0, 3);
+          const overflow = dayJobs.length - visible.length;
+          return (
+            <MonthCell
+              key={d.toISOString()}
+              date={d}
+              inMonth={inMonth}
+              dayJobs={dayJobs}
+              visible={visible}
+              overflow={overflow}
+              showDebug={showDebug}
+              colorMode={colorMode}
+              getSpName={getSpName}
+              getSpColorFor={getSpColorFor}
+              mode={mode}
+              onJobClick={onJobClick}
+              onEmptyDayClick={onEmptyDayClick}
+              onDayClick={onDayClick}
+              dndEnabled={dndEnabled}
+              isMobile={isMobile}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+interface MonthCellProps {
+  date: Date;
+  inMonth: boolean;
+  dayJobs: Job[];
+  visible: Job[];
+  overflow: number;
+  showDebug?: boolean;
+  colorMode: ColorMode;
+  getSpName: (id?: string) => string;
+  getSpColorFor: (id?: string) => SpColor;
+  mode: "admin" | "sp";
+  onJobClick: (job: Job) => void;
+  onEmptyDayClick?: (date: Date) => void;
+  onDayClick?: (date: Date) => void;
+  dndEnabled: boolean;
+  isMobile: boolean;
+}
+
+function MonthCell({
+  date, inMonth, dayJobs, visible, overflow, showDebug, colorMode, getSpName, getSpColorFor,
+  mode, onJobClick, onEmptyDayClick, onDayClick, dndEnabled, isMobile,
+}: MonthCellProps) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `month-cell:${date.toISOString()}`,
+    data: { kind: "month-cell", date },
+    disabled: !dndEnabled,
+  });
+
+  const dayTotal = formatDayTotal(dayJobs);
+  const dayTotalCompact = formatCompactCAD(dayJobs);
+  const clickable = !!onDayClick;
+  const mobileDots = dayJobs.slice(0, 2);
+  const mobileOverflow = dayJobs.length - mobileDots.length;
+
+  return (
+    <div
+      ref={setNodeRef}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? () => onDayClick!(date) : undefined}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onDayClick!(date);
+              }
+            }
+          : undefined
+      }
+      className={cn(
+        "border-r border-b last:border-r-0 min-h-[64px] sm:min-h-[110px] p-0.5 sm:p-1 space-y-0.5 sm:space-y-1 transition-colors",
+        !inMonth && "bg-muted/20",
+        isToday(date) && "bg-primary/5",
+        isOver && "bg-primary/10 ring-2 ring-primary ring-inset",
+        clickable && "cursor-pointer hover:bg-accent/40 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset"
+      )}
+    >
+      <div className={cn(
+        "px-0.5 sm:px-1",
+        isMobile
+          ? "flex flex-col items-start gap-0"
+          : "flex items-center justify-between gap-1"
+      )}>
+        <div
+          className={cn(
+            "text-xs font-semibold",
+            !inMonth && "text-muted-foreground",
+            isToday(date) && "text-primary"
           )}
+        >
+          {format(date, "d")}
+        </div>
+        {isMobile
+          ? dayTotalCompact && (
+              <div className="font-semibold text-primary text-[9px] leading-tight w-full">
+                {dayTotalCompact}
+              </div>
+            )
+          : dayTotal && (
+              <div className="font-semibold text-primary truncate text-[10px]">
+                {dayTotal}
+              </div>
+            )}
+      </div>
+
       {isMobile ? (
         dayJobs.length > 0 && (
           <div className="flex items-center gap-1 px-0.5 flex-wrap">
