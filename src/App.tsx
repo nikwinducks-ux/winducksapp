@@ -25,8 +25,7 @@ import AccountPage from "./pages/sp/AccountPage";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
-import AllocationControl from "./pages/admin/AllocationControl";
-import FairnessControls from "./pages/admin/FairnessControls";
+import AllocationHub from "./pages/admin/AllocationHub";
 import SPManagement from "./pages/admin/SPManagement";
 import SPDetail from "./pages/admin/SPDetail";
 import SPForm from "./pages/admin/SPForm";
