@@ -24,11 +24,18 @@ interface OfferRecord {
   acceptance_source?: string;
 }
 
+interface CrewRecord {
+  id: string;
+  job_id: string;
+  sp_id: string;
+  is_lead?: boolean;
+}
+
 interface WebhookPayload {
   type: "INSERT" | "UPDATE" | "DELETE";
   table: string;
-  record: OfferRecord;
-  old_record: OfferRecord | null;
+  record: any;
+  old_record: any;
 }
 
 // ─── base64url helpers ───
