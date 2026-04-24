@@ -12,7 +12,11 @@ import {
   LogOut, ClipboardList, Settings, TestTube, CalendarDays,
   Smartphone, Monitor,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 
 const spLinks = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
