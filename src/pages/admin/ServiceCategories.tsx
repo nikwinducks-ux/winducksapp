@@ -127,6 +127,15 @@ export default function ServiceCategories() {
                 <Button size="sm" variant="ghost" onClick={(e) => { stop(e); handleToggleActive(cat.id, cat.active); }}>
                   {cat.active ? "Deactivate" : "Activate"}
                 </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={(e) => { stop(e); setDeleteTarget({ id: cat.id, name: cat.name }); }}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  aria-label={`Delete ${cat.name}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
                 <ChevronRight className="h-4 w-4 text-muted-foreground ml-1" />
               </div>
             </>
