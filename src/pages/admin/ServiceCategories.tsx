@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useServiceCategories, useCreateServiceCategory, useUpdateServiceCategory } from "@/hooks/useSupabaseData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Plus, Pencil, X, Check } from "lucide-react";
+import { Plus, Pencil, X, Check, ChevronRight } from "lucide-react";
 
 export default function ServiceCategories() {
   const { data: categories = [], isLoading } = useServiceCategories();
@@ -88,36 +89,45 @@ export default function ServiceCategories() {
       )}
 
       <div className="space-y-2">
-        {sorted.map((cat) => (
-          <div key={cat.id} className={`metric-card flex items-center gap-4 ${!cat.active ? "opacity-60" : ""}`}>
-            {editId === cat.id ? (
-              <div className="flex-1 flex items-center gap-3">
-                <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="max-w-[180px]" />
-                <Input value={editCode} onChange={(e) => setEditCode(e.target.value)} placeholder="Code" className="max-w-[80px] font-mono" />
-                <Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="Description" className="max-w-[180px]" />
-                <Button size="sm" variant="ghost" onClick={() => handleUpdate(cat.id)}><Check className="h-4 w-4" /></Button>
-                <Button size="sm" variant="ghost" onClick={() => setEditId(null)}><X className="h-4 w-4" /></Button>
+        {sorted.map((cat) => {
+          const isEditing = editId === cat.id;
+          const stop = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); };
+          const inner = isEditing ? (
+            <div className="flex-1 flex items-center gap-3" onClick={stop}>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="max-w-[180px]" />
+              <Input value={editCode} onChange={(e) => setEditCode(e.target.value)} placeholder="Code" className="max-w-[80px] font-mono" />
+              <Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="Description" className="max-w-[180px]" />
+              <Button size="sm" variant="ghost" onClick={(e) => { stop(e); handleUpdate(cat.id); }}><Check className="h-4 w-4" /></Button>
+              <Button size="sm" variant="ghost" onClick={(e) => { stop(e); setEditId(null); }}><X className="h-4 w-4" /></Button>
+            </div>
+          ) : (
+            <>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold">{cat.name}</p>
+                  {cat.code && <span className="font-mono text-xs text-muted-foreground">({cat.code})</span>}
+                  <StatusBadge label={cat.active ? "Active" : "Inactive"} variant={cat.active ? "valid" : "warning"} />
+                </div>
+                {cat.description && <p className="text-sm text-muted-foreground mt-0.5">{cat.description}</p>}
               </div>
-            ) : (
-              <>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold">{cat.name}</p>
-                    {cat.code && <span className="font-mono text-xs text-muted-foreground">({cat.code})</span>}
-                    <StatusBadge label={cat.active ? "Active" : "Inactive"} variant={cat.active ? "valid" : "warning"} />
-                  </div>
-                  {cat.description && <p className="text-sm text-muted-foreground mt-0.5">{cat.description}</p>}
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <Button size="sm" variant="ghost" onClick={() => startEdit(cat)}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button size="sm" variant="ghost" onClick={() => handleToggleActive(cat.id, cat.active)}>
-                    {cat.active ? "Deactivate" : "Activate"}
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        ))}
+              <div className="flex items-center gap-1 shrink-0">
+                <Button size="sm" variant="ghost" onClick={(e) => { stop(e); startEdit(cat); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                <Button size="sm" variant="ghost" onClick={(e) => { stop(e); handleToggleActive(cat.id, cat.active); }}>
+                  {cat.active ? "Deactivate" : "Activate"}
+                </Button>
+                <ChevronRight className="h-4 w-4 text-muted-foreground ml-1" />
+              </div>
+            </>
+          );
+          const baseClass = `metric-card flex items-center gap-4 ${!cat.active ? "opacity-60" : ""} ${!isEditing ? "hover:border-primary/40 transition-colors cursor-pointer" : ""}`;
+          return isEditing ? (
+            <div key={cat.id} className={baseClass}>{inner}</div>
+          ) : (
+            <Link key={cat.id} to={`/admin/categories/${cat.id}`} className={baseClass}>
+              {inner}
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
