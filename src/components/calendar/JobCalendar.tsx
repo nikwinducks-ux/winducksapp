@@ -533,32 +533,76 @@ function DayGridDroppable({
     return () => cancelAnimationFrame(raf);
   }, [isOver, dndEnabled, dnd, node, date]);
 
-  // Tap-to-create unavailable (SP-only)
+  // Long-press-to-create unavailable (SP-only).
+  // Short taps used to fire accidentally while scrolling on mobile, so creation
+  // now requires a deliberate ~500ms press without significant movement.
   const createEnabled = !!onCreateUnavailable;
+  const LONG_PRESS_MS = 500;
+  const MOVE_CANCEL_PX = 8;
+  const longPressTimerRef = useRef<number | null>(null);
+  const pressStartRef = useRef<{ x: number; y: number } | null>(null);
+  const [pressActive, setPressActive] = useState(false);
 
-  function onGridClick(e: React.MouseEvent<HTMLDivElement>) {
+  function clearLongPress() {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    pressStartRef.current = null;
+    setPressActive(false);
+  }
+
+  function onGridPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (!createEnabled) return;
+    // Only primary button / touch / pen — ignore right-click etc.
+    if (e.pointerType === "mouse" && e.button !== 0) return;
     const target = e.target as HTMLElement;
     if (target.closest("[data-jobblock]")) return;
     if (target.closest("[data-unavailable-block]")) return;
+
     const rect = e.currentTarget.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const startMin = yToSnappedMinutes(y);
-    const dayEndMin = DAY_END_HOUR * 60;
-    let endMin = Math.min(startMin + 60, dayEndMin);
-    if (endMin - startMin < 15) endMin = startMin + 15;
-    onCreateUnavailable?.(date, minutesToHHMM(startMin), minutesToHHMM(endMin));
+    const yWithin = e.clientY - rect.top;
+    pressStartRef.current = { x: e.clientX, y: e.clientY };
+    setPressActive(true);
+
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressTimerRef.current = null;
+      setPressActive(false);
+      pressStartRef.current = null;
+      try { navigator.vibrate?.(15); } catch { /* noop */ }
+      const startMin = yToSnappedMinutes(yWithin);
+      const dayEndMin = DAY_END_HOUR * 60;
+      let endMin = Math.min(startMin + 60, dayEndMin);
+      if (endMin - startMin < 15) endMin = startMin + 15;
+      onCreateUnavailable?.(date, minutesToHHMM(startMin), minutesToHHMM(endMin));
+    }, LONG_PRESS_MS);
   }
+
+  function onGridPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const start = pressStartRef.current;
+    if (!start) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    if (dx * dx + dy * dy > MOVE_CANCEL_PX * MOVE_CANCEL_PX) {
+      clearLongPress();
+    }
+  }
+
+  useEffect(() => () => clearLongPress(), []);
 
   return (
     <div
       ref={setNodeRef}
-      onClick={onGridClick}
+      onPointerDown={createEnabled ? onGridPointerDown : undefined}
+      onPointerMove={createEnabled ? onGridPointerMove : undefined}
+      onPointerUp={createEnabled ? clearLongPress : undefined}
+      onPointerCancel={createEnabled ? clearLongPress : undefined}
+      onPointerLeave={createEnabled ? clearLongPress : undefined}
       className={cn(
-        "relative flex-1",
+        "relative flex-1 touch-pan-y select-none",
         today && "bg-primary/5",
         isOver && "bg-primary/10 ring-2 ring-primary ring-inset",
-        createEnabled && "cursor-pointer"
+        pressActive && "bg-primary/10"
       )}
       style={{ height: GRID_HEIGHT_PX }}
     >
