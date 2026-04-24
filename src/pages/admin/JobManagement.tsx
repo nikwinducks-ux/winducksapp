@@ -605,17 +605,36 @@ export default function JobManagement() {
 
   if (isLoading) return <div className="py-20 text-center text-muted-foreground">Loading jobs...</div>;
 
+  const activeCount = jobs.filter((j) => j.status !== "Completed" && j.status !== "Cancelled").length;
+  const pastCount = jobs.filter((j) => j.status === "Completed").length;
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="page-header">Jobs</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{filtered.length} jobs</p>
+          <p className="mt-1 text-sm text-muted-foreground">{filtered.length} {tab === "past" ? "past" : "active"} jobs</p>
         </div>
         <Link to="/admin/jobs/new">
           <Button><Plus className="h-4 w-4 mr-2" />Create Job</Button>
         </Link>
       </div>
+
+      <Tabs
+        value={tab}
+        onValueChange={(v) => {
+          const next = new URLSearchParams(searchParams);
+          if (v === "active") next.delete("tab");
+          else next.set("tab", v);
+          setSearchParams(next, { replace: true });
+          clearSelection();
+        }}
+      >
+        <TabsList>
+          <TabsTrigger value="active">Active ({activeCount})</TabsTrigger>
+          <TabsTrigger value="past">Past Jobs ({pastCount})</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="relative max-w-sm flex-1 min-w-[200px]">
