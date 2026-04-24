@@ -37,11 +37,11 @@ export function GlobalActivityLog({ onNavigate }: Props) {
   const [search, setSearch] = useState("");
 
   const customerMap = useMemo(
-    () => new Map(customers.map((c) => [c.dbId ?? c.id, c.name])),
+    () => new Map(customers.map((c) => [c.id, c.name])),
     [customers],
   );
   const jobMap = useMemo(
-    () => new Map(jobs.map((j) => [j.dbId ?? j.id, j.id])),
+    () => new Map(jobs.map((j) => [j.dbId, j.id])),
     [jobs],
   );
 
