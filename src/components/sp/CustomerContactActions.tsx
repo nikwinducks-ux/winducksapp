@@ -16,12 +16,57 @@ function cleanPhone(phone: string | undefined | null): string | null {
   const cleaned = phone.replace(/[^\d+]/g, "");
   return cleaned || null;
 }
-const telHref = (p?: string | null) => {
-  const c = cleanPhone(p); return c ? `tel:${c}` : null;
-};
-const smsHref = (p?: string | null) => {
-  const c = cleanPhone(p); return c ? `sms:${c}` : null;
-};
+
+/**
+ * Open a tel:/sms: URL reliably even when rendered inside a sandboxed
+ * preview iframe (where plain <a href="tel:..."> can be silently blocked).
+ * Tries the top-level window first, then window.open, then a same-window assign.
+ */
+function openContactUrl(url: string) {
+  try {
+    if (window.top && window.top !== window) {
+      window.top.location.href = url;
+      return;
+    }
+  } catch {
+    // cross-origin top access blocked — fall through
+  }
+  const opened = window.open(url, "_top");
+  if (!opened) {
+    window.location.href = url;
+  }
+}
+
+interface ContactIconButtonProps {
+  url: string;
+  label: string;
+  tooltip: string;
+  children: React.ReactNode;
+}
+
+function ContactIconButton({ url, label, tooltip, children }: ContactIconButtonProps) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          aria-label={label}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openContactUrl(url);
+          }}
+        >
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{tooltip}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 /**
  * Phone/SMS quick-action icons for contacting the customer of a job.
@@ -39,48 +84,47 @@ export function CustomerContactActions({
   // Prefer primary contact phone, then any contact phone, then customer.phone
   const primaryContact =
     customer.contacts?.find((c) => c.isPrimary) ?? customer.contacts?.[0];
-  const phone = cleanPhone(primaryContact?.phone) ?? cleanPhone(customer.phone);
+  const phone =
+    cleanPhone(primaryContact?.phone) ?? cleanPhone(customer.phone);
 
   const displayName = customerName || customer.name || "customer";
   const firstName = displayName.split(/\s+/)[0] ?? "customer";
 
-  const tel = telHref(phone);
-  const sms = smsHref(phone);
-
-  if (!tel && !sms) return null;
-
-  if (variant === "inline") {
+  if (!phone) {
+    if (variant === "inline") return null;
     return (
-      <TooltipProvider delayDuration={200}>
-        <div className="flex items-center gap-1.5">
-          {tel && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button asChild variant="outline" size="icon" className="h-8 w-8">
-                  <a href={tel} aria-label={`Call ${firstName}`}>
-                    <Phone className="h-4 w-4" />
-                  </a>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Call {firstName}</TooltipContent>
-            </Tooltip>
-          )}
-          {sms && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button asChild variant="outline" size="icon" className="h-8 w-8">
-                  <a href={sms} aria-label={`Text ${firstName}`}>
-                    <MessageSquare className="h-4 w-4" />
-                  </a>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Text {firstName}</TooltipContent>
-            </Tooltip>
-          )}
+      <div className="rounded-md border bg-muted/20 p-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <User className="h-4 w-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-muted-foreground">Customer</p>
+            <p className="text-sm font-medium truncate">{displayName}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">— no phone on file</p>
+          </div>
         </div>
-      </TooltipProvider>
+      </div>
     );
   }
+
+  const telUrl = `tel:${phone}`;
+  const smsUrl = `sms:${phone}`;
+
+  const buttons = (
+    <TooltipProvider delayDuration={200}>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <ContactIconButton url={telUrl} label={`Call ${firstName}`} tooltip={`Call ${firstName}`}>
+          <Phone className="h-4 w-4" />
+        </ContactIconButton>
+        <ContactIconButton url={smsUrl} label={`Text ${firstName}`} tooltip={`Text ${firstName}`}>
+          <MessageSquare className="h-4 w-4" />
+        </ContactIconButton>
+      </div>
+    </TooltipProvider>
+  );
+
+  if (variant === "inline") return buttons;
 
   return (
     <div className="rounded-md border bg-muted/20 p-3">
@@ -91,35 +135,9 @@ export function CustomerContactActions({
         <div className="flex-1 min-w-0">
           <p className="text-xs text-muted-foreground">Customer</p>
           <p className="text-sm font-medium truncate">{displayName}</p>
+          <p className="text-xs text-muted-foreground mt-0.5 font-mono">{phone}</p>
         </div>
-        <TooltipProvider delayDuration={200}>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {tel && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button asChild variant="outline" size="icon" className="h-8 w-8">
-                    <a href={tel} aria-label={`Call ${firstName}`}>
-                      <Phone className="h-4 w-4" />
-                    </a>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Call {firstName}</TooltipContent>
-              </Tooltip>
-            )}
-            {sms && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button asChild variant="outline" size="icon" className="h-8 w-8">
-                    <a href={sms} aria-label={`Text ${firstName}`}>
-                      <MessageSquare className="h-4 w-4" />
-                    </a>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Text {firstName}</TooltipContent>
-              </Tooltip>
-            )}
-          </div>
-        </TooltipProvider>
+        {buttons}
       </div>
     </div>
   );
