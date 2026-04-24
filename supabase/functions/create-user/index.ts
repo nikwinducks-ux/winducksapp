@@ -198,6 +198,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ success: true, userId: user.user.id }), { headers: jsonHeaders });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { headers: jsonHeaders, status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    return new Response(JSON.stringify({ error: message }), { headers: jsonHeaders, status: 500 });
   }
 });
