@@ -58,6 +58,7 @@ export default function SPCalendar() {
   const [view, setView] = useState<CalendarView | "availability">("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [optimisticAcceptedJobId, setOptimisticAcceptedJobId] = useState<string | null>(null);
   // Always read live job from refetched jobs list so the sheet reflects the
   // current status (e.g. "Assigned" right after the SP accepts an offer).
   const selectedJob = useMemo<Job | null>(
@@ -139,6 +140,7 @@ export default function SPCalendar() {
   async function handleAccept() {
     if (!selectedOffer) return;
     await acceptOffer.mutateAsync({ offerId: selectedOffer.id });
+    setOptimisticAcceptedJobId(selectedOffer.job_id);
     // Keep the sheet open so the SP sees the new "Assigned" status and the
     // "Start Job" CTA without an extra tap.
   }
@@ -146,6 +148,7 @@ export default function SPCalendar() {
   async function handleReject() {
     if (!selectedOffer) return;
     await declineOffer.mutateAsync({ offerId: selectedOffer.id, declineReason: "" });
+    setOptimisticAcceptedJobId(null);
     setSelectedJob(null);
   }
 
@@ -235,7 +238,13 @@ export default function SPCalendar() {
   // jobs already preassigned to me — an Offered job needs explicit Accept/Decline
   // before "Start Job" becomes available.
   const isPendingOffer = selectedJob
-    ? pendingOfferJobIds.has(selectedJob.dbId) || selectedJob.status === "Offered"
+    ? optimisticAcceptedJobId !== selectedJob.dbId && (pendingOfferJobIds.has(selectedJob.dbId) || selectedJob.status === "Offered")
+    : false;
+  const selectedJobStatus = selectedJob
+    ? (optimisticAcceptedJobId === selectedJob.dbId && selectedJob.status === "Offered" ? "Assigned" : selectedJob.status)
+    : null;
+  const isSelectedJobAssignedToMe = selectedJob
+    ? selectedJob.assignedSpId === spId || optimisticAcceptedJobId === selectedJob.dbId
     : false;
   const me = providers.find((p) => p.id === spId);
   const autoAcceptOn = !!me?.autoAccept;
@@ -367,7 +376,7 @@ export default function SPCalendar() {
               <SheetHeader>
                 <SheetTitle className="flex items-center gap-2">
                   {selectedJob.id}
-                  <Badge variant="secondary">{statusLabel(selectedJob.status)}</Badge>
+                  <Badge variant="secondary">{statusLabel((selectedJobStatus ?? selectedJob.status) as Job["status"])}</Badge>
                 </SheetTitle>
                 <SheetDescription>{selectedJob.customerName}</SheetDescription>
               </SheetHeader>
@@ -424,9 +433,9 @@ export default function SPCalendar() {
                 )}
 
                 {!isPendingOffer &&
-                  selectedJob.assignedSpId === spId &&
-                  (selectedJob.status === "Assigned" ||
-                    selectedJob.status === "Accepted") && (
+                  isSelectedJobAssignedToMe &&
+                  (selectedJobStatus === "Assigned" ||
+                    selectedJobStatus === "Accepted") && (
                   <div className="rounded-md border bg-card p-3 space-y-2">
                     <h3 className="text-sm font-semibold">Update Status</h3>
                     <Button
