@@ -230,12 +230,19 @@ export default function SPCalendar() {
               : "Your scheduled jobs and pending offers. Drag empty time to mark yourself unavailable."}
           </p>
         </div>
-        <Tabs value={view} onValueChange={(v) => setView(v as CalendarView | "availability")}>
-          <TabsList>
+        <Tabs
+          value={view}
+          onValueChange={(v) => setView(v as CalendarView | "availability")}
+          className="w-full sm:w-auto"
+        >
+          <TabsList className="w-full sm:w-auto overflow-x-auto justify-start sm:justify-center">
             <TabsTrigger value="day">Day</TabsTrigger>
             {!isMobile && <TabsTrigger value="week">Week</TabsTrigger>}
             <TabsTrigger value="month">Month</TabsTrigger>
-            <TabsTrigger value="availability">Availability</TabsTrigger>
+            <TabsTrigger value="availability">
+              <span className="sm:hidden">Avail.</span>
+              <span className="hidden sm:inline">Availability</span>
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
