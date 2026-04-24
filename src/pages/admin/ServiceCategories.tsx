@@ -21,6 +21,7 @@ export default function ServiceCategories() {
   const { data: categories = [], isLoading } = useServiceCategories();
   const createCategory = useCreateServiceCategory();
   const updateCategory = useUpdateServiceCategory();
+  const deleteCategory = useDeleteServiceCategory();
 
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
@@ -30,6 +31,7 @@ export default function ServiceCategories() {
   const [editName, setEditName] = useState("");
   const [editCode, setEditCode] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const handleAdd = () => {
     if (!newName.trim()) return;
