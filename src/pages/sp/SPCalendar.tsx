@@ -212,7 +212,21 @@ export default function SPCalendar() {
     );
   }
 
-  const isPendingOffer = selectedJob ? pendingOfferJobIds.has(selectedJob.dbId) && selectedJob.assignedSpId !== spId : false;
+  // An offer is "respondable" if we have a pending offer record for it OR the job
+  // is still in an Offered state and isn't already assigned to me. This guards
+  // against transient race conditions where the offer record briefly drops out
+  // of the pending list (e.g. realtime refresh) but the job is clearly awaiting
+  // my response.
+  const offerForSelected = useMemo(() => {
+    if (!selectedJob) return null;
+    return spOffers.find((o) => o.job_id === selectedJob.dbId) ?? null;
+  }, [selectedJob, spOffers]);
+
+  const isPendingOffer = selectedJob
+    ? (pendingOfferJobIds.has(selectedJob.dbId) ||
+        (selectedJob.status === "Offered" && selectedJob.assignedSpId !== spId)) &&
+      selectedJob.assignedSpId !== spId
+    : false;
   const me = providers.find((p) => p.id === spId);
   const autoAcceptOn = !!me?.autoAccept;
 
@@ -350,9 +364,19 @@ export default function SPCalendar() {
 
               <div className="space-y-4 mt-4">
                 {/* Primary actions — promoted to top so SPs can start/end jobs in one tap */}
-                {isPendingOffer && selectedOffer && !autoAcceptOn && (
-                  <div className="rounded-md border bg-card p-3 space-y-2">
+                {isPendingOffer && offerForSelected && (
+                  <div className="rounded-md border bg-card p-3 space-y-3">
                     <h3 className="text-sm font-semibold">Respond to Offer</h3>
+                    {autoAcceptOn && (
+                      <p className="text-xs text-muted-foreground">
+                        Auto-Accept is ON — offers are usually handled automatically. You can still
+                        respond manually below, or{" "}
+                        <Link to="/auto-accept" className="text-primary hover:underline">
+                          turn it off
+                        </Link>
+                        .
+                      </p>
+                    )}
                     <div className="flex gap-2">
                       <Button
                         size="lg"
@@ -360,7 +384,7 @@ export default function SPCalendar() {
                         disabled={acceptOffer.isPending}
                         className="flex-1"
                       >
-                        Accept
+                        {acceptOffer.isPending ? "Accepting..." : "Accept"}
                       </Button>
                       <Button
                         size="lg"
@@ -369,21 +393,22 @@ export default function SPCalendar() {
                         disabled={declineOffer.isPending}
                         className="flex-1"
                       >
-                        Reject
+                        {declineOffer.isPending ? "Declining..." : "Decline"}
                       </Button>
                     </div>
                   </div>
                 )}
 
-                {isPendingOffer && selectedOffer && autoAcceptOn && (
-                  <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-1.5">
-                    <h3 className="text-sm font-semibold">Auto-Accept is ON</h3>
+                {isPendingOffer && !offerForSelected && (
+                  <div className="rounded-md border border-muted bg-muted/30 p-3 space-y-1.5">
+                    <h3 className="text-sm font-semibold">Offer no longer available</h3>
                     <p className="text-xs text-muted-foreground">
-                      Offers are handled automatically.{" "}
-                      <Link to="/auto-accept" className="text-primary hover:underline">
-                        Turn it off
+                      This offer may have expired, been withdrawn, or already been responded to.
+                      Check{" "}
+                      <Link to="/jobs" className="text-primary hover:underline">
+                        Job Offers
                       </Link>{" "}
-                      to respond manually.
+                      for current opportunities.
                     </p>
                   </div>
                 )}

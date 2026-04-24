@@ -732,7 +732,7 @@ function DayView({
   const colorMode: ColorMode = mode === "admin" ? "sp" : "status";
   const showEmpty = dayJobs.length === 0 && (nearestPrevious || nearestNext);
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
+    <div className="rounded-lg border bg-card overflow-hidden" data-no-ptr="true">
       <div className="border-b px-4 py-2 flex items-center justify-between gap-2">
         <div className="text-sm font-medium min-w-0 truncate">
           {format(currentDate, "EEEE, MMMM d, yyyy")}
@@ -800,7 +800,7 @@ function WeekView({
   const showEmpty = totalWeekJobs === 0 && (nearestPrevious || nearestNext);
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
+    <div className="rounded-lg border bg-card overflow-hidden" data-no-ptr="true">
       <div className="flex border-b bg-muted/30">
         <div className="w-14 shrink-0 border-r" />
         {days.map((d) => {
@@ -898,7 +898,7 @@ function MonthView({ jobs, providers, currentDate, onJobClick, onEmptyDayClick, 
   );
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
+    <div className="rounded-lg border bg-card overflow-hidden" data-no-ptr="true">
       <div className="grid grid-cols-7 border-b bg-muted/30">
         {weekdays.map((w, i) => (
           <div
