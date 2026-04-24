@@ -38,10 +38,26 @@ export default function CustomerDetail() {
           <h1 className="page-header">{customer.name}</h1>
           <p className="text-sm text-muted-foreground">{customer.email} · {customer.phone}</p>
         </div>
-        <Link to={`/admin/customers/${customer.id}/edit`}>
-          <Button variant="outline" size="sm"><Pencil className="h-4 w-4 mr-2" />Edit</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setLogOpen(true)}>
+            <History className="h-4 w-4 mr-2" />Log
+          </Button>
+          <Link to={`/admin/customers/${customer.id}/edit`}>
+            <Button variant="outline" size="sm"><Pencil className="h-4 w-4 mr-2" />Edit</Button>
+          </Link>
+        </div>
       </div>
+
+      <Sheet open={logOpen} onOpenChange={setLogOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-xl flex flex-col">
+          <SheetHeader>
+            <SheetTitle>{customer.name} — Activity Log</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 min-h-0 mt-4">
+            <CustomerActivityLog customerId={customer.id} />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {customer.tags.length > 0 && (
         <div className="flex gap-2">
