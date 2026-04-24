@@ -1,37 +1,73 @@
 
 
-## Replace teammate phone text with phone + SMS icon buttons
+## Mobile calendar Week view + Samsung $ clipping fix + iOS pull-to-refresh fix
 
-In the SP portal's "Working with" teammate list, replace the visible phone number with two compact icon buttons: a **phone** icon (tap-to-call via `tel:`) and a **message** icon (tap-to-SMS via `sms:`). The teammate's name and "Lead" star stay visible; the number itself is no longer shown.
+Three small, targeted fixes for the SP mobile experience.
 
-### What you'll see
+---
 
-In every place the `CrewTeammates` card renders (SP Calendar job sheet, SP Job Detail, Job Offer Detail), each teammate row will show:
+### 1. Enable Week view on mobile (SP calendar)
 
-```text
-[Avatar]  Jane Smith ★ Lead          [📞]  [💬]
-```
+Right now `SPCalendar.tsx` hides the **Week** tab on mobile and force-switches to **Day** if a user lands on Week with a small viewport. Bring Week back as a first-class option.
 
-- **📞 Phone button** — `<a href="tel:+1...">` with `Phone` icon, opens dialer.
-- **💬 Message button** — `<a href="sms:+1...">` with `MessageSquare` icon, opens SMS composer prefilled to teammate's number.
-- Both rendered as small `Button variant="outline" size="icon"` (h-8 w-8) so they're easy to tap on mobile.
-- If the teammate has no phone on file, both buttons are hidden and a small "— no phone on file" hint is shown instead.
-- Tooltip on hover: "Call Jane" / "Text Jane".
+**Changes in `src/pages/sp/SPCalendar.tsx`:**
+- Remove the `{!isMobile && <TabsTrigger value="week">}` guard — show **Day / Week / Month / Avail.** on every viewport.
+- Remove the `useEffect` that auto-flips Week → Day on mobile.
+- The existing `WeekView` in `JobCalendar.tsx` already uses `flex-1 min-w-0` columns + horizontal time axis, so it fits at 360–414px wide. The day-header date totals already use `truncate` and a smaller font, so they degrade gracefully.
 
-The inline variant (used in `MyJobs` list) already shows names only — no change needed.
+No changes to admin calendar (admins already get Week on mobile).
 
-### Implementation
+---
 
-Edit only `src/components/sp/CrewTeammates.tsx`:
+### 2. Fix clipped daily $ total on Samsung (Month view)
 
-- Replace the current `<a href={tel:...}>{phone}</a>` block with two icon buttons side-by-side.
-- Add an `smsHref(phone)` helper next to the existing `telHref(phone)` (same digit-stripping, `sms:` scheme).
-- Import `MessageSquare` from `lucide-react` alongside the existing `Phone`.
-- Wrap each icon in the `Tooltip` component (already in the UI kit) for accessibility.
+On a 360px-wide Samsung viewport, the Month cell header packs the day number and total into a single flex row separated by `justify-between`. With totals like `$1,250` and `gap-1 px-0.5`, the amount truncates mid-character.
+
+**Changes in `src/components/calendar/JobCalendar.tsx` (`MonthCell`):**
+- On mobile, **stack** the day number and total vertically inside the cell header (column layout, total on its own line, full-width, centered or right-aligned, no `truncate`).
+- On mobile, render the total using a **compact format** (`$1.2k`, `$950`, `$12k`) so it always fits even on the narrowest Android viewports.
+- Add a tiny helper `formatCompactCAD(n: number)`:
+  - `< 1000` → `$950`
+  - `1000–9999` → `$1.2k`
+  - `≥ 10000` → `$12k`
+- Desktop continues to show the full `formatCADWhole` value.
+
+Result: the $ total is always fully readable on every device, including 360px Samsung screens.
+
+---
+
+### 3. Fix pull-to-refresh on iPhone
+
+iOS Safari's native rubber-band overscroll competes with our gesture. Specifically:
+- On iOS, `<main className="overflow-auto">` still lets the document body bounce, so `scrollTop===0` checks pass but iOS hijacks the touchmove and we never get reliable `e.preventDefault()` cycles.
+- Our `touchmove` listener is registered on the scroll container. On iOS, when the gesture starts at the very top, Safari pre-emptively starts the bounce animation before our handler decides to call `preventDefault()`.
+
+**Changes:**
+
+**`src/components/DashboardLayout.tsx`:**
+- Add `overscroll-behavior: contain` (`overscroll-contain` Tailwind class) and `touch-action: pan-y` to both the mobile and desktop `<main>` scroll containers. This tells iOS we'll handle the vertical gesture and stops body-level rubber-banding.
+- Add `-webkit-overflow-scrolling: touch` is no longer needed (modern iOS), but ensure no `position: fixed` ancestor is constraining scroll height.
+
+**`src/hooks/usePullToRefresh.ts`:**
+- Track gesture state with **two** thresholds: a small `activationThreshold` (~6px) to claim the gesture before iOS bounce kicks in. Once a downward intent is detected at `scrollTop === 0`, immediately call `e.preventDefault()` on subsequent moves (not just when `damped > 5`) to suppress iOS bounce.
+- Detect iOS via `/iP(hone|ad|od)/.test(navigator.userAgent)` or feature-test, and on iOS:
+  - Always call `e.preventDefault()` on touchmove once the gesture is "active", regardless of distance.
+  - Use a slightly looser `scrollTop` check (`<= 0`) since iOS can briefly report negative values during bounce — treat negative as "at top".
+- Keep current Android behavior intact.
+- Add a fallback: if `touchend` doesn't fire (interrupted by tab switch), `touchcancel` already resets — verified.
+
+**`src/components/PullToRefreshIndicator.tsx`:**
+- No logic change, but add `will-change: transform` to avoid jank on iOS during the spring animation.
+
+---
 
 ### Files touched
 
-- **Edited**: `src/components/sp/CrewTeammates.tsx` (only the `card` variant's phone rendering)
+- **Edited**: `src/pages/sp/SPCalendar.tsx` (re-enable Week tab on mobile)
+- **Edited**: `src/components/calendar/JobCalendar.tsx` (`MonthCell` mobile header layout + compact $ formatter)
+- **Edited**: `src/components/DashboardLayout.tsx` (`overscroll-contain` + `touch-action: pan-y` on main)
+- **Edited**: `src/hooks/usePullToRefresh.ts` (iOS-aware preventDefault + activation threshold)
+- **Edited**: `src/components/PullToRefreshIndicator.tsx` (`will-change: transform`)
 
-No schema, RLS, hook, or other-page changes. Admin pages are unaffected.
+No schema, RLS, hook-API, or admin-side changes.
 
