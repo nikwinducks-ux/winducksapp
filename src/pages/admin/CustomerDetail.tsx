@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useCustomer, useJobs } from "@/hooks/useSupabaseData";
 import { formatAddress } from "@/data/mockData";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MapPin, Pencil } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { CustomerActivityLog } from "@/components/CustomerActivityLog";
+import { ArrowLeft, MapPin, Pencil, History } from "lucide-react";
 
 export default function CustomerDetail() {
   const { id } = useParams();
