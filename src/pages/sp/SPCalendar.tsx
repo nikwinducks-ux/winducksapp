@@ -347,6 +347,66 @@ export default function SPCalendar() {
               </SheetHeader>
 
               <div className="space-y-4 mt-4">
+                {/* Primary actions — promoted to top so SPs can start/end jobs in one tap */}
+                {isPendingOffer && selectedOffer && (
+                  <div className="rounded-md border bg-card p-3 space-y-2">
+                    <h3 className="text-sm font-semibold">Respond to Offer</h3>
+                    <div className="flex gap-2">
+                      <Button
+                        size="lg"
+                        onClick={handleAccept}
+                        disabled={acceptOffer.isPending}
+                        className="flex-1"
+                      >
+                        Accept
+                      </Button>
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        onClick={handleReject}
+                        disabled={declineOffer.isPending}
+                        className="flex-1"
+                      >
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {!isPendingOffer && (selectedJob.status === "Assigned" || selectedJob.status === "Accepted") && (
+                  <div className="rounded-md border bg-card p-3 space-y-2">
+                    <h3 className="text-sm font-semibold">Update Status</h3>
+                    <Button
+                      size="lg"
+                      onClick={markInProgress}
+                      disabled={updateStatus.isPending}
+                      className="w-full"
+                    >
+                      {updateStatus.isPending ? "Starting..." : "Start Job"}
+                    </Button>
+                  </div>
+                )}
+
+                {!isPendingOffer && selectedJob.status === "InProgress" && (
+                  <div className="rounded-md border border-warning/30 bg-warning/5 p-3 space-y-2">
+                    <h3 className="text-sm font-semibold">Job in progress</h3>
+                    <Button
+                      size="lg"
+                      onClick={markCompleted}
+                      disabled={updateStatus.isPending}
+                      className="w-full"
+                    >
+                      {updateStatus.isPending ? "Ending..." : "End Job"}
+                    </Button>
+                  </div>
+                )}
+
+                {!isPendingOffer && selectedJob.status === "Completed" && (
+                  <div className="rounded-md border border-success/30 bg-success/5 p-3 text-center">
+                    <p className="text-sm font-semibold text-success">✓ Job Completed</p>
+                  </div>
+                )}
+
                 <div className="text-sm space-y-1">
                   <div><span className="text-muted-foreground">Address:</span> {selectedJob.address}</div>
                   <div><span className="text-muted-foreground">Service:</span> {selectedJob.serviceCategory}</div>
@@ -367,40 +427,6 @@ export default function SPCalendar() {
                 <CrewTeammates jobId={selectedJob.dbId} excludeSpId={spId} variant="card" showPhone />
 
                 <div className="border-t pt-4 space-y-2">
-                  {isPendingOffer && selectedOffer && (
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={handleAccept}
-                        disabled={acceptOffer.isPending}
-                        className="flex-1"
-                      >
-                        Accept
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleReject}
-                        disabled={declineOffer.isPending}
-                        className="flex-1"
-                      >
-                        Reject
-                      </Button>
-                    </div>
-                  )}
-
-                  {!isPendingOffer && (selectedJob.status === "Assigned" || selectedJob.status === "Accepted") && (
-                    <Button size="sm" onClick={markInProgress} disabled={updateStatus.isPending} className="w-full">
-                      Mark In Progress
-                    </Button>
-                  )}
-
-                  {!isPendingOffer && selectedJob.status === "InProgress" && (
-                    <Button size="sm" onClick={markCompleted} disabled={updateStatus.isPending} className="w-full">
-                      Mark Completed
-                    </Button>
-                  )}
-                </div>
 
                 <div className="border-t pt-4">
                   <Link
