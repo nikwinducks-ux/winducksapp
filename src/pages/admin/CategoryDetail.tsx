@@ -176,11 +176,11 @@ export default function CategoryDetail() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-start gap-3">
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{item.title || item.description}</p>
+                      <p className="font-medium break-words">{item.title || item.description}</p>
                       {item.description && item.title && (
-                        <p className="text-xs text-muted-foreground truncate mt-0.5">{item.description}</p>
+                        <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words mt-0.5">{item.description}</p>
                       )}
                     </div>
                     <p className="font-mono text-sm shrink-0">{formatCAD(Number(item.price) || 0)}</p>
