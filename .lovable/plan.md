@@ -1,43 +1,37 @@
 
 
-## Add pull-to-refresh on mobile
+## Replace teammate phone text with phone + SMS icon buttons
 
-Add a native-feeling pull-to-refresh gesture on mobile screens that re-fetches the current page's data (jobs, offers, calendar, etc.) and shows a spinner while refreshing.
+In the SP portal's "Working with" teammate list, replace the visible phone number with two compact icon buttons: a **phone** icon (tap-to-call via `tel:`) and a **message** icon (tap-to-SMS via `sms:`). The teammate's name and "Lead" star stay visible; the number itself is no longer shown.
 
-### What you'll see (mobile only)
+### What you'll see
 
-- On any page, when scrolled to the top, pulling down reveals a circular spinner that grows/rotates with the pull distance.
-- Releasing past the threshold (~70px) triggers a refresh: spinner locks in, React Query invalidates all active queries, and the spinner retracts when data settles.
-- Releasing before threshold snaps back with no refresh.
-- Desktop (≥768px) is unaffected — gesture is disabled.
-- Works inside the existing `DashboardLayout` scroll container, so every authenticated page (SP + Admin) gets it for free.
+In every place the `CrewTeammates` card renders (SP Calendar job sheet, SP Job Detail, Job Offer Detail), each teammate row will show:
 
-### How it works
+```text
+[Avatar]  Jane Smith ★ Lead          [📞]  [💬]
+```
 
-- New hook `src/hooks/usePullToRefresh.ts`:
-  - Attaches `touchstart` / `touchmove` / `touchend` to a target ref.
-  - Only engages when `scrollTop === 0` and the gesture is a downward pull.
-  - Applies dampening (pull distance × 0.5) and exposes `pullDistance` + `isRefreshing` state.
-  - Calls an `onRefresh: () => Promise<void>` callback when threshold is crossed.
-- New component `src/components/PullToRefreshIndicator.tsx`:
-  - Fixed-position spinner using `lucide-react`'s `RefreshCw`, rotates proportional to pull distance, opacity fades in.
-- Wire into `src/components/DashboardLayout.tsx`:
-  - Use `useIsMobile()` to gate.
-  - Get `useQueryClient()` and refresh via `await queryClient.invalidateQueries()` (refetches all active queries — covers jobs, offers, crew, providers, etc.).
-  - Attach the hook to the `<main>` scroll container ref and render `<PullToRefreshIndicator>` at top.
+- **📞 Phone button** — `<a href="tel:+1...">` with `Phone` icon, opens dialer.
+- **💬 Message button** — `<a href="sms:+1...">` with `MessageSquare` icon, opens SMS composer prefilled to teammate's number.
+- Both rendered as small `Button variant="outline" size="icon"` (h-8 w-8) so they're easy to tap on mobile.
+- If the teammate has no phone on file, both buttons are hidden and a small "— no phone on file" hint is shown instead.
+- Tooltip on hover: "Call Jane" / "Text Jane".
 
-### Edge cases handled
+The inline variant (used in `MyJobs` list) already shows names only — no change needed.
 
-- Disabled when any modal/sheet is interacting (gesture only fires on the main scroll area, not portaled overlays).
-- Doesn't interfere with horizontal scrolls (e.g. TabsList) — only triggers on vertical pull when scrollY is 0.
-- Auto-times-out after 10s if a query hangs, so spinner never gets stuck.
-- No-op on desktop — zero overhead.
+### Implementation
+
+Edit only `src/components/sp/CrewTeammates.tsx`:
+
+- Replace the current `<a href={tel:...}>{phone}</a>` block with two icon buttons side-by-side.
+- Add an `smsHref(phone)` helper next to the existing `telHref(phone)` (same digit-stripping, `sms:` scheme).
+- Import `MessageSquare` from `lucide-react` alongside the existing `Phone`.
+- Wrap each icon in the `Tooltip` component (already in the UI kit) for accessibility.
 
 ### Files touched
 
-- **New**: `src/hooks/usePullToRefresh.ts`
-- **New**: `src/components/PullToRefreshIndicator.tsx`
-- **Edited**: `src/components/DashboardLayout.tsx` (attach hook + indicator on mobile)
+- **Edited**: `src/components/sp/CrewTeammates.tsx` (only the `card` variant's phone rendering)
 
-No schema, RLS, or data-model changes.
+No schema, RLS, hook, or other-page changes. Admin pages are unaffected.
 
