@@ -1,12 +1,36 @@
+import { useMemo, useState } from "react";
 import { MetricCard } from "@/components/MetricCard";
-import { useServiceProviders, useJobs } from "@/hooks/useSupabaseData";
+import { useServiceProviders, useJobs, useGlobalActivityLog } from "@/hooks/useSupabaseData";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, Briefcase, TrendingUp, AlertTriangle, Star } from "lucide-react";
+import { Users, Briefcase, TrendingUp, AlertTriangle, Star, History } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { GlobalActivityLog } from "@/components/GlobalActivityLog";
+
+const LAST_SEEN_KEY = "winducks.activity.lastSeen";
 
 export default function AdminDashboard() {
   const { data: serviceProviders = [] } = useServiceProviders();
   const { data: jobs = [] } = useJobs();
+  const { data: activity = [] } = useGlobalActivityLog(200);
+
+  const [logOpen, setLogOpen] = useState(false);
+  const [lastSeen, setLastSeen] = useState<string>(
+    () => localStorage.getItem(LAST_SEEN_KEY) ?? new Date(0).toISOString(),
+  );
+
+  const unread = useMemo(() => {
+    const seenMs = new Date(lastSeen).getTime();
+    return activity.filter((e) => new Date(e.created_at).getTime() > seenMs).length;
+  }, [activity, lastSeen]);
+
+  const handleOpenLog = () => {
+    setLogOpen(true);
+    const now = new Date().toISOString();
+    localStorage.setItem(LAST_SEEN_KEY, now);
+    setLastSeen(now);
+  };
 
   const { data: avgRating30d } = useQuery({
     queryKey: ["avg-rating-30d"],
@@ -32,9 +56,20 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <div>
-        <h1 className="page-header">Admin Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">System overview</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="page-header">Admin Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">System overview</p>
+        </div>
+        <Button variant="outline" onClick={handleOpenLog} className="relative shrink-0">
+          <History className="h-4 w-4" />
+          History
+          {unread > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold flex items-center justify-center">
+              {unread > 99 ? "99+" : unread}
+            </span>
+          )}
+        </Button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -92,6 +127,17 @@ export default function AdminDashboard() {
           </table>
         </div>
       </div>
+
+      <Sheet open={logOpen} onOpenChange={setLogOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl flex flex-col">
+          <SheetHeader>
+            <SheetTitle>Activity History</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4 flex-1 min-h-0">
+            <GlobalActivityLog onNavigate={() => setLogOpen(false)} />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
