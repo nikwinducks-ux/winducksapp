@@ -601,12 +601,12 @@ function DayGridDroppable({
       onPointerCancel={createEnabled ? clearLongPress : undefined}
       onPointerLeave={createEnabled ? clearLongPress : undefined}
       className={cn(
-        "relative flex-1 touch-pan-y select-none",
+        "relative flex-1 select-none",
         today && "bg-primary/5",
         isOver && "bg-primary/10 ring-2 ring-primary ring-inset",
         pressActive && "bg-primary/10"
       )}
-      style={{ height: GRID_HEIGHT_PX }}
+      style={{ height: GRID_HEIGHT_PX, touchAction: "pan-x pan-y" }}
     >
       {HOURS.map((h) => (
         <div
