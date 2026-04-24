@@ -137,6 +137,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const role = user?.role ?? "sp";
   const isAdmin = role === "admin" || role === "owner";
   const links = isAdmin ? adminLinks : spLinks;
+  const isMobile = useIsMobile();
+  const queryClient = useQueryClient();
+  const mobileMainRef = useRef<HTMLElement>(null);
+  const desktopMainRef = useRef<HTMLElement>(null);
 
   useOfferRealtime(!isAdmin ? user?.spId ?? null : null);
 
@@ -150,6 +154,20 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     return match?.label ?? "Winducks";
   }, [location.pathname]);
 
+  const handleRefresh = async () => {
+    await queryClient.invalidateQueries();
+  };
+
+  const ptrEnabled = isMobile;
+  const mobilePtr = usePullToRefresh(mobileMainRef, {
+    enabled: ptrEnabled && mode === "mobile",
+    onRefresh: handleRefresh,
+  });
+  const desktopPtr = usePullToRefresh(desktopMainRef, {
+    enabled: ptrEnabled && mode !== "mobile",
+    onRefresh: handleRefresh,
+  });
+
   if (mode === "mobile") {
     return (
       <div className="flex min-h-screen w-full flex-col">
@@ -160,7 +178,14 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           user={user}
           signOut={signOut}
         />
-        <main className="flex-1 overflow-auto">
+        {isMobile && (
+          <PullToRefreshIndicator
+            pullDistance={mobilePtr.pullDistance}
+            isRefreshing={mobilePtr.isRefreshing}
+            threshold={mobilePtr.threshold}
+          />
+        )}
+        <main ref={mobileMainRef} className="flex-1 overflow-auto">
           <div className="mx-auto max-w-7xl p-4 sm:p-6">
             {!isAdmin && user?.spId && <NotificationsBanner />}
             {children}
