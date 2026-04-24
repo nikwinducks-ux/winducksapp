@@ -3,9 +3,10 @@ import {
   LayoutDashboard, Briefcase, Calendar, Zap, TrendingUp,
   Sliders, Scale, Users, FlaskConical, GitBranch, Plug, Tag,
   Shield, UserCircle, Contact, LogOut, ClipboardList, Settings,
-  TestTube, CalendarDays, Smartphone, History,
+  TestTube, CalendarDays, Smartphone, History, Monitor,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLayoutMode } from "@/contexts/LayoutModeContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,10 +43,11 @@ export function MobileTopNav({
 }: Props) {
   const location = useLocation();
   const role = user?.role ?? "sp";
+  const { toggle } = useLayoutMode();
 
   return (
     <header
-      className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 xl:hidden"
+      className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
       {/* Row 1: header */}
@@ -75,6 +77,16 @@ export function MobileTopNav({
             )}
           </Button>
         )}
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggle}
+          aria-label="Switch to desktop view"
+          title="Switch to desktop view"
+        >
+          <Monitor className="h-5 w-5" />
+        </Button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
