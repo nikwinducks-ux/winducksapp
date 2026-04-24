@@ -215,6 +215,31 @@ export function useUpdateServiceCategory() {
   });
 }
 
+export function useDeleteServiceCategory() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // Remove line items first (no FK cascade)
+      const { error: liErr } = await supabase
+        .from("service_category_line_items" as any)
+        .delete()
+        .eq("category_id", id);
+      if (liErr) throw liErr;
+      const { error } = await supabase.from("service_categories").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["service_categories"] });
+      qc.invalidateQueries({ queryKey: ["service_category_line_items"] });
+      toast({ title: "Category deleted" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+}
+
 // ===== Service Category Line Items =====
 
 export interface ServiceCategoryLineItem {
