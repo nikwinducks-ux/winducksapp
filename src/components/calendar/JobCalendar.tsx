@@ -841,7 +841,7 @@ function DayView({
 function WeekView({
   jobs, providers, currentDate, onJobClick, onEmptyDayClick, mode, showDebug,
   nearestPrevious, nearestNext, nearestPreviousLabel, nearestNextLabel, onJumpToDate,
-  dnd, unavailableBlocks, onUnavailableClick, onCreateUnavailable, onNavigateWeek,
+  dnd, unavailableBlocks, onUnavailableClick, onCreateUnavailable, onNavigateWeek, onDateChange,
 }: ViewProps) {
   const getSpName = spNameLookup(providers);
   const getSpColorFor = spColorLookup(providers);
