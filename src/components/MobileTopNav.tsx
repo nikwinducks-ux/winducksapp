@@ -51,13 +51,13 @@ export function MobileTopNav({
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
       {/* Row 1: header */}
-      <div className="flex h-14 items-center gap-2 px-3">
+      <div className="flex h-14 items-center gap-1.5 px-2 sm:gap-2 sm:px-3">
         <img
           src="/assets/branding/winducks-iconw.png"
           alt=""
-          className="h-8 w-8 shrink-0 rounded-md object-contain"
+          className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 rounded-md object-contain"
         />
-        <h1 className="flex-1 truncate text-base font-semibold tracking-tight">
+        <h1 className="flex-1 min-w-0 truncate text-base font-semibold tracking-tight">
           {title}
         </h1>
 
@@ -67,7 +67,7 @@ export function MobileTopNav({
             size="icon"
             onClick={onOpenHistory}
             aria-label="Open history"
-            className="relative"
+            className="relative shrink-0 h-9 w-9"
           >
             <History className="h-5 w-5" />
             {historyUnread > 0 && (
@@ -84,6 +84,7 @@ export function MobileTopNav({
           onClick={toggle}
           aria-label="Switch to desktop view"
           title="Switch to desktop view"
+          className="shrink-0 h-9 w-9"
         >
           <Monitor className="h-5 w-5" />
         </Button>
