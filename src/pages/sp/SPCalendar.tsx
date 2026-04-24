@@ -413,7 +413,11 @@ export default function SPCalendar() {
                   </div>
                 )}
 
-                {!isPendingOffer && (selectedJob.status === "Assigned" || selectedJob.status === "Accepted") && (
+                {!isPendingOffer &&
+                  selectedJob.assignedSpId === spId &&
+                  (selectedJob.status === "Assigned" ||
+                    selectedJob.status === "Accepted" ||
+                    selectedJob.status === "Offered") && (
                   <div className="rounded-md border bg-card p-3 space-y-2">
                     <h3 className="text-sm font-semibold">Update Status</h3>
                     <Button
