@@ -19,7 +19,8 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Search, Plus, Eye, Pencil, UserPlus, UserX, Trash2, Radio, X, RadioTower, CalendarClock } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -66,6 +67,8 @@ function formatScheduleToast(date: string, time: string) {
 
 export default function JobManagement() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get("tab") === "past" ? "past" : "active";
   const [search, setSearch] = useState("");
   const [urgencyFilter, setUrgencyFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -121,13 +124,19 @@ export default function JobManagement() {
     [providers]
   );
 
-  let filtered = jobs.filter(
+  // Partition by tab: Active = everything except Completed/Cancelled; Past = Completed only
+  const tabFiltered = jobs.filter((j) =>
+    tab === "past"
+      ? j.status === "Completed"
+      : j.status !== "Completed" && j.status !== "Cancelled"
+  );
+
+  let filtered = tabFiltered.filter(
     (j) =>
-      j.status !== "Cancelled" &&
-      (j.id.toLowerCase().includes(search.toLowerCase()) ||
-        j.customerName.toLowerCase().includes(search.toLowerCase()) ||
-        j.serviceCategory.toLowerCase().includes(search.toLowerCase()) ||
-        j.jobAddress.city.toLowerCase().includes(search.toLowerCase()))
+      j.id.toLowerCase().includes(search.toLowerCase()) ||
+      j.customerName.toLowerCase().includes(search.toLowerCase()) ||
+      j.serviceCategory.toLowerCase().includes(search.toLowerCase()) ||
+      j.jobAddress.city.toLowerCase().includes(search.toLowerCase())
   );
 
   if (urgencyFilter !== "all") {
@@ -596,17 +605,36 @@ export default function JobManagement() {
 
   if (isLoading) return <div className="py-20 text-center text-muted-foreground">Loading jobs...</div>;
 
+  const activeCount = jobs.filter((j) => j.status !== "Completed" && j.status !== "Cancelled").length;
+  const pastCount = jobs.filter((j) => j.status === "Completed").length;
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="page-header">Jobs</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{filtered.length} jobs</p>
+          <p className="mt-1 text-sm text-muted-foreground">{filtered.length} {tab === "past" ? "past" : "active"} jobs</p>
         </div>
         <Link to="/admin/jobs/new">
           <Button><Plus className="h-4 w-4 mr-2" />Create Job</Button>
         </Link>
       </div>
+
+      <Tabs
+        value={tab}
+        onValueChange={(v) => {
+          const next = new URLSearchParams(searchParams);
+          if (v === "active") next.delete("tab");
+          else next.set("tab", v);
+          setSearchParams(next, { replace: true });
+          clearSelection();
+        }}
+      >
+        <TabsList>
+          <TabsTrigger value="active">Active ({activeCount})</TabsTrigger>
+          <TabsTrigger value="past">Past Jobs ({pastCount})</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="relative max-w-sm flex-1 min-w-[200px]">
@@ -664,21 +692,25 @@ export default function JobManagement() {
             </Button>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => { setBulkAssignSpId(""); setBulkAssignOpen(true); }}>
-              <UserPlus className="h-4 w-4 mr-2" />Assign Selected
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setBulkUnassignOpen(true)}>
-              <UserX className="h-4 w-4 mr-2" />Unassign Selected
-            </Button>
-            <Button size="sm" variant="outline" onClick={openScheduleBulk}>
-              <CalendarClock className="h-4 w-4 mr-2" />Schedule Selected
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => { setStartBroadcastJobId(null); setBroadcastOpen(true); }}>
-              <Radio className="h-4 w-4 mr-2" />Broadcast Selected
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setBulkStopOpen(true)}>
-              <RadioTower className="h-4 w-4 mr-2" />Stop Broadcast
-            </Button>
+            {tab === "active" && (
+              <>
+                <Button size="sm" variant="outline" onClick={() => { setBulkAssignSpId(""); setBulkAssignOpen(true); }}>
+                  <UserPlus className="h-4 w-4 mr-2" />Assign Selected
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setBulkUnassignOpen(true)}>
+                  <UserX className="h-4 w-4 mr-2" />Unassign Selected
+                </Button>
+                <Button size="sm" variant="outline" onClick={openScheduleBulk}>
+                  <CalendarClock className="h-4 w-4 mr-2" />Schedule Selected
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => { setStartBroadcastJobId(null); setBroadcastOpen(true); }}>
+                  <Radio className="h-4 w-4 mr-2" />Broadcast Selected
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setBulkStopOpen(true)}>
+                  <RadioTower className="h-4 w-4 mr-2" />Stop Broadcast
+                </Button>
+              </>
+            )}
             <Button size="sm" variant="destructive" onClick={openDeleteBulk}>
               <Trash2 className="h-4 w-4 mr-2" />Delete Selected
             </Button>
