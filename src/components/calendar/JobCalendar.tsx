@@ -841,27 +841,36 @@ function WeekView({
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="flex border-b bg-muted/30">
         <div className="w-14 shrink-0 border-r" />
-        {days.map((d) => (
-          <div
-            key={d.toISOString()}
-            className={cn(
-              "flex-1 min-w-0 px-2 py-2 text-center border-r last:border-r-0",
-              isToday(d) && "bg-primary/10"
-            )}
-          >
-            <div className="text-[10px] uppercase text-muted-foreground font-semibold">
-              {format(d, "EEE")}
-            </div>
+        {days.map((d) => {
+          const headerDayJobs = jobsOnDate(jobs, d);
+          const dayTotal = formatDayTotal(headerDayJobs);
+          return (
             <div
+              key={d.toISOString()}
               className={cn(
-                "text-sm font-semibold",
-                isToday(d) && "text-primary"
+                "flex-1 min-w-0 px-2 py-2 text-center border-r last:border-r-0",
+                isToday(d) && "bg-primary/10"
               )}
             >
-              {format(d, "d")}
+              <div className="text-[10px] uppercase text-muted-foreground font-semibold">
+                {format(d, "EEE")}
+              </div>
+              <div
+                className={cn(
+                  "text-sm font-semibold",
+                  isToday(d) && "text-primary"
+                )}
+              >
+                {format(d, "d")}
+              </div>
+              {dayTotal && (
+                <div className="text-[10px] font-semibold text-primary mt-0.5 truncate">
+                  {dayTotal}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div className="relative flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
         <TimeAxis />
