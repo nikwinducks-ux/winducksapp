@@ -216,6 +216,7 @@ export default function JobForm() {
 
     const payload: any = {
       customerId: form.customerId,
+      customerPropertyId: form.customerPropertyId,
       serviceCategory: primaryCategory,
       payout: finalPayout,
       street: form.street,
@@ -279,6 +280,7 @@ export default function JobForm() {
       try {
         const { data: newJob, error } = await supabase.from("jobs").insert({
           customer_id: payload.customerId || null,
+          customer_property_id: payload.customerPropertyId || null,
           service_category: payload.serviceCategory,
           payout: parseFloat(payload.payout) || 0,
           job_address_street: payload.street,
@@ -366,6 +368,30 @@ export default function JobForm() {
                 </SelectContent>
               </Select>
             </div>
+            {(() => {
+              const cust = customers.find((c) => c.id === form.customerId);
+              const props = cust?.properties ?? [];
+              if (!cust || props.length === 0) return null;
+              return (
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Property</Label>
+                  <Select
+                    value={form.customerPropertyId}
+                    onValueChange={(v) => update("customerPropertyId", v)}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Select property" /></SelectTrigger>
+                    <SelectContent>
+                      {props.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.label}{p.isPrimary ? " (Primary)" : ""} — {p.address.street}, {p.address.city}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Job address auto-fills from the selected property. You can override below.</p>
+                </div>
+              );
+            })()}
             <div className="space-y-1.5">
               <Label>Amount <span className="text-xs text-muted-foreground">(CAD — auto-calculated from services if empty)</span></Label>
               <Input type="number" min="0" step="0.01" value={form.payout} onChange={(e) => update("payout", e.target.value)} placeholder={computedTotal > 0 ? `Auto: ${formatCAD(computedTotal)}` : "0.00"} />

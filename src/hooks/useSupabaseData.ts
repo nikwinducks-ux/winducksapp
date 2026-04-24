@@ -994,7 +994,7 @@ export function useCreateJob() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: async (form: {
-      customerId: string; serviceCategory: string; payout: string;
+      customerId: string; customerPropertyId?: string; serviceCategory: string; payout: string;
       street: string; city: string; province: string; postalCode: string; country: string;
       lat: string; lng: string; scheduledDate: string; scheduledTime: string; estimatedDuration: string;
       notes?: string; urgency?: string;
@@ -1002,6 +1002,7 @@ export function useCreateJob() {
       // job_number is auto-assigned by DB trigger (assign_job_number)
       const { error } = await supabase.from("jobs").insert({
         customer_id: form.customerId || null,
+        customer_property_id: form.customerPropertyId || null,
         service_category: form.serviceCategory,
         payout: parseFloat(form.payout) || 0,
         job_address_street: form.street,
@@ -1038,13 +1039,14 @@ export function useUpdateJob() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: async ({ id, ...form }: {
-      id: string; customerId: string; serviceCategory: string; payout: string;
+      id: string; customerId: string; customerPropertyId?: string; serviceCategory: string; payout: string;
       street: string; city: string; province: string; postalCode: string; country: string;
       lat: string; lng: string; scheduledDate: string; scheduledTime: string; estimatedDuration: string;
       notes?: string; urgency?: string;
     }) => {
       const { error } = await supabase.from("jobs").update({
         customer_id: form.customerId || null,
+        customer_property_id: form.customerPropertyId || null,
         service_category: form.serviceCategory,
         payout: parseFloat(form.payout) || 0,
         job_address_street: form.street,
