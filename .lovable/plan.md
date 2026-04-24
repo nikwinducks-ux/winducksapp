@@ -1,29 +1,29 @@
 
 
-## Remove redundant date picker from "Mark unavailable" dialog
+## Remove Start/End time inputs from "Mark unavailable" dialog
 
-When an SP taps an empty time slot on the calendar, the `UnavailableDialog` opens with the date already prefilled from the tapped day. The current dialog still shows a **Date** input at the top, which is redundant and reads as a "please select a date" prompt. Remove that field — keep date editing accessible via the existing Start/End time inputs only.
+The dialog currently shows Start and End time scrollers. Remove both — the times are already prefilled from the tapped slot (start = tap, end = start + 1h). The dialog will only show the **Reason** field plus Save/Cancel/Delete actions.
 
 ### What you'll see
 
 - Tap an empty time slot on the SP Day/Week calendar → dialog opens titled **"Mark unavailable"** with:
-  - **Start** (prefilled, snapped to 15-min slot, editable)
-  - **End** (prefilled to start + 1h, editable)
-  - **Reason** (optional)
-- No more standalone "Date" field at the top.
-- The date is still bound internally to the tapped day (and to the existing block's date when editing).
-- Edit mode for an existing block behaves the same — title becomes "Edit time off", no Date input shown.
+  - A read-only summary line showing the prefilled date + time range (e.g. "Mon, Apr 28 · 2:00 PM – 3:00 PM") so the user knows what they're blocking.
+  - **Reason** (optional textarea)
+  - Cancel / Save buttons (Delete in edit mode)
+- No Start input. No End input. No Date input.
+- Saving uses the prefilled date/start/end from the tap (or the original values when editing).
 
 ### Implementation
 
 **`src/components/calendar/UnavailableDialog.tsx`**:
-- Remove the `<Label htmlFor="ua-date">Date</Label>` + `<Input id="ua-date" type="date" …>` block from the dialog body.
-- Keep the `date` state and the `useEffect` that hydrates it from `initial.date` — `handleSave` still passes `date` through unchanged so the parent's create/update mutation gets the correct day.
-- No prop or signature changes; `UnavailableDialogValue.date` stays in the contract.
+- Remove the Start `<Input type="time">` and End `<Input type="time">` block (the two-column grid).
+- Remove the `toMin` helper and the time-format / 15-min validation in `handleSave` — no user-editable times to validate. Keep `start`/`end` state and the `useEffect` hydration so saved values pass through unchanged.
+- Add a small read-only summary line above the Reason field showing the formatted date and time range (12-hour format, e.g. "Mon, Apr 28 · 2:00 PM – 3:00 PM"), derived from `date`/`start`/`end`.
+- Keep `UnavailableDialogValue` shape and all props/callbacks unchanged.
 
 ### Files touched
 
-- **Edited**: `src/components/calendar/UnavailableDialog.tsx` (remove Date input from JSX only)
+- **Edited**: `src/components/calendar/UnavailableDialog.tsx`
 
-No changes to `SPCalendar.tsx`, hooks, schema, RLS, or admin flows.
+No changes to `SPCalendar.tsx`, `JobCalendar.tsx`, hooks, schema, or admin flows.
 
