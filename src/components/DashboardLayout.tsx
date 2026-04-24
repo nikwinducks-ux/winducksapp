@@ -233,7 +233,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       <main
         ref={desktopMainRef}
         className="flex-1 overflow-auto overscroll-contain"
-        style={{ touchAction: "pan-y" }}
       >
         <div className="sticky top-0 z-20 flex h-10 items-center justify-end gap-2 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
           <Button
