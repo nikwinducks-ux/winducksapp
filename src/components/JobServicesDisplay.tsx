@@ -42,8 +42,8 @@ export function JobServicesDisplay({ services, categories, compact = false }: Pr
               </span>
               <span className="text-muted-foreground shrink-0">
                 {svc.quantity > 1 ? `${svc.quantity} × ` : ""}
-                {svc.unit_price != null ? `$${svc.unit_price}` : ""}
-                {svc.line_total > 0 ? ` = $${svc.line_total}` : ""}
+                {svc.unit_price != null ? formatCAD(svc.unit_price) : ""}
+                {svc.line_total > 0 ? ` = ${formatCAD(svc.line_total)}` : ""}
               </span>
             </div>
             {svc.notes && <p className="text-xs text-muted-foreground mt-0.5">{svc.notes}</p>}

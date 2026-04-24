@@ -725,7 +725,7 @@ export default function JobManagement() {
                   <td className="py-3">
                     <JobServicesCodesSummary services={job.services} categories={categories} fallbackCategory={job.serviceCategory} />
                   </td>
-                  <td className="py-3 font-medium">${job.payout}</td>
+                  <td className="py-3 font-medium">{formatCAD(job.payout)}</td>
                   <td className="py-3 text-muted-foreground">{job.jobAddress.city}</td>
                   <td className="py-3"><UrgencyBadge urgency={job.urgency} /></td>
                   <td className="py-3">

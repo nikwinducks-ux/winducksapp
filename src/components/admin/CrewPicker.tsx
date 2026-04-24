@@ -106,12 +106,12 @@ export function CrewPicker({
       </div>
       {value.length > 1 && payout > 0 && (
         <p className="text-xs text-muted-foreground">
-          Each SP will be paid ${perSp.toFixed(2)} (= ${payout} ÷ {value.length})
+          Each SP will be paid {formatCAD(perSp)} (= {formatCAD(payout)} ÷ {value.length})
         </p>
       )}
       {value.length === 1 && payout > 0 && (
         <p className="text-xs text-muted-foreground">
-          {activeProviders.find((sp) => sp.id === value[0].spId)?.name ?? "SP"} will be paid ${payout.toFixed(2)}
+          {activeProviders.find((sp) => sp.id === value[0].spId)?.name ?? "SP"} will be paid {formatCAD(payout)}
         </p>
       )}
     </div>

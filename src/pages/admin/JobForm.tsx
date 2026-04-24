@@ -359,8 +359,8 @@ export default function JobForm() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Amount ($) <span className="text-xs text-muted-foreground">(auto-calculated from services if empty)</span></Label>
-              <Input type="number" min="0" step="0.01" value={form.payout} onChange={(e) => update("payout", e.target.value)} placeholder={computedTotal > 0 ? `Auto: $${computedTotal.toFixed(2)}` : "0.00"} />
+              <Label>Amount <span className="text-xs text-muted-foreground">(CAD — auto-calculated from services if empty)</span></Label>
+              <Input type="number" min="0" step="0.01" value={form.payout} onChange={(e) => update("payout", e.target.value)} placeholder={computedTotal > 0 ? `Auto: ${formatCAD(computedTotal)}` : "0.00"} />
             </div>
           </div>
         </div>

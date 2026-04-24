@@ -219,7 +219,7 @@ export function JobBlock({
             </span>
           )}
         </span>
-        <span className="font-semibold shrink-0">${job.payout}</span>
+        <span className="font-semibold shrink-0">{formatCAD(job.payout)}</span>
       </div>
       {!compact && (
         <>
