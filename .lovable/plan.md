@@ -1,28 +1,41 @@
 
 
-## Make Customer rows clickable
+## Merge four allocation pages into one tabbed Allocation page
 
-Mirror the Jobs-list pattern on `/admin/customers`: clicking anywhere on a customer row opens their detail page, while existing action buttons keep working.
+Combine **Allocation Control**, **Fairness Controls**, **Simulation**, and **Allocation QA** into a single page at `/admin/allocation` with four tabs. The existing page components are reused as-is — only the wrapper, route, and sidebar change.
 
 ### What you'll see
 
-- **Hover**: row gets a subtle highlight + pointer cursor.
-- **Click anywhere on the row** (except the Actions buttons) → navigates to `/admin/customers/:id` (existing detail page, which already has an Edit button).
-- **Name column**: rendered as a link to the same detail page so middle-click / open-in-new-tab works and the affordance is obvious.
-- **Actions column** (View / Edit / Archive) stays as-is.
+- One sidebar entry: **Allocation** (replaces the four separate entries).
+- Page at `/admin/allocation` shows a tab bar:
+  1. **Control** — scoring weights & policy versions (current `AllocationControl`)
+  2. **Fairness** — rolling window, share caps, etc. (current `FairnessControls`)
+  3. **Simulation** — quick "what-if" scoring (current `SimulationTool`)
+  4. **QA** — full allocation run + offer monitor + policy diff (current `AllocationQA`)
+- Active tab is reflected in the URL via `?tab=control|fairness|simulation|qa` so links and refreshes preserve the tab.
+- Old URLs (`/admin/fairness`, `/admin/simulation`, `/admin/qa`) redirect to the new page with the matching tab.
 
 ### Implementation
 
-In `src/pages/admin/CustomerManagement.tsx`:
+**New file** `src/pages/admin/AllocationHub.tsx`:
+- Renders a page header "Allocation" + shadcn `Tabs` with the four tab triggers.
+- Reads/writes `tab` query param via `useSearchParams` (default `control`).
+- Each `TabsContent` renders the existing page component unchanged: `<AllocationControl />`, `<FairnessControls />`, `<SimulationTool />`, `<AllocationQA />`. Their internal `<h1 className="page-header">` is kept (acts as a section header under the tab).
 
-- Import `useNavigate` from `react-router-dom`.
-- On the `<tr>`: add `onClick={() => navigate(`/admin/customers/${c.id}`)}`, `role="button"`, `tabIndex={0}`, an `onKeyDown` handler for Enter/Space, and `cursor-pointer hover:bg-muted/40 transition-colors`.
-- Wrap the Name cell content in `<Link to={`/admin/customers/${c.id}`} onClick={(e) => e.stopPropagation()}>` so middle-click works.
-- Add `onClick={(e) => e.stopPropagation()}` to the Actions `<td>` so the View/Edit/Archive buttons don't double-trigger row navigation.
+**`src/App.tsx`**:
+- Replace the four separate routes with a single `/admin/allocation` → `AllocationHub`.
+- Add redirect routes for `/admin/fairness` → `/admin/allocation?tab=fairness`, `/admin/simulation` → `?tab=simulation`, `/admin/qa` → `?tab=qa` (using `<Navigate replace>`).
+- Drop the now-unused imports? Keep them — they're still rendered inside `AllocationHub`.
+
+**`src/components/DashboardLayout.tsx`**:
+- Remove the four entries (`/admin/allocation` Control, `/admin/fairness`, `/admin/simulation`, `/admin/qa`).
+- Add one entry: `{ to: "/admin/allocation", icon: Sliders, label: "Allocation" }`.
 
 ### Files touched
 
-- `src/pages/admin/CustomerManagement.tsx` — single `<tbody>` row block.
+- **New**: `src/pages/admin/AllocationHub.tsx`
+- **Edited**: `src/App.tsx` (routes + redirects), `src/components/DashboardLayout.tsx` (sidebar)
+- **Untouched**: `AllocationControl.tsx`, `FairnessControls.tsx`, `SimulationTool.tsx`, `AllocationQA.tsx` (reused as tab bodies)
 
-No route, hook, or schema changes — `/admin/customers/:id` already exists.
+No schema, hook, or business-logic changes.
 
