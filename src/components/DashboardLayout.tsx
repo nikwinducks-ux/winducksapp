@@ -1,14 +1,16 @@
 import { NavLink, useLocation, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLayoutMode } from "@/contexts/LayoutModeContext";
 import { useOfferRealtime } from "@/hooks/useOfferRealtime";
 import { NotificationsBanner } from "@/components/NotificationsBanner";
 import { MobileTopNav } from "@/components/MobileTopNav";
+import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard, Briefcase, Calendar, Zap, TrendingUp,
   Sliders, Scale, Users, FlaskConical, GitBranch, Plug, Tag,
   ChevronLeft, ChevronRight, Shield, UserCircle, Contact,
   LogOut, ClipboardList, Settings, TestTube, CalendarDays,
-  Smartphone,
+  Smartphone, Monitor,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -128,6 +130,7 @@ function SidebarBody({
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
+  const { mode, toggle } = useLayoutMode();
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const role = user?.role ?? "sp";
@@ -146,11 +149,30 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     return match?.label ?? "Winducks";
   }, [location.pathname]);
 
+  if (mode === "mobile") {
+    return (
+      <div className="flex min-h-screen w-full flex-col">
+        <MobileTopNav
+          title={pageTitle}
+          links={links}
+          isAdmin={isAdmin}
+          user={user}
+          signOut={signOut}
+        />
+        <main className="flex-1 overflow-auto">
+          <div className="mx-auto max-w-7xl p-4 sm:p-6">
+            {!isAdmin && user?.spId && <NotificationsBanner />}
+            {children}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen w-full">
-      {/* Desktop sidebar (xl+) */}
       <aside
-        className={`sticky top-0 hidden h-screen flex-col border-r bg-sidebar text-sidebar-foreground transition-all duration-300 xl:flex ${
+        className={`sticky top-0 hidden h-screen flex-col border-r bg-sidebar text-sidebar-foreground transition-all duration-300 sm:flex ${
           collapsed ? "w-16" : "w-60"
         }`}
       >
@@ -169,15 +191,19 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </button>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        <MobileTopNav
-          title={pageTitle}
-          links={links}
-          isAdmin={isAdmin}
-          user={user}
-          signOut={signOut}
-        />
+        <div className="sticky top-0 z-20 flex h-10 items-center justify-end gap-2 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggle}
+            aria-label="Switch to mobile view"
+            title="Switch to mobile view"
+            className="h-8 w-8"
+          >
+            <Smartphone className="h-4 w-4" />
+          </Button>
+        </div>
         <div className="mx-auto max-w-7xl p-4 sm:p-6 xl:p-8">
           {!isAdmin && user?.spId && <NotificationsBanner />}
           {children}
