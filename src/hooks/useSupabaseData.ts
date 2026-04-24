@@ -1321,3 +1321,36 @@ export function useCustomerActivityLog(customerId: string | undefined) {
     },
   });
 }
+
+export function useGlobalActivityLog(limit = 200) {
+  const queryClient = useQueryClient();
+
+  React.useEffect(() => {
+    const channel = (supabase as any)
+      .channel("global-activity-log")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "customer_activity_log" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["global-activity"] });
+        },
+      )
+      .subscribe();
+    return () => {
+      (supabase as any).removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  return useQuery({
+    queryKey: ["global-activity", limit],
+    queryFn: async (): Promise<CustomerActivityLogEntry[]> => {
+      const { data, error } = await (supabase as any)
+        .from("customer_activity_log")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return (data ?? []) as CustomerActivityLogEntry[];
+    },
+  });
+}
