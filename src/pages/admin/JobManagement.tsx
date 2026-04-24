@@ -889,7 +889,7 @@ export default function JobManagement() {
                       );
                     })()}
                   </td>
-                  <td className="py-3">
+                  <td className="py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-1">
                       <Link to={`/admin/jobs/${job.dbId}`}>
                         <Button size="sm" variant="ghost" title="View"><Eye className="h-4 w-4" /></Button>
