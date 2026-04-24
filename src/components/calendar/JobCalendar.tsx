@@ -771,14 +771,21 @@ function DayView({
   const showEmpty = dayJobs.length === 0 && (nearestPrevious || nearestNext);
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
-      <div className="border-b px-4 py-2 flex items-center justify-between">
-        <div className="text-sm font-medium">
+      <div className="border-b px-4 py-2 flex items-center justify-between gap-2">
+        <div className="text-sm font-medium min-w-0 truncate">
           {format(currentDate, "EEEE, MMMM d, yyyy")}
           {isToday(currentDate) && (
             <span className="ml-2 text-xs text-primary font-semibold">Today</span>
           )}
         </div>
-        <div className="text-xs text-muted-foreground">{dayJobs.length} job(s)</div>
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="text-xs text-muted-foreground">{dayJobs.length} job(s)</div>
+          {formatDayTotal(dayJobs) && (
+            <div className="text-xs font-semibold text-foreground bg-primary/10 text-primary rounded-md px-2 py-0.5">
+              {formatDayTotal(dayJobs)}
+            </div>
+          )}
+        </div>
       </div>
       <div className="relative flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
         <TimeAxis />
