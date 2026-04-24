@@ -1,5 +1,7 @@
-import { Phone, Star, Users } from "lucide-react";
+import { MessageSquare, Phone, Star, Users } from "lucide-react";
 import { useJobCrew, useServiceProviders } from "@/hooks/useSupabaseData";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface CrewTeammatesProps {
   jobId: string | undefined;
@@ -10,10 +12,18 @@ interface CrewTeammatesProps {
   hideWhenEmpty?: boolean;
 }
 
-function telHref(phone: string | undefined | null): string | null {
+function cleanPhone(phone: string | undefined | null): string | null {
   if (!phone) return null;
   const cleaned = phone.replace(/[^\d+]/g, "");
-  return cleaned ? `tel:${cleaned}` : null;
+  return cleaned || null;
+}
+function telHref(phone: string | undefined | null): string | null {
+  const c = cleanPhone(phone);
+  return c ? `tel:${c}` : null;
+}
+function smsHref(phone: string | undefined | null): string | null {
+  const c = cleanPhone(phone);
+  return c ? `sms:${c}` : null;
 }
 
 export function CrewTeammates({
@@ -60,7 +70,9 @@ export function CrewTeammates({
           const initials = sp?.name
             ? sp.name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase()
             : "?";
-          const href = showPhone ? telHref(sp?.phone) : null;
+          const tel = showPhone ? telHref(sp?.phone) : null;
+          const sms = showPhone ? smsHref(sp?.phone) : null;
+          const firstName = sp?.name?.split(/\s+/)[0] ?? "teammate";
           return (
             <div key={m.id} className="flex items-center gap-3 rounded-md border bg-background p-2">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
@@ -75,19 +87,40 @@ export function CrewTeammates({
                     </span>
                   )}
                 </p>
-                {showPhone && (
-                  href ? (
-                    <a
-                      href={href}
-                      className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-0.5"
-                    >
-                      <Phone className="h-3 w-3" /> {sp?.phone}
-                    </a>
-                  ) : (
-                    <p className="text-xs text-muted-foreground mt-0.5">— no phone on file</p>
-                  )
+                {showPhone && !tel && !sms && (
+                  <p className="text-xs text-muted-foreground mt-0.5">— no phone on file</p>
                 )}
               </div>
+              {showPhone && (tel || sms) && (
+                <TooltipProvider delayDuration={200}>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {tel && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button asChild variant="outline" size="icon" className="h-8 w-8">
+                            <a href={tel} aria-label={`Call ${firstName}`}>
+                              <Phone className="h-4 w-4" />
+                            </a>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Call {firstName}</TooltipContent>
+                      </Tooltip>
+                    )}
+                    {sms && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button asChild variant="outline" size="icon" className="h-8 w-8">
+                            <a href={sms} aria-label={`Text ${firstName}`}>
+                              <MessageSquare className="h-4 w-4" />
+                            </a>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Text {firstName}</TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
+                </TooltipProvider>
+              )}
             </div>
           );
         })}
