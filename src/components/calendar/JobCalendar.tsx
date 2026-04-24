@@ -18,7 +18,8 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { Job, ServiceProvider } from "@/data/mockData";
-import { JobBlock, type ColorMode } from "./JobBlock";
+import { JobBlock, getJobAppearance, type ColorMode } from "./JobBlock";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { getSpColor, type SpColor } from "./spColors";
 import { cn } from "@/lib/utils";
 import {
