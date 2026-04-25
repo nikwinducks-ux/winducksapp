@@ -352,9 +352,19 @@ function useNowMinutes() {
 // area renders its own hour grid lines. Each label sits at the very top of its
 // hour cell so the top of the text appears just under the corresponding grid
 // line, leaving the label area clean and readable.
-function TimeAxis() {
+function TimeAxis({ sticky = false }: { sticky?: boolean }) {
+  // When `sticky` is true the axis is rendered as a sticky flex child pinned
+  // to the left edge of the horizontal scroll container. Sticky is applied
+  // directly on this element (no wrapper) so Android Chrome resolves
+  // `left: 0` against the scroll port reliably.
   return (
-    <div className="w-14 shrink-0 border-r bg-muted/20 text-[10px] text-muted-foreground select-none">
+    <div
+      className={cn(
+        "w-14 shrink-0 border-r text-[10px] text-muted-foreground select-none",
+        sticky ? "z-20 bg-card" : "bg-muted/20"
+      )}
+      style={sticky ? { position: "sticky", left: 0 } : undefined}
+    >
       <div style={{ height: GRID_HEIGHT_PX }}>
         {HOURS.map((h) => {
           const period = h >= 12 ? "PM" : "AM";
@@ -1028,18 +1038,28 @@ function WeekView({
         style={{
           touchAction: isFit ? "pan-y" : "pan-x pan-y",
           WebkitOverflowScrolling: "touch",
-          scrollSnapType: isMobile && !isFit ? "x proximity" : undefined,
-          scrollPaddingLeft: isMobile ? AXIS_PX : undefined,
+          // NOTE: scroll-snap intentionally disabled — it conflicts with
+          // `position: sticky` left-pinning on Android Chrome and caused
+          // the time axis to scroll out of view. The active day is still
+          // centered programmatically via useLayoutEffect.
           maxHeight: "70vh",
         }}
       >
-        <div style={{ minWidth: `${AXIS_PX + dayMinWidthPx * days.length}px` }}>
+        <div
+          style={{
+            width: `${AXIS_PX + dayMinWidthPx * days.length}px`,
+            isolation: "isolate",
+          }}
+        >
           {/* Date header — lives inside the same horizontal scroller as the
               time columns so the date label is always locked above its column.
               Sticky to the top so it stays visible while the user scrolls
               vertically through the day grid. */}
           <div className="flex border-b bg-muted/30 relative sticky top-0 z-30">
-            <div className="w-14 shrink-0 border-r sticky left-0 z-30 bg-muted/30" />
+            <div
+              className="w-14 shrink-0 border-r bg-muted/30 z-30"
+              style={{ position: "sticky", left: 0 }}
+            />
             {days.map((d) => {
               const headerDayJobs = jobsOnDate(jobs, d);
               const dayTotal = formatDayTotal(headerDayJobs);
@@ -1077,7 +1097,7 @@ function WeekView({
                   type="button"
                   key={d.toISOString()}
                   onClick={() => onDateChange?.(d)}
-                  style={{ minWidth: `${dayMinWidthPx}px`, scrollSnapAlign: "start" }}
+                  style={{ minWidth: `${dayMinWidthPx}px` }}
                   className={className}
                   aria-pressed={selected}
                 >
@@ -1095,16 +1115,14 @@ function WeekView({
             })}
           </div>
           <div className="relative flex">
-            <div className="sticky left-0 z-20 bg-card shrink-0">
-              <TimeAxis />
-            </div>
+            <TimeAxis sticky />
             {days.map((d) => {
               const dayJobs = jobsOnDate(jobs, d);
               const dayBlocks = blocksOnDate(unavailableBlocks, d);
               return (
                 <div
                   key={d.toISOString()}
-                  style={{ minWidth: `${dayMinWidthPx}px`, scrollSnapAlign: isMobile ? "start" : undefined }}
+                  style={{ minWidth: `${dayMinWidthPx}px` }}
                   className="flex-1 flex"
                 >
                   <DayColumn
