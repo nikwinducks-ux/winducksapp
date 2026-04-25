@@ -352,22 +352,24 @@ function useNowMinutes() {
 function TimeAxis() {
   return (
     <div className="w-14 shrink-0 border-r bg-muted/20 text-[10px] text-muted-foreground select-none">
-      {HOURS.map((h) => {
-        const period = h >= 12 ? "PM" : "AM";
-        const hr12 = h % 12 === 0 ? 12 : h % 12;
-        return (
-          <div
-            key={h}
-            style={{ height: HOUR_PX }}
-            className="relative"
-          >
-            <span className="absolute top-0.5 right-1.5 leading-none">
-              {hr12}
-              {period}
-            </span>
-          </div>
-        );
-      })}
+      <div style={{ height: GRID_HEIGHT_PX }}>
+        {HOURS.map((h) => {
+          const period = h >= 12 ? "PM" : "AM";
+          const hr12 = h % 12 === 0 ? 12 : h % 12;
+          return (
+            <div
+              key={h}
+              style={{ height: HOUR_PX }}
+              className="relative"
+            >
+              <span className="absolute top-0.5 right-1.5 leading-none">
+                {hr12}
+                {period}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
