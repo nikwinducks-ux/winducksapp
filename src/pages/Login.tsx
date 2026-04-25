@@ -24,6 +24,8 @@ export default function Login() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [sendingReset, setSendingReset] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
 
   // Navigate once user/role is resolved
   useEffect(() => {
@@ -34,15 +36,16 @@ export default function Login() {
     }
   }, [signedInWaiting, user, navigate]);
 
-  // Safety fallback: 2s timeout for role resolution
+  // Safety fallback: 8s timeout for role resolution (mobile-realistic)
+  // Reads latest user from ref to avoid stale-closure false-trigger.
   useEffect(() => {
     if (signedInWaiting && !user) {
       timeoutRef.current = setTimeout(() => {
-        if (!user) {
-          console.log("Role loaded: null (timeout)");
+        if (!userRef.current) {
+          console.log("Role loaded: null (timeout after 8s)");
           setRoleTimeout(true);
         }
-      }, 2000);
+      }, 8000);
       return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
     }
   }, [signedInWaiting, user]);
