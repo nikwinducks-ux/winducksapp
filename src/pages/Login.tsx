@@ -99,7 +99,10 @@ export default function Login() {
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="w-full max-w-sm space-y-4 px-6 text-center">
           <p className="text-destructive font-medium">
-            Signed in, but role not found. Please contact admin.
+            Sign-in succeeded, but we couldn't load your account details.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            This is usually a slow connection. Please check your network and try again. If the problem persists, contact your admin.
           </p>
           <Button onClick={handleRetryRole} variant="outline" className="w-full">
             Retry
