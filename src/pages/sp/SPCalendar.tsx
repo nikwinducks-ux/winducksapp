@@ -28,8 +28,7 @@ import {
   Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
 import { statusLabel } from "@/components/calendar/JobBlock";
-import { CrewTeammates } from "@/components/sp/CrewTeammates";
-import { CustomerContactActions } from "@/components/sp/CustomerContactActions";
+import { SPJobDetailContent } from "@/components/sp/SPJobDetailContent";
 import type { Job } from "@/data/mockData";
 
 function dateToISO(d: Date): string {
