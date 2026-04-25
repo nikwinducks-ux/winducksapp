@@ -10,6 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 
 type LoginPhase = "form" | "loading" | "failed";
 
+type ResolvedRole = { role: string; isActive: boolean };
+
 export default function Login() {
   const navigate = useNavigate();
   const { signIn, signOut } = useAuth();
@@ -24,12 +26,12 @@ export default function Login() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [sendingReset, setSendingReset] = useState(false);
 
-  // Fetch role directly with retries — does not depend on AuthContext propagation.
-  async function fetchRoleWithRetries(userId: string): Promise<{ role: string; isActive: boolean } | null> {
-    const delays = [0, 400, 800, 1500];
+  // Fallback role check for browsers that delay auth-state propagation on mobile.
+  async function fetchRoleWithRetries(userId: string): Promise<ResolvedRole | null> {
+    const delays = [0, 500, 1000, 2000, 3500, 5000];
     for (let attempt = 0; attempt < delays.length; attempt++) {
       if (delays[attempt] > 0) await new Promise((r) => setTimeout(r, delays[attempt]));
-      console.log(`[Login] Inline role fetch attempt ${attempt + 1}`);
+      console.log(`[Login] Fallback role fetch attempt ${attempt + 1}`);
       try {
         const { data, error } = await supabase
           .from("user_roles")
@@ -38,18 +40,24 @@ export default function Login() {
           .limit(1)
           .maybeSingle();
         if (error) {
-          console.log(`[Login] Inline role error:`, error.message);
+          console.log(`[Login] Fallback role error:`, error.message);
           continue;
         }
         if (data) {
-          console.log(`[Login] Inline role resolved:`, data.role, "active:", data.is_active);
+          console.log(`[Login] Fallback role resolved:`, data.role, "active:", data.is_active);
           return { role: data.role as string, isActive: data.is_active ?? true };
         }
       } catch (err: any) {
-        console.log(`[Login] Inline role exception:`, err?.message);
+        console.log(`[Login] Fallback role exception:`, err?.message);
       }
     }
     return null;
+  }
+
+  function navigateForRole(roleData: ResolvedRole) {
+    const target = (roleData.role === "admin" || roleData.role === "owner") ? "/admin" : "/";
+    console.log("[Login] Navigating to", target);
+    navigate(target, { replace: true });
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,11 +67,40 @@ export default function Login() {
     console.log("[Login] Submitting");
 
     try {
-      const { error: signInErr } = await signIn(email, password);
+      const { error: signInErr, user: signedInUser } = await signIn(email, password);
       if (signInErr) {
         console.log("[Login] Sign-in error:", signInErr);
-        setError(signInErr);
-        setPhase("form");
+        if (!signedInUser) {
+          const { data: { user: fallbackUser } } = await supabase.auth.getUser();
+          if (!fallbackUser) {
+            setError(signInErr);
+            setPhase("form");
+            return;
+          }
+          const fallbackRole = await fetchRoleWithRetries(fallbackUser.id);
+          if (!fallbackRole) {
+            setPhase("failed");
+            return;
+          }
+          if (!fallbackRole.isActive) {
+            setError("Your account has been disabled. Please contact your admin.");
+            await signOut();
+            setPhase("form");
+            return;
+          }
+          navigateForRole(fallbackRole);
+          return;
+        }
+      }
+
+      if (signedInUser) {
+        if (!signedInUser.isActive) {
+          setError("Your account has been disabled. Please contact your admin.");
+          await signOut();
+          setPhase("form");
+          return;
+        }
+        navigateForRole(signedInUser);
         return;
       }
 

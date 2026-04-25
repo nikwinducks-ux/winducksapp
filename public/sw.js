@@ -4,7 +4,7 @@
 // - Pre-caches the built app shell via vite-plugin-pwa's injectManifest
 // - CACHE_VERSION is bumped on each publish to force fresh bundles for returning users
 
-const CACHE_VERSION = 'v4';
+const CACHE_VERSION = 'v5';
 
 import { precacheAndRoute, cleanupOutdatedCaches } from "workbox-precaching";
 
@@ -23,7 +23,17 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil((async () => {
+    await self.clients.claim();
+    const allClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of allClients) {
+      try {
+        await client.navigate(client.url);
+      } catch (_e) {
+        // Ignore cross-origin or already-closing clients.
+      }
+    }
+  })());
 });
 
 self.addEventListener("push", (event) => {
