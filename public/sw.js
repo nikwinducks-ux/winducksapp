@@ -2,12 +2,20 @@
 // Winducks Service Worker
 // - Handles web push notifications (existing behavior)
 // - Pre-caches the built app shell via vite-plugin-pwa's injectManifest
+// - CACHE_VERSION is bumped on each publish to force fresh bundles for returning users
+
+const CACHE_VERSION = 'v2';
 
 import { precacheAndRoute, cleanupOutdatedCaches } from "workbox-precaching";
 
 // Workbox replaces self.__WB_MANIFEST at build time with the precache manifest.
 // The cast keeps the file valid as plain JS (no TS) while still parsing in editors.
-precacheAndRoute(self.__WB_MANIFEST || []);
+precacheAndRoute((self.__WB_MANIFEST || []).map(entry => {
+  // Append cache version to URLs for cache-busting
+  const url = typeof entry === 'string' ? entry : entry.url;
+  const revision = typeof entry === 'string' ? CACHE_VERSION : (entry.revision || CACHE_VERSION);
+  return typeof entry === 'string' ? { url, revision } : { ...entry, url, revision };
+}));
 cleanupOutdatedCaches();
 
 self.addEventListener("install", (event) => {
