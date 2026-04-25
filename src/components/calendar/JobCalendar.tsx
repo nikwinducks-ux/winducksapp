@@ -1097,7 +1097,7 @@ function WeekView({
                   type="button"
                   key={d.toISOString()}
                   onClick={() => onDateChange?.(d)}
-                  style={{ minWidth: `${dayMinWidthPx}px`, scrollSnapAlign: "start" }}
+                  style={{ minWidth: `${dayMinWidthPx}px` }}
                   className={className}
                   aria-pressed={selected}
                 >
