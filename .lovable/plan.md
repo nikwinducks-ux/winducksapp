@@ -1,76 +1,58 @@
-## What you're seeing
+# Fix: Sticky Time Axis in Mobile Week Calendar (5-day / 3-day zoom)
 
-You sign in successfully on Android, but the screen says **"Sign-in succeeded, but we couldn't load your account details."** Hitting Retry doesn't help.
+## Root cause
 
-## Root cause (different from last time)
+In `src/components/calendar/JobCalendar.tsx` (`WeekView`), the calendar grid is split across two scroll containers:
 
-I checked the database, the auth logs, and the live network requests:
+- **Outer wrapper** (`hScrollRef`, line ~1021): handles **horizontal** scrolling (`overflow-x-auto`).
+- **Inner body row** (line ~1094): wraps `<TimeAxis />` + day columns and applies `overflow-y: auto` with `maxHeight: 70vh` for vertical scrolling.
 
-- Database: your role IS correct (`sp`, active, sp_id linked). ✅
-- Auth: login returns 200 OK in ~100ms. ✅
-- Role lookup query: returns the correct row in 200–580ms. ✅
+The time axis uses `position: sticky; left: 0` to stay pinned on the left. However, per CSS spec, when an element gets `overflow-y: auto`, its `overflow-x` is implicitly promoted to `auto` (it can no longer be `visible`). That makes the **inner body row its own horizontal scroll container**, so `sticky left-0` sticks the time axis to *that* container's left edge — not to the visible viewport. Since the inner container itself never scrolls horizontally (the outer one does), the axis gets carried off-screen along with the day columns when the user pans sideways in 5-day / 3-day mode.
 
-**So the data is fine. The bug is in how the Login page waits for the role.**
-
-The Login page relies on a chain of React state updates flowing through `AuthContext`:
-
-```text
-Login submits → supabase signs in → onAuthStateChange fires in AuthContext
-  → setTimeout(0) → fetchRole (200-600ms) → setUser → React re-render
-  → AuthContext value propagates → Login useEffect sees `user` → navigate
-```
-
-On desktop this whole chain runs in well under a second. On a slower Android device, the network log shows the role fetch sometimes firing **6+ seconds after the sign-in returned**, because:
-
-1. The `setTimeout(0)` defers the fetch behind any other queued work,
-2. `onAuthStateChange` may fire multiple times (`SIGNED_IN`, then `TOKEN_REFRESHED`), each kicking off a fresh fetch,
-3. Each context update triggers a re-render of the entire app tree, which is slow on Android.
-
-By the time `user` finally arrives in the Login component, the 8s safety timer has already fired and shown the error screen — even though the role IS loading correctly.
-
-This is fundamentally fragile. The Login page should not depend on the AuthContext propagation chain to know when sign-in is complete.
+The header row above does not have this bug because it has no `overflow-y`, so its sticky child correctly sticks to the outer horizontal scroller.
 
 ## Fix
 
-Make the Login page **fetch the role directly** right after `signInWithPassword` returns, then navigate immediately. Stop waiting for AuthContext to catch up.
+Unify scrolling onto a single container so `sticky left-0` resolves against the same element that scrolls horizontally.
 
-### 1. `src/pages/Login.tsx` — fetch role inline
+### Change in `src/components/calendar/JobCalendar.tsx` (WeekView render, lines ~1021–1140)
 
-In `handleSubmit`, after a successful `signIn()`:
+1. Move `maxHeight: 70vh` and vertical scrolling onto the outer `hScrollRef` container:
+   - Replace the current `overflow-y-hidden overscroll-x-contain` on the outer container with `overflow-y-auto overscroll-contain` (keeping `overflow-x-auto` / `overflow-x-hidden` toggle as today).
+   - Add `maxHeight: "70vh"` to the outer container's inline style.
 
-- Get the freshly-signed-in user via `supabase.auth.getUser()`.
-- Query `user_roles` directly with up to 3 retries (400ms / 800ms / 1500ms backoff).
-- If a role is returned, navigate immediately using that role — do not wait for `user` from `useAuth()`.
-- If after 3 tries no role is returned, then show the "couldn't load" screen.
-- Remove the 8s timeout-based safety net entirely; replace with deterministic outcome from the inline fetch.
+2. Remove the inner body wrapper's own scroll container behavior:
+   - Change the inner body row (currently `<div className="relative flex overflow-y-auto" style={{ maxHeight: "70vh" }}>`) to just `<div className="relative flex">` (no `overflow-y`, no `maxHeight`).
 
-This makes the post-login behavior fully deterministic and unaffected by AuthContext re-render timing on slow devices.
+3. Make the header row sticky to the **top** of the outer scroller so it stays visible during vertical scroll (small bonus, prevents losing day labels):
+   - Add `sticky top-0 z-30` to the existing header row (`<div className="flex border-b bg-muted/30 relative">`). Bump time-axis sticky `z-20` to `z-20` (header takes z-30) so the time axis still sits above day columns but under the header corner.
+   - Ensure the header's left spacer keeps `sticky left-0 z-30` (raised from z-20) so the top-left corner stays clean above both axes.
 
-### 2. `src/contexts/AuthContext.tsx` — keep as-is for app-wide use
+4. Keep the `<TimeAxis />` wrapper as `sticky left-0 z-20 bg-card shrink-0`. With scrolling now unified on the outer container, this will correctly pin the axis to the visible left edge during horizontal scrolling at every zoom level (7-day, 5-day, 3-day).
 
-AuthContext still needs to populate `user` for the rest of the app (route guards, dashboards). That part keeps working as it does today. We just stop *relying* on its timing for the login navigation decision.
+### What stays the same
 
-### 3. `public/sw.js` — bump cache to `v4`
+- `AXIS_PX = 56` and `w-14` width on `TimeAxis` (no shrinking).
+- Day-column widths, scroll snap, infinite window, centering logic, zoom buttons, and `JobBlock` rendering.
+- Desktop behavior (`isMobile === false`) — desktop already uses comfortable widths and was not affected, but this change improves it consistently.
+- The "fit" 7-day mode (no horizontal scrolling) — still works; the axis simply sits at left:0 with no scroll to track.
 
-Force Android to fetch the new Login bundle on next visit so the fix actually takes effect (the previous `v3` bump may not have activated on your device yet).
+### Why this is safe
 
-## Why this works where the last fix didn't
+- The outer container already manages horizontal scroll, scroll-snap, and the centering / "infinite" effects (`handleScroll`, `useLayoutEffect` on `currentDate`). Adding vertical scroll to the same element does not affect any of that logic — `el.scrollLeft`, `clientWidth`, and scroll snap on the X axis are independent of Y scrolling.
+- Removing `overflow-y` from the inner body row eliminates the implicit `overflow-x: auto`, restoring `sticky left-0` to resolve against the outer (horizontally scrolling) container — which is exactly what we need.
+- Touch behavior (`touchAction: "pan-x pan-y"` on the outer container) already permits both-axis panning, so vertical drag continues to work on mobile.
 
-Last fix increased the timeout and added retries to AuthContext. But the real problem isn't the fetch speed — it's that Login was waiting for context state to propagate through React renders on a slow device. By doing the role lookup directly inside `handleSubmit` and acting on its return value, we cut the entire propagation chain out of the critical path.
+## Files touched
 
-## After deploying
+- `src/components/calendar/JobCalendar.tsx` (only the `WeekView` JSX block, ~20 lines changed).
 
-You'll need to **publish**, then on your Android phone:
-1. Fully close the browser tab (not just background it).
-2. Reopen `winducksapp.lovable.app`.
-3. Sign in. Should navigate straight to the SP dashboard within ~1 second of pressing Sign In.
+No other components, hooks, styles, or backend changes required. No new dependencies.
 
-## Files to edit
+## Verification checklist (after implementation)
 
-- `src/pages/Login.tsx`
-- `public/sw.js`
-
-## Out of scope
-
-- No DB changes (verified correct).
-- No AuthContext logic changes (still needed for app-wide auth state).
+- Mobile 7-day ("fit"): time axis visible, no horizontal scroll, vertical scroll works inside 70vh.
+- Mobile 5-day ("comfortable"): swipe horizontally — time axis stays pinned on the left, day columns slide underneath header; vertical scroll still works.
+- Mobile 3-day ("large"): same as 5-day.
+- Desktop week view: unchanged visual; horizontal trackpad scroll still pans columns; time axis remains visible.
+- Job blocks render in the correct row positions at all zoom levels (no row-misalignment regressions).
