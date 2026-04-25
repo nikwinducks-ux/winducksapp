@@ -1122,7 +1122,7 @@ function WeekView({
               return (
                 <div
                   key={d.toISOString()}
-                  style={{ minWidth: `${dayMinWidthPx}px`, scrollSnapAlign: isMobile ? "start" : undefined }}
+                  style={{ minWidth: `${dayMinWidthPx}px` }}
                   className="flex-1 flex"
                 >
                   <DayColumn
