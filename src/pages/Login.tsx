@@ -24,6 +24,8 @@ export default function Login() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [sendingReset, setSendingReset] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
 
   // Navigate once user/role is resolved
   useEffect(() => {
@@ -34,15 +36,16 @@ export default function Login() {
     }
   }, [signedInWaiting, user, navigate]);
 
-  // Safety fallback: 2s timeout for role resolution
+  // Safety fallback: 8s timeout for role resolution (mobile-realistic)
+  // Reads latest user from ref to avoid stale-closure false-trigger.
   useEffect(() => {
     if (signedInWaiting && !user) {
       timeoutRef.current = setTimeout(() => {
-        if (!user) {
-          console.log("Role loaded: null (timeout)");
+        if (!userRef.current) {
+          console.log("Role loaded: null (timeout after 8s)");
           setRoleTimeout(true);
         }
-      }, 2000);
+      }, 8000);
       return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
     }
   }, [signedInWaiting, user]);
@@ -96,7 +99,10 @@ export default function Login() {
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="w-full max-w-sm space-y-4 px-6 text-center">
           <p className="text-destructive font-medium">
-            Signed in, but role not found. Please contact admin.
+            Sign-in succeeded, but we couldn't load your account details.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            This is usually a slow connection. Please check your network and try again. If the problem persists, contact your admin.
           </p>
           <Button onClick={handleRetryRole} variant="outline" className="w-full">
             Retry
