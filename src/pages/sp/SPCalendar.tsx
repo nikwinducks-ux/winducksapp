@@ -5,7 +5,7 @@ import {
   startOfMonth, endOfMonth, isWithinInterval, parseISO, compareAsc,
   subDays, subMonths, subWeeks,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, Settings } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useJobs, useServiceProviders, useUpdateJobStatus } from "@/hooks/useSupabaseData";
 import { useSpOffers, useAcceptOffer, useDeclineOffer } from "@/hooks/useOfferData";
@@ -272,9 +272,12 @@ export default function SPCalendar() {
             <TabsTrigger value="day">Day</TabsTrigger>
             <TabsTrigger value="week">Week</TabsTrigger>
             <TabsTrigger value="month">Month</TabsTrigger>
-            <TabsTrigger value="availability">
-              <span className="sm:hidden">Avail.</span>
-              <span className="hidden sm:inline">Availability</span>
+            <TabsTrigger
+              value="availability"
+              aria-label="Availability settings"
+              title="Availability"
+            >
+              <Settings className="h-4 w-4" />
             </TabsTrigger>
           </TabsList>
         </Tabs>
