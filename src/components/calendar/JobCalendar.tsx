@@ -935,8 +935,7 @@ function WeekView({
     if (!el || !useWindowed || dayMinWidthPx <= 0) return;
     const idx = days.findIndex((d) => isSameDay(d, currentDate));
     if (idx < 0) return;
-    const axis = 56;
-    const target = axis + idx * dayMinWidthPx + dayMinWidthPx / 2 - el.clientWidth / 2;
+    const target = AXIS_PX + idx * dayMinWidthPx + dayMinWidthPx / 2 - el.clientWidth / 2;
     suppressSettle.current = true;
     el.scrollTo({
       left: Math.max(0, target),
