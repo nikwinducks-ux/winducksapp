@@ -43,6 +43,9 @@ const DAY_END_HOUR = 21;
 const HOUR_PX = 60;
 const HOURS = Array.from({ length: DAY_END_HOUR - DAY_START_HOUR }, (_, i) => DAY_START_HOUR + i);
 const GRID_HEIGHT_PX = (DAY_END_HOUR - DAY_START_HOUR) * HOUR_PX;
+/** Width of the left time-axis gutter in week view. Kept in sync with the
+ *  `w-14` Tailwind utility on `<TimeAxis />` and the matching header spacer. */
+const AXIS_PX = 56;
 
 interface JobCalendarProps {
   jobs: Job[];
