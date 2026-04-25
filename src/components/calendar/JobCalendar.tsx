@@ -352,9 +352,19 @@ function useNowMinutes() {
 // area renders its own hour grid lines. Each label sits at the very top of its
 // hour cell so the top of the text appears just under the corresponding grid
 // line, leaving the label area clean and readable.
-function TimeAxis() {
+function TimeAxis({ sticky = false }: { sticky?: boolean }) {
+  // When `sticky` is true the axis is rendered as a sticky flex child pinned
+  // to the left edge of the horizontal scroll container. Sticky is applied
+  // directly on this element (no wrapper) so Android Chrome resolves
+  // `left: 0` against the scroll port reliably.
   return (
-    <div className="w-14 shrink-0 border-r bg-muted/20 text-[10px] text-muted-foreground select-none">
+    <div
+      className={cn(
+        "w-14 shrink-0 border-r text-[10px] text-muted-foreground select-none",
+        sticky ? "z-20 bg-card" : "bg-muted/20"
+      )}
+      style={sticky ? { position: "sticky", left: 0 } : undefined}
+    >
       <div style={{ height: GRID_HEIGHT_PX }}>
         {HOURS.map((h) => {
           const period = h >= 12 ? "PM" : "AM";
