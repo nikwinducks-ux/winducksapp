@@ -43,6 +43,9 @@ const DAY_END_HOUR = 21;
 const HOUR_PX = 60;
 const HOURS = Array.from({ length: DAY_END_HOUR - DAY_START_HOUR }, (_, i) => DAY_START_HOUR + i);
 const GRID_HEIGHT_PX = (DAY_END_HOUR - DAY_START_HOUR) * HOUR_PX;
+/** Width of the left time-axis gutter in week view. Kept in sync with the
+ *  `w-14` Tailwind utility on `<TimeAxis />` and the matching header spacer. */
+const AXIS_PX = 56;
 
 interface JobCalendarProps {
   jobs: Job[];
@@ -903,16 +906,18 @@ function WeekView({
   }, []);
 
   // Per-day column width: desktop keeps 160px so trackpad swipes scroll horizontally
-  // instead of triggering browser back/forward. Mobile width follows the zoom level.
+  // instead of triggering browser back/forward. Mobile width divides the available
+  // viewport (after the sticky 56px time axis) by the active zoom's column count
+  // so exactly 7 / 5 / 3 day columns fit on screen.
   const dayMinWidthPx = useMemo(() => {
     if (!isMobile) return 160;
-    const axis = 56;
-    const avail = Math.max(0, containerWidth - axis);
-    if (weekZoom === "fit" && avail > 0) {
-      return Math.max(36, Math.floor(avail / 7));
+    const avail = Math.max(0, containerWidth - AXIS_PX);
+    if (avail <= 0) {
+      // Initial paint fallback before ResizeObserver fires.
+      return weekZoom === "large" ? 120 : weekZoom === "comfortable" ? 80 : 52;
     }
-    if (weekZoom === "large") return 132;
-    return 84;
+    const cols = weekZoom === "fit" ? 7 : weekZoom === "comfortable" ? 5 : 3;
+    return Math.max(36, Math.floor(avail / cols));
   }, [isMobile, containerWidth, weekZoom]);
 
   const isFit = isMobile && weekZoom === "fit";
@@ -930,8 +935,7 @@ function WeekView({
     if (!el || !useWindowed || dayMinWidthPx <= 0) return;
     const idx = days.findIndex((d) => isSameDay(d, currentDate));
     if (idx < 0) return;
-    const axis = 56;
-    const target = axis + idx * dayMinWidthPx + dayMinWidthPx / 2 - el.clientWidth / 2;
+    const target = AXIS_PX + idx * dayMinWidthPx + dayMinWidthPx / 2 - el.clientWidth / 2;
     suppressSettle.current = true;
     el.scrollTo({
       left: Math.max(0, target),
@@ -954,8 +958,7 @@ function WeekView({
     if (settleTimer.current) window.clearTimeout(settleTimer.current);
     settleTimer.current = window.setTimeout(() => {
       if (suppressSettle.current) return;
-      const axis = 56;
-      const center = el.scrollLeft + el.clientWidth / 2 - axis;
+      const center = el.scrollLeft + el.clientWidth / 2 - AXIS_PX;
       const idx = Math.max(0, Math.min(days.length - 1, Math.round(center / dayMinWidthPx - 0.5)));
       const d = days[idx];
       if (d && !isSameDay(d, currentDate)) {
@@ -1026,14 +1029,14 @@ function WeekView({
           touchAction: isFit ? "pan-y" : "pan-x pan-y",
           WebkitOverflowScrolling: "touch",
           scrollSnapType: isMobile && !isFit ? "x proximity" : undefined,
-          scrollPaddingLeft: isMobile ? 56 : undefined,
+          scrollPaddingLeft: isMobile ? AXIS_PX : undefined,
         }}
       >
-        <div style={{ minWidth: `${56 + dayMinWidthPx * days.length}px` }}>
+        <div style={{ minWidth: `${AXIS_PX + dayMinWidthPx * days.length}px` }}>
           {/* Date header — lives inside the same horizontal scroller as the
               time columns so the date label is always locked above its column. */}
           <div className="flex border-b bg-muted/30 relative">
-            <div className="w-14 shrink-0 border-r sticky left-0 z-10 bg-muted/30" />
+            <div className="w-14 shrink-0 border-r sticky left-0 z-20 bg-muted/30" />
             {days.map((d) => {
               const headerDayJobs = jobsOnDate(jobs, d);
               const dayTotal = formatDayTotal(headerDayJobs);
@@ -1089,7 +1092,9 @@ function WeekView({
             })}
           </div>
           <div className="relative flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
-            <TimeAxis />
+            <div className="sticky left-0 z-20 bg-card shrink-0">
+              <TimeAxis />
+            </div>
             {days.map((d) => {
               const dayJobs = jobsOnDate(jobs, d);
               const dayBlocks = blocksOnDate(unavailableBlocks, d);
