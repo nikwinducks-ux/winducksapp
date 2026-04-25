@@ -958,8 +958,7 @@ function WeekView({
     if (settleTimer.current) window.clearTimeout(settleTimer.current);
     settleTimer.current = window.setTimeout(() => {
       if (suppressSettle.current) return;
-      const axis = 56;
-      const center = el.scrollLeft + el.clientWidth / 2 - axis;
+      const center = el.scrollLeft + el.clientWidth / 2 - AXIS_PX;
       const idx = Math.max(0, Math.min(days.length - 1, Math.round(center / dayMinWidthPx - 0.5)));
       const d = days[idx];
       if (d && !isSameDay(d, currentDate)) {
