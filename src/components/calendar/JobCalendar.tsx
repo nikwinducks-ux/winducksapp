@@ -903,16 +903,18 @@ function WeekView({
   }, []);
 
   // Per-day column width: desktop keeps 160px so trackpad swipes scroll horizontally
-  // instead of triggering browser back/forward. Mobile width follows the zoom level.
+  // instead of triggering browser back/forward. Mobile width divides the available
+  // viewport (after the sticky 56px time axis) by the active zoom's column count
+  // so exactly 7 / 5 / 3 day columns fit on screen.
   const dayMinWidthPx = useMemo(() => {
     if (!isMobile) return 160;
-    const axis = 56;
-    const avail = Math.max(0, containerWidth - axis);
-    if (weekZoom === "fit" && avail > 0) {
-      return Math.max(36, Math.floor(avail / 7));
+    const avail = Math.max(0, containerWidth - AXIS_PX);
+    if (avail <= 0) {
+      // Initial paint fallback before ResizeObserver fires.
+      return weekZoom === "large" ? 120 : weekZoom === "comfortable" ? 80 : 52;
     }
-    if (weekZoom === "large") return 132;
-    return 84;
+    const cols = weekZoom === "fit" ? 7 : weekZoom === "comfortable" ? 5 : 3;
+    return Math.max(36, Math.floor(avail / cols));
   }, [isMobile, containerWidth, weekZoom]);
 
   const isFit = isMobile && weekZoom === "fit";
