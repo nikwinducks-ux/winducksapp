@@ -98,7 +98,13 @@ export function CrewTeammates({
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button asChild variant="outline" size="icon" className="h-8 w-8">
-                            <a href={tel} aria-label={`Call ${firstName}`}>
+                            <a
+                              href={tel}
+                              aria-label={`Call ${firstName}`}
+                              target="_top"
+                              rel="noopener"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <Phone className="h-4 w-4" />
                             </a>
                           </Button>
@@ -110,7 +116,13 @@ export function CrewTeammates({
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button asChild variant="outline" size="icon" className="h-8 w-8">
-                            <a href={sms} aria-label={`Text ${firstName}`}>
+                            <a
+                              href={sms}
+                              aria-label={`Text ${firstName}`}
+                              target="_top"
+                              rel="noopener"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <MessageSquare className="h-4 w-4" />
                             </a>
                           </Button>

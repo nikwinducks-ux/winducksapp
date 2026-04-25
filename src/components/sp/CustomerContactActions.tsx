@@ -68,7 +68,13 @@ function ContactIconButton({
     <Tooltip>
       <TooltipTrigger asChild>
         <Button asChild variant="outline" size="icon" className="h-8 w-8">
-          <a href={href} aria-label={label}>
+          <a
+            href={href}
+            aria-label={label}
+            target="_top"
+            rel="noopener"
+            onClick={(e) => e.stopPropagation()}
+          >
             {children}
           </a>
         </Button>
