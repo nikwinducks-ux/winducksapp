@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,93 +8,120 @@ import { Label } from "@/components/ui/label";
 import { Shield, UserCircle, LogIn, Loader2, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+type LoginPhase = "form" | "loading" | "failed";
+
 export default function Login() {
   const navigate = useNavigate();
-  const { signIn, user, signOut } = useAuth();
+  const { signIn, signOut } = useAuth();
   const { toast } = useToast();
   const [mode, setMode] = useState<"admin" | "sp" | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [signedInWaiting, setSignedInWaiting] = useState(false);
-  const [roleTimeout, setRoleTimeout] = useState(false);
+  const [phase, setPhase] = useState<LoginPhase>("form");
   const [showForgot, setShowForgot] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [sendingReset, setSendingReset] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const userRef = useRef(user);
-  useEffect(() => { userRef.current = user; }, [user]);
 
-  // Navigate once user/role is resolved
-  useEffect(() => {
-    if (signedInWaiting && user) {
-      console.log("Role loaded:", user.role);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      navigate((user.role === "admin" || user.role === "owner") ? "/admin" : "/", { replace: true });
-    }
-  }, [signedInWaiting, user, navigate]);
-
-  // Safety fallback: 8s timeout for role resolution (mobile-realistic)
-  // Reads latest user from ref to avoid stale-closure false-trigger.
-  useEffect(() => {
-    if (signedInWaiting && !user) {
-      timeoutRef.current = setTimeout(() => {
-        if (!userRef.current) {
-          console.log("Role loaded: null (timeout after 8s)");
-          setRoleTimeout(true);
+  // Fetch role directly with retries — does not depend on AuthContext propagation.
+  async function fetchRoleWithRetries(userId: string): Promise<{ role: string; isActive: boolean } | null> {
+    const delays = [0, 400, 800, 1500];
+    for (let attempt = 0; attempt < delays.length; attempt++) {
+      if (delays[attempt] > 0) await new Promise((r) => setTimeout(r, delays[attempt]));
+      console.log(`[Login] Inline role fetch attempt ${attempt + 1}`);
+      try {
+        const { data, error } = await supabase
+          .from("user_roles")
+          .select("role, is_active")
+          .eq("user_id", userId)
+          .limit(1)
+          .maybeSingle();
+        if (error) {
+          console.log(`[Login] Inline role error:`, error.message);
+          continue;
         }
-      }, 8000);
-      return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
+        if (data) {
+          console.log(`[Login] Inline role resolved:`, data.role, "active:", data.is_active);
+          return { role: data.role as string, isActive: data.is_active ?? true };
+        }
+      } catch (err: any) {
+        console.log(`[Login] Inline role exception:`, err?.message);
+      }
     }
-  }, [signedInWaiting, user]);
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setSubmitting(true);
-    setRoleTimeout(false);
-    console.log("Submitting login");
+    setPhase("loading");
+    console.log("[Login] Submitting");
+
     try {
-      const { error } = await signIn(email, password);
-      if (error) {
-        console.log("Login result: error", error);
-        setError(error);
-      } else {
-        console.log("Login result: success");
-        setSignedInWaiting(true);
+      const { error: signInErr } = await signIn(email, password);
+      if (signInErr) {
+        console.log("[Login] Sign-in error:", signInErr);
+        setError(signInErr);
+        setPhase("form");
+        return;
       }
+
+      // Get the freshly authenticated user directly from supabase
+      const { data: { user: authUser }, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !authUser) {
+        console.log("[Login] getUser failed:", userErr?.message);
+        setError("Sign-in succeeded but session could not be read. Please try again.");
+        setPhase("form");
+        return;
+      }
+
+      // Fetch role inline with retries
+      const roleData = await fetchRoleWithRetries(authUser.id);
+      if (!roleData) {
+        console.log("[Login] Role fetch exhausted retries");
+        setPhase("failed");
+        return;
+      }
+
+      if (!roleData.isActive) {
+        setError("Your account has been disabled. Please contact your admin.");
+        await signOut();
+        setPhase("form");
+        return;
+      }
+
+      // Navigate immediately based on the role we just fetched.
+      const target = (roleData.role === "admin" || roleData.role === "owner") ? "/admin" : "/";
+      console.log("[Login] Navigating to", target);
+      navigate(target, { replace: true });
     } catch (err: any) {
-      console.log("Login result: error", err);
+      console.log("[Login] Unexpected error:", err);
       setError(err?.message ?? "An unexpected error occurred.");
-    } finally {
-      setSubmitting(false);
+      setPhase("form");
     }
   };
 
-  const handleRetryRole = () => {
-    setRoleTimeout(false);
-    setSignedInWaiting(false);
+  const handleRetry = async () => {
+    setPhase("form");
     setError("");
-    // Force re-check by signing out and letting user try again
-    signOut();
+    await signOut();
   };
 
-  // Post-login waiting state
-  if (signedInWaiting && !roleTimeout) {
+  // Loading state during sign-in + role fetch
+  if (phase === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-          <p className="text-muted-foreground">Loading your dashboard...</p>
+          <p className="text-muted-foreground">Signing you in...</p>
         </div>
       </div>
     );
   }
 
-  // Role timeout state
-  if (signedInWaiting && roleTimeout) {
+  // Failure state — only shown after retries are exhausted
+  if (phase === "failed") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="w-full max-w-sm space-y-4 px-6 text-center">
@@ -104,7 +131,7 @@ export default function Login() {
           <p className="text-sm text-muted-foreground">
             This is usually a slow connection. Please check your network and try again. If the problem persists, contact your admin.
           </p>
-          <Button onClick={handleRetryRole} variant="outline" className="w-full">
+          <Button onClick={handleRetry} variant="outline" className="w-full">
             Retry
           </Button>
         </div>
@@ -214,12 +241,8 @@ export default function Login() {
             </div>
           </div>
 
-          <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Signing in...</>
-            ) : (
-              <><LogIn className="h-4 w-4 mr-2" /> Sign In</>
-            )}
+          <Button type="submit" className="w-full">
+            <LogIn className="h-4 w-4 mr-2" /> Sign In
           </Button>
 
           <button
