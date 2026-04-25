@@ -1,99 +1,80 @@
-# Fix: Sticky Time Axis on Android Chrome (Week Calendar)
+# Reuse My Jobs Detail in the SP Calendar Side Panel
 
-## Why the previous fix worked on iOS but not Android
+## Goal
 
-The earlier change unified scrolling onto a single container, which makes `position: sticky; left: 0` resolve correctly on iOS Safari. On Android Chrome, sticky-left inside a horizontally scrolling flex container has additional, well-documented quirks that the previous fix didn't address:
+When a job is tapped in the SP Calendar (mobile + desktop), the existing side sheet should open with the **exact same content and styling** as the My Jobs full job detail page (`/sp/jobs/:id`) — same Job Details card, customer, address with Open in Maps, schedule, duration, payout, services, notes, crew, photos, and status update actions.
 
-1. **Sticky inside an intermediate flex/wrapper child is unreliable.** The TimeAxis is currently wrapped in `<div className="sticky left-0 z-20 bg-card shrink-0">` — the sticky div is a *flex child*, and Android Chrome sometimes resolves `left: 0` against the flex container's content box (which itself is inside the wider scroll content) instead of the scroll port. iOS Safari computes this against the scroll port, hence the difference.
-2. **`scroll-snap-type: x proximity` on the scroll container conflicts with sticky children on Android Chrome.** Snap re-anchoring can cause the sticky element to "jump" off-screen mid-scroll or stay glued to the snapped column.
-3. **`min-width` (vs explicit `width`) on the scroll content** can leave Android computing the wrong containing-block width for sticky resolution when the inner box is wider than the scroll port.
+The current calendar sheet renders a custom simplified summary (single `text-sm` block listing Address/Service/Payout/When/Duration plus a few bespoke action cards). We will replace that body with the My Jobs detail body.
 
-## Fix
+## Approach
 
-All changes are confined to the `WeekView` block of `src/components/calendar/JobCalendar.tsx` (and a small refactor of `TimeAxis`).
+Extract the body of `src/pages/sp/SPJobDetail.tsx` into a reusable presentational component, then render it inside the existing `<Sheet>` in `src/pages/sp/SPCalendar.tsx`. The page route continues to use the same component so the two stay perfectly in sync.
 
-### 1. Make `TimeAxis` accept a `sticky` prop and apply sticky directly on its root element
+### 1. Create `src/components/sp/SPJobDetailContent.tsx`
 
-Replace the current `TimeAxis` (lines ~355–378) so it can be rendered as a sticky flex child without an intermediate wrapper:
+A new component that renders everything currently between the page header and the bottom of `SPJobDetail` — i.e. the entire detail view minus the page-level chrome (back link, top-level `<h1>` page header, animate-fade-in wrapper, max-width, mobile sticky bottom bar).
 
-```tsx
-function TimeAxis({ sticky = false }: { sticky?: boolean }) {
-  return (
-    <div
-      className={cn(
-        "w-14 shrink-0 border-r bg-muted/20 text-[10px] text-muted-foreground select-none",
-        sticky && "z-20 bg-card"
-      )}
-      style={sticky ? { position: "sticky", left: 0 } : undefined}
-    >
-      {/* ... existing hour cells ... */}
-    </div>
-  );
-}
-```
+Props:
 
-Update the only other caller (`<TimeAxis />` in `DayView`, line ~814) — no `sticky` prop, default `false`, behaviour unchanged.
+- `job: Job` (or look it up internally via `dbId`)
+- `variant?: "page" | "panel"` — controls a few small affordances:
+  - `page`: keeps the mobile sticky bottom CTA + bottom spacer (current behavior)
+  - `panel`: renders the status-update actions inline at the top of the body (so they're tappable inside the sheet) and omits the fixed bottom bar
 
-### 2. In `WeekView`, drop the wrapper around `<TimeAxis />` and pass `sticky`
+What the component renders (identical markup to today's page):
 
-Replace lines ~1097–1100:
+- Header row: `{job.id}` as a heading + `<StatusBadge>` + `<UrgencyBadge>` (sized down slightly in `panel` mode so it fits the sheet header area, or rendered just below the `<SheetHeader>` title)
+- "Job Details" `metric-card` with the 2-column grid: Customer, Address (with Open in Maps button via `openInMaps`), Schedule (`<ScheduleDisplay>`), Duration, Payout (with crew share line), Distance (when available, computed via `computeProximityResult`)
+- Services `metric-card` using `<JobServicesDisplay services={job.services} categories={allCategories} />`
+- Legacy single-service fallback card
+- Notes `metric-card`
+- Crew `metric-card` with `<CrewTeammates variant="card" showPhone />`
+- `<JobPhotosCard jobId={job.dbId} />`
+- Status update actions card (`Mark In Progress`, `Mark Completed`) — gated by `isMyJob` and current status, using `useUpdateJobStatus`
+- "Job Completed" success banner when applicable
 
-```tsx
-<div className="relative flex">
-  <TimeAxis sticky />
-  {days.map(...)}
-</div>
-```
+All hooks (`useJobs`, `useServiceProviders`, `useActiveServiceCategories`, `useServiceCategories`, `useUpdateJobStatus`, `useJobCrew`, `useAuth`) move into this component.
 
-This removes the extra wrapper that was breaking sticky resolution on Android Chrome.
+### 2. Refactor `src/pages/sp/SPJobDetail.tsx`
 
-### 3. Apply the same direct-sticky pattern to the header's left spacer
+Becomes a thin wrapper:
 
-The header spacer at line ~1042 is fine in principle but it sits inside another flex row. Keep it but make sticky inline so Android resolves it the same way:
+- Reads `id` from the route, finds the job, handles loading / not-found / not-linked states (unchanged)
+- Renders the page chrome: `animate-fade-in max-w-3xl`, the "Back to My Jobs" link, then `<SPJobDetailContent job={job} variant="page" />`
 
-```tsx
-<div
-  className="w-14 shrink-0 border-r bg-muted/30 z-30"
-  style={{ position: "sticky", left: 0 }}
-/>
-```
+No visual change for `/sp/jobs/:id` users.
 
-### 4. Use explicit `width` instead of `min-width` on the scroll content
+### 3. Update `src/pages/sp/SPCalendar.tsx` sheet body
 
-Change line ~1036 from `minWidth` to `width` so Android can compute the sticky containing block reliably:
+In the existing `<Sheet open={!!selectedJob}>` block (lines ~378–515):
 
-```tsx
-<div style={{ width: `${AXIS_PX + dayMinWidthPx * days.length}px` }}>
-```
+- Keep `<Sheet>`, `<SheetContent className="overflow-y-auto">`, and the existing open/close interaction (no animation changes)
+- Replace the custom `<SheetHeader>` + the bespoke summary block (the `text-sm space-y-1` div, the inline status/offer cards, the address/service/payout list, the notes block, the contact actions, the crew block, and the "Open full job" link) with:
 
-(Behaviour identical on iOS / desktop; `width` is only stricter and avoids the `min-width` ambiguity on Android.)
+  ```tsx
+  <SPJobDetailContent job={selectedJob} variant="panel" />
+  ```
 
-### 5. Disable `scroll-snap-type` on the outer container
+- Preserve the **offer response** affordance (Accept / Decline buttons + "Offer no longer available" / Auto-Accept hint) because that flow is calendar-specific and not present on the My Jobs page. Render it above `<SPJobDetailContent>` inside the sheet so accept/decline still work for pending offers tapped from the calendar.
+- Keep an "Open full page" link at the bottom of the sheet (small, secondary) so users can still navigate to the dedicated route if desired.
 
-Remove `scrollSnapType` from the outer `hScrollRef` style (line ~1031). Also remove `scrollSnapAlign` from the day-column wrappers (lines ~1080 and ~1107). The center-on-date logic in `useLayoutEffect` already actively scrolls to the active day, so we don't lose UX, and we eliminate the snap/sticky conflict on Android.
+### 4. AdminCalendar (out of scope)
 
-### 6. Add `isolation: isolate` on the inner scroll content wrapper
+The user is on the SP portal (current route `/sp/jobs/...`) and the issue specifically references "My Jobs". Admin calendar's sheet has different admin-only controls (assign SP, crew picker, etc.) and is not changed.
 
-Add `style={{ isolation: 'isolate' }}` (alongside the new `width`) on the inner wrapper at line ~1036. This creates a new stacking context that prevents Android Chrome from promoting any child layer in a way that breaks sticky.
+## Files to edit
 
-## What stays the same
+- **New:** `src/components/sp/SPJobDetailContent.tsx` — extracted detail body
+- **Edit:** `src/pages/sp/SPJobDetail.tsx` — becomes a thin page wrapper around the new component
+- **Edit:** `src/pages/sp/SPCalendar.tsx` — replace sheet body with `<SPJobDetailContent variant="panel" />`, keep offer-response card + sheet open/close behavior
 
-- All zoom logic, infinite-window growth, centering on date change, header rendering, JobBlock layout, drag-and-drop.
-- iOS / desktop behaviour — these changes are strictly more compatible, not different.
-- `AXIS_PX = 56` and `w-14` width.
+## Acceptance criteria
 
-## Files touched
-
-- `src/components/calendar/JobCalendar.tsx` only — `TimeAxis` (lines 355–378), `DayView`'s `<TimeAxis />` call site (line ~814), and the `WeekView` JSX block (lines ~1031–1141).
-
-No backend, no other component, no new dependencies.
-
-## Verification (after implementation)
-
-On Android Chrome, in the published app, log in and open the Week calendar:
-- Switch to 5-day mode → swipe horizontally → time axis stays pinned on the left.
-- Switch to 3-day mode → swipe horizontally → same.
-- Vertical scroll inside the grid still works; header stays pinned on top.
-- Tap a date in the header → grid centers on that day; time axis remains visible throughout.
-
-Also verify on iOS Safari that nothing regressed (it should look identical to today's working behaviour).
+- Tapping a job in the SP Calendar opens the side sheet with the exact same cards, fields, icons, spacing, and badges as `/sp/jobs/:id`
+- Address shows the "Open in Maps" button (currently missing from the calendar sheet)
+- Payout is rendered as `$XX.XX` with the primary-colored large number and "your share" line for crews (currently it's a small inline `$payout`)
+- Services render via `JobServicesDisplay` with category codes (currently a single `serviceCategory` string)
+- Notes, crew teammates, and photos appear with the same `metric-card` styling
+- Mark In Progress / Mark Completed actions work from inside the sheet
+- For pending offers, Accept / Decline still appear and function
+- The sheet still slides in from the right with the same animation; no layout regressions on `/sp/jobs/:id`
