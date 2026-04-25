@@ -25,20 +25,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  async function fetchRole(authUser: User): Promise<AuthUser | null> {
+  async function fetchRole(authUser: User, attempt = 1): Promise<AuthUser | null> {
+    const startedAt = Date.now();
     try {
-      console.log("[Auth] Fetching role for", authUser.email);
+      console.log(`[Auth] Fetching role for ${authUser.email} (attempt ${attempt})`);
       const { data, error } = await supabase
         .from("user_roles")
         .select("role, sp_id, is_active")
         .eq("user_id", authUser.id)
         .limit(1)
         .maybeSingle();
-      if (error || !data) {
-        console.log("[Auth] Role fetch result: none", error?.message);
+      const elapsed = Date.now() - startedAt;
+      if (error) {
+        console.log(`[Auth] Role fetch error after ${elapsed}ms:`, error.message);
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 800));
+          return fetchRole(authUser, attempt + 1);
+        }
         return null;
       }
-      console.log("[Auth] Role resolved:", data.role, "active:", data.is_active);
+      if (!data) {
+        console.log(`[Auth] Role fetch result: none after ${elapsed}ms`);
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 800));
+          return fetchRole(authUser, attempt + 1);
+        }
+        return null;
+      }
+      console.log(`[Auth] Role resolved in ${elapsed}ms:`, data.role, "active:", data.is_active);
       return {
         id: authUser.id,
         email: authUser.email ?? "",
@@ -46,7 +60,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         spId: data.sp_id,
         isActive: data.is_active ?? true,
       };
-    } catch {
+    } catch (err: any) {
+      console.log(`[Auth] Role fetch exception:`, err?.message);
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 800));
+        return fetchRole(authUser, attempt + 1);
+      }
       return null;
     }
   }
