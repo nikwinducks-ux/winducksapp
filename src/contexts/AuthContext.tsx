@@ -118,9 +118,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: error.message };
-    return { error: null };
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { error: error.message, user: null };
+    if (!data.user) return { error: "Sign-in succeeded but session could not be read. Please try again.", user: null };
+
+    const authUser = await fetchRole(data.user);
+    setSession(data.session ?? null);
+    setUser(authUser);
+
+    if (!authUser) {
+      return { error: "Sign-in succeeded, but we couldn't load your account details. Please try again.", user: null };
+    }
+
+    return { error: null, user: authUser };
   };
 
   const signOut = async () => {
