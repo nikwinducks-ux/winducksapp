@@ -4,7 +4,7 @@
 // - Pre-caches the built app shell via vite-plugin-pwa's injectManifest
 // - CACHE_VERSION is bumped on each publish to force fresh bundles for returning users
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 
 import { precacheAndRoute, cleanupOutdatedCaches } from "workbox-precaching";
 
