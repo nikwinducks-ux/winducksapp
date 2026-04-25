@@ -1092,7 +1092,9 @@ function WeekView({
             })}
           </div>
           <div className="relative flex overflow-y-auto" style={{ maxHeight: "70vh" }}>
-            <TimeAxis />
+            <div className="sticky left-0 z-20 bg-card shrink-0">
+              <TimeAxis />
+            </div>
             {days.map((d) => {
               const dayJobs = jobsOnDate(jobs, d);
               const dayBlocks = blocksOnDate(unavailableBlocks, d);
