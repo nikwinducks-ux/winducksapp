@@ -1029,14 +1029,14 @@ function WeekView({
           touchAction: isFit ? "pan-y" : "pan-x pan-y",
           WebkitOverflowScrolling: "touch",
           scrollSnapType: isMobile && !isFit ? "x proximity" : undefined,
-          scrollPaddingLeft: isMobile ? 56 : undefined,
+          scrollPaddingLeft: isMobile ? AXIS_PX : undefined,
         }}
       >
-        <div style={{ minWidth: `${56 + dayMinWidthPx * days.length}px` }}>
+        <div style={{ minWidth: `${AXIS_PX + dayMinWidthPx * days.length}px` }}>
           {/* Date header — lives inside the same horizontal scroller as the
               time columns so the date label is always locked above its column. */}
           <div className="flex border-b bg-muted/30 relative">
-            <div className="w-14 shrink-0 border-r sticky left-0 z-10 bg-muted/30" />
+            <div className="w-14 shrink-0 border-r sticky left-0 z-20 bg-muted/30" />
             {days.map((d) => {
               const headerDayJobs = jobsOnDate(jobs, d);
               const dayTotal = formatDayTotal(headerDayJobs);
