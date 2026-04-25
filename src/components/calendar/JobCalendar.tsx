@@ -345,10 +345,13 @@ function useNowMinutes() {
 }
 
 // ===== Time Axis =====
+// Note: no horizontal borders are drawn on the axis itself — the appointment
+// area renders its own hour grid lines. Each label sits at the very top of its
+// hour cell so the top of the text appears just under the corresponding grid
+// line, leaving the label area clean and readable.
 function TimeAxis() {
   return (
     <div className="w-14 shrink-0 border-r bg-muted/20 text-[10px] text-muted-foreground select-none">
-      <div style={{ height: HOUR_PX / 2 }} />
       {HOURS.map((h) => {
         const period = h >= 12 ? "PM" : "AM";
         const hr12 = h % 12 === 0 ? 12 : h % 12;
@@ -356,9 +359,9 @@ function TimeAxis() {
           <div
             key={h}
             style={{ height: HOUR_PX }}
-            className="relative border-t border-border/60 -mt-px"
+            className="relative"
           >
-            <span className="absolute -top-2 right-1.5 bg-muted/20 px-1">
+            <span className="absolute top-0.5 right-1.5 leading-none">
               {hr12}
               {period}
             </span>

@@ -1,40 +1,34 @@
-# Fix customer contact icons not opening phone/SMS
+# Calendar Time-Label Alignment Fix
 
 ## Problem
+In Day and Week views, the left-hand time column currently centers each label vertically on the hour grid line (using `-top-2` offset and a `border-t` on each hourly cell). This makes the horizontal divider lines visually run *through* the time labels (e.g. the line crosses through "7AM").
 
-The Phone and Message icons render correctly in the SP calendar's job sheet, but clicking them only shows the focus state ("turn orange") and never opens the phone dialer or SMS app.
+## Goal
+- Keep the appointment-area grid lines exactly where they are.
+- Move each time label slightly upward so the **top of the text sits just underneath** the corresponding horizontal grid line.
+- Remove the horizontal divider lines from the time-label column so labels look clean.
 
-Root cause: the buttons use `<Button asChild><a href="tel:..."></a></Button>`. Inside the Lovable preview iframe (and many sandboxed iframes), navigating to non-`http(s)` schemes like `tel:` / `sms:` from an inline `<a>` is silently blocked. The teammate buttons in `CrewTeammates` have the same latent issue but aren't usually noticed because users test them less.
+## Scope
+Only one component is touched: `TimeAxis` in `src/components/calendar/JobCalendar.tsx` (lines 348–370).
 
-The fix is to (a) intercept the click and explicitly route the navigation to the top-level window, and (b) surface the phone number itself so the user has a fallback to copy.
+The appointment-area grid lines are rendered separately inside `DayGridDroppable` (the right-side day columns), so changes to `TimeAxis` cannot affect them.
 
 ## Changes
 
-### `src/components/sp/CustomerContactActions.tsx` (rewrite)
+In `src/components/calendar/JobCalendar.tsx`, rewrite the `TimeAxis` component:
 
-- Replace the `<Button asChild><a href>` pattern with real `<button>` elements that handle the click via JS.
-- New helper `openContactUrl(url)` that:
-  1. Tries `window.top.location.href = url` (escapes the preview iframe).
-  2. Falls back to `window.open(url, "_top")`.
-  3. Final fallback: `window.location.href = url`.
-- Wrap each icon in a small `ContactIconButton` that calls `openContactUrl` with `tel:` / `sms:` and stops event propagation so the surrounding Sheet doesn't swallow it.
-- Display the resolved phone number under the customer name so the SP can copy it manually if their device can't follow the link.
-- When no phone is on file, render a clear "no phone on file" state instead of nothing (so the SP knows why icons are absent).
-- Keep the same public API (`customerId`, `customerName`, `variant`) so the existing `SPCalendar.tsx` integration keeps working with no changes.
+1. **Drop the half-hour top spacer** (`<div style={{ height: HOUR_PX / 2 }} />`). It existed to vertically center labels on lines; we no longer want centering.
+2. **Remove `border-t` from each hourly cell** in the axis so no horizontal lines pass through the label area.
+3. **Remove the `-mt-px` and the absolute `-top-2` positioning** on the label span. Instead, position the label at the very top of its hour cell (with a tiny `pt` like `pt-0.5`) so the top of the text sits just below the grid line that the appointment area draws at the same Y coordinate.
+4. **Drop the small `bg-muted/20 px-1` background pill** on the span — it was needed only to mask the line crossing through the text. With no line, the pill is unnecessary.
+5. Keep the column width (`w-14`), the right-hand border (`border-r`) that separates the axis from the day columns, and the muted background.
 
-## Technical detail
+The total axis height stays at `GRID_HEIGHT_PX` (15 hours × 60px), matching the appointment grid exactly, so nothing in the appointment area shifts.
 
-```tsx
-function openContactUrl(url: string) {
-  try {
-    if (window.top && window.top !== window) {
-      window.top.location.href = url;
-      return;
-    }
-  } catch { /* cross-origin top — fall through */ }
-  const opened = window.open(url, "_top");
-  if (!opened) window.location.href = url;
-}
-```
+## Result
+- Appointment cards: unchanged position, unchanged size.
+- Appointment grid lines: unchanged.
+- Left time column: each hour label (e.g. "7AM") now sits just under its corresponding grid line, with no line cutting through the text and no divider lines visible inside the label column.
 
-No other files need to change — `SPCalendar.tsx` already renders `<CustomerContactActions />` and the props stay the same.
+## Files Changed
+- `src/components/calendar/JobCalendar.tsx` — `TimeAxis` component only (~20 lines).
