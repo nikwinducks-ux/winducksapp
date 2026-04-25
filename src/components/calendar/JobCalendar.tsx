@@ -1022,7 +1022,7 @@ function WeekView({
         ref={hScrollRef}
         onScroll={handleScroll}
         className={cn(
-          "overflow-y-hidden overscroll-x-contain",
+          "overflow-y-auto overscroll-contain",
           isFit ? "overflow-x-hidden" : "overflow-x-auto"
         )}
         style={{
@@ -1030,13 +1030,16 @@ function WeekView({
           WebkitOverflowScrolling: "touch",
           scrollSnapType: isMobile && !isFit ? "x proximity" : undefined,
           scrollPaddingLeft: isMobile ? AXIS_PX : undefined,
+          maxHeight: "70vh",
         }}
       >
         <div style={{ minWidth: `${AXIS_PX + dayMinWidthPx * days.length}px` }}>
           {/* Date header — lives inside the same horizontal scroller as the
-              time columns so the date label is always locked above its column. */}
-          <div className="flex border-b bg-muted/30 relative">
-            <div className="w-14 shrink-0 border-r sticky left-0 z-20 bg-muted/30" />
+              time columns so the date label is always locked above its column.
+              Sticky to the top so it stays visible while the user scrolls
+              vertically through the day grid. */}
+          <div className="flex border-b bg-muted/30 relative sticky top-0 z-30">
+            <div className="w-14 shrink-0 border-r sticky left-0 z-30 bg-muted/30" />
             {days.map((d) => {
               const headerDayJobs = jobsOnDate(jobs, d);
               const dayTotal = formatDayTotal(headerDayJobs);
