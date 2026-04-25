@@ -1038,8 +1038,10 @@ function WeekView({
         style={{
           touchAction: isFit ? "pan-y" : "pan-x pan-y",
           WebkitOverflowScrolling: "touch",
-          scrollSnapType: isMobile && !isFit ? "x proximity" : undefined,
-          scrollPaddingLeft: isMobile ? AXIS_PX : undefined,
+          // NOTE: scroll-snap intentionally disabled — it conflicts with
+          // `position: sticky` left-pinning on Android Chrome and caused
+          // the time axis to scroll out of view. The active day is still
+          // centered programmatically via useLayoutEffect.
           maxHeight: "70vh",
         }}
       >
