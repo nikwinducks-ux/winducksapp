@@ -14,7 +14,7 @@ interface AuthContextType {
   user: AuthUser | null;
   session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: string | null; user: AuthUser | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -38,16 +38,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const elapsed = Date.now() - startedAt;
       if (error) {
         console.log(`[Auth] Role fetch error after ${elapsed}ms:`, error.message);
-        if (attempt < 2) {
-          await new Promise((r) => setTimeout(r, 800));
+        if (attempt < 5) {
+          await new Promise((r) => setTimeout(r, Math.min(500 * attempt, 2500)));
           return fetchRole(authUser, attempt + 1);
         }
         return null;
       }
       if (!data) {
         console.log(`[Auth] Role fetch result: none after ${elapsed}ms`);
-        if (attempt < 2) {
-          await new Promise((r) => setTimeout(r, 800));
+        if (attempt < 5) {
+          await new Promise((r) => setTimeout(r, Math.min(500 * attempt, 2500)));
           return fetchRole(authUser, attempt + 1);
         }
         return null;
@@ -62,8 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
     } catch (err: any) {
       console.log(`[Auth] Role fetch exception:`, err?.message);
-      if (attempt < 2) {
-        await new Promise((r) => setTimeout(r, 800));
+      if (attempt < 5) {
+        await new Promise((r) => setTimeout(r, Math.min(500 * attempt, 2500)));
         return fetchRole(authUser, attempt + 1);
       }
       return null;
