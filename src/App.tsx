@@ -22,6 +22,7 @@ import PerformancePage from "./pages/sp/PerformancePage";
 import MyJobs from "./pages/sp/MyJobs";
 import SPJobDetail from "./pages/sp/SPJobDetail";
 import AccountPage from "./pages/sp/AccountPage";
+import Earnings from "./pages/sp/Earnings";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
