@@ -49,7 +49,7 @@ export default function SPCalendar() {
 
   const acceptOffer = useAcceptOffer();
   const declineOffer = useDeclineOffer();
-  const updateStatus = useUpdateJobStatus();
+  
   const createBlock = useCreateSpUnavailable();
   const updateBlock = useUpdateSpUnavailable();
   const deleteBlock = useDeleteSpUnavailable();
