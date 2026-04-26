@@ -17,8 +17,6 @@ import { PALETTE_LABELS, type PaletteKey } from "@/components/calendar/spColors"
 import { complianceStateForDate, complianceLabel, complianceBadgeVariant, worstComplianceState } from "@/lib/compliance";
 import { toast } from "sonner";
 import { useState } from "react";
-import { toast } from "sonner";
-import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const jobStatusVariant = (s: string) => {
