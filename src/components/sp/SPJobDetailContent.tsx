@@ -8,11 +8,11 @@ import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { JobServicesDisplay } from "@/components/JobServicesDisplay";
 import { JobPhotosCard } from "@/components/JobPhotosCard";
 import { CrewTeammates } from "@/components/sp/CrewTeammates";
+import { JobVisitsCard } from "@/components/sp/JobVisitsCard";
 import {
   useServiceProviders,
   useActiveServiceCategories,
   useServiceCategories,
-  useUpdateJobStatus,
   useJobCrew,
 } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
@@ -66,7 +66,6 @@ export function SPJobDetailContent({ job, variant = "page", hideHeader = false }
   const { data: providers = [] } = useServiceProviders();
   const activeCategories = useActiveServiceCategories();
   const { data: allCategories = [] } = useServiceCategories();
-  const updateStatus = useUpdateJobStatus();
   const { data: crew = [] } = useJobCrew(job.dbId);
 
   const currentSp = providers.find((sp) => sp.id === user?.spId);
@@ -79,48 +78,8 @@ export function SPJobDetailContent({ job, variant = "page", hideHeader = false }
 
   const isCrewMember = crew.some((c) => c.spId === user?.spId);
   const isMyJob = job.assignedSpId === user?.spId || isCrewMember;
-  const canMarkInProgress = isMyJob && ["Assigned", "Accepted"].includes(job.status);
-  const canMarkCompleted = isMyJob && ["Assigned", "Accepted", "InProgress"].includes(job.status);
   const isCrew = crew.length > 1;
   const myShare = isCrew ? Math.round((job.payout / crew.length) * 100) / 100 : job.payout;
-
-  const handleStatusUpdate = (newStatus: string) => {
-    if (!user?.spId) return;
-    updateStatus.mutate({
-      jobDbId: job.dbId,
-      oldStatus: job.status,
-      newStatus,
-      spId: user.spId,
-    });
-  };
-
-  const inlineStatusActions =
-    isMyJob && (canMarkInProgress || canMarkCompleted) ? (
-      <div className="metric-card space-y-3">
-        <h2 className="section-title">Update Status</h2>
-        <div className="flex gap-2">
-          {canMarkInProgress && (
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => handleStatusUpdate("InProgress")}
-              disabled={updateStatus.isPending}
-            >
-              {updateStatus.isPending ? "Updating..." : "Mark In Progress"}
-            </Button>
-          )}
-          {canMarkCompleted && (
-            <Button
-              className="flex-1"
-              onClick={() => handleStatusUpdate("Completed")}
-              disabled={updateStatus.isPending}
-            >
-              {updateStatus.isPending ? "Updating..." : "Mark Completed"}
-            </Button>
-          )}
-        </div>
-      </div>
-    ) : null;
 
   return (
     <div className="space-y-6">
@@ -132,8 +91,8 @@ export function SPJobDetailContent({ job, variant = "page", hideHeader = false }
         </div>
       )}
 
-      {/* In panel mode, surface status actions near the top */}
-      {variant === "panel" && inlineStatusActions}
+      {/* In panel mode, surface visit actions near the top so they're always reachable */}
+      {variant === "panel" && isMyJob && <JobVisitsCard job={job} variant="panel" />}
 
       {/* Job Details */}
       <div className="metric-card space-y-4">
@@ -245,65 +204,8 @@ export function SPJobDetailContent({ job, variant = "page", hideHeader = false }
       {/* Photos */}
       <JobPhotosCard jobId={job.dbId} />
 
-      {/* Page-mode status actions: inline (desktop) + sticky bottom (mobile) */}
-      {variant === "page" && isMyJob && (canMarkInProgress || canMarkCompleted) && (
-        <>
-          <div className="metric-card space-y-4 hidden lg:block">
-            <h2 className="section-title">Update Status</h2>
-            <div className="flex gap-3">
-              {canMarkInProgress && (
-                <Button
-                  variant="outline"
-                  onClick={() => handleStatusUpdate("InProgress")}
-                  disabled={updateStatus.isPending}
-                >
-                  {updateStatus.isPending ? "Updating..." : "Mark In Progress"}
-                </Button>
-              )}
-              {canMarkCompleted && (
-                <Button
-                  onClick={() => handleStatusUpdate("Completed")}
-                  disabled={updateStatus.isPending}
-                >
-                  {updateStatus.isPending ? "Updating..." : "Mark Completed"}
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Mobile sticky bottom CTA — sits above the bottom tab bar */}
-          <div
-            className="fixed inset-x-0 z-30 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 p-3 lg:hidden"
-            style={{ bottom: "calc(env(safe-area-inset-bottom) + 56px)" }}
-          >
-            <div className="mx-auto flex max-w-3xl gap-2">
-              {canMarkInProgress && (
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="flex-1"
-                  onClick={() => handleStatusUpdate("InProgress")}
-                  disabled={updateStatus.isPending}
-                >
-                  {updateStatus.isPending ? "..." : "In Progress"}
-                </Button>
-              )}
-              {canMarkCompleted && (
-                <Button
-                  size="lg"
-                  className="flex-1"
-                  onClick={() => handleStatusUpdate("Completed")}
-                  disabled={updateStatus.isPending}
-                >
-                  {updateStatus.isPending ? "..." : "Mark Completed"}
-                </Button>
-              )}
-            </div>
-          </div>
-          {/* Spacer so content isn't hidden behind sticky bar on mobile */}
-          <div className="h-20 lg:hidden" aria-hidden />
-        </>
-      )}
+      {/* Page-mode visit/complete actions */}
+      {variant === "page" && isMyJob && <JobVisitsCard job={job} variant="page" />}
 
       {job.status === "Completed" && (
         <div className="metric-card border-success/30 bg-success/5 text-center py-6">

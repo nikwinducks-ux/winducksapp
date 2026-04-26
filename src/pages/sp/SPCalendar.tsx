@@ -7,7 +7,7 @@ import {
 } from "date-fns";
 import { ChevronLeft, ChevronRight, ExternalLink, Settings } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useJobs, useServiceProviders, useUpdateJobStatus } from "@/hooks/useSupabaseData";
+import { useJobs, useServiceProviders } from "@/hooks/useSupabaseData";
 import { useSpOffers, useAcceptOffer, useDeclineOffer } from "@/hooks/useOfferData";
 import {
   useSpUnavailableBlocks,
@@ -49,7 +49,7 @@ export default function SPCalendar() {
 
   const acceptOffer = useAcceptOffer();
   const declineOffer = useDeclineOffer();
-  const updateStatus = useUpdateJobStatus();
+  
   const createBlock = useCreateSpUnavailable();
   const updateBlock = useUpdateSpUnavailable();
   const deleteBlock = useDeleteSpUnavailable();
@@ -152,27 +152,6 @@ export default function SPCalendar() {
     setSelectedJob(null);
   }
 
-  async function markInProgress() {
-    if (!selectedJob || !spId) return;
-    await updateStatus.mutateAsync({
-      jobDbId: selectedJob.dbId,
-      oldStatus: selectedJob.status,
-      newStatus: "InProgress",
-      spId,
-    });
-    setSelectedJob(null);
-  }
-
-  async function markCompleted() {
-    if (!selectedJob || !spId) return;
-    await updateStatus.mutateAsync({
-      jobDbId: selectedJob.dbId,
-      oldStatus: selectedJob.status,
-      newStatus: "Completed",
-      spId,
-    });
-    setSelectedJob(null);
-  }
 
   function handleCreateUnavailable(date: Date, start: string, end: string) {
     setDialogInitial({ date: dateToISO(date), start, end, reason: "" });
