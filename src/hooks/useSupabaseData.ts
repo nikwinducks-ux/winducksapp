@@ -1935,3 +1935,154 @@ export function useUpdateAppSettings() {
     onError: (err: any) => toast({ title: "Couldn't save", description: err.message, variant: "destructive" }),
   });
 }
+
+// ===== SP Compliance Documents =====
+
+export interface SPComplianceDoc {
+  id: string;
+  spId: string;
+  name: string;
+  documentType: string;
+  expiresOn: string | null;
+  filePath: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function dbDocToSPComplianceDoc(row: any): SPComplianceDoc {
+  return {
+    id: row.id,
+    spId: row.sp_id,
+    name: row.name ?? "",
+    documentType: row.document_type ?? "",
+    expiresOn: row.expires_on ?? null,
+    filePath: row.file_path ?? "",
+    fileName: row.file_name ?? "",
+    fileSize: row.file_size ?? 0,
+    mimeType: row.mime_type ?? "",
+    notes: row.notes ?? "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function useSPComplianceDocs(spId: string | undefined) {
+  return useQuery({
+    queryKey: ["sp_compliance_documents", spId],
+    enabled: !!spId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sp_compliance_documents" as any)
+        .select("*")
+        .eq("sp_id", spId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map(dbDocToSPComplianceDoc);
+    },
+  });
+}
+
+export function useUpsertSPComplianceDoc() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (params: {
+      id?: string;
+      spId: string;
+      name: string;
+      documentType: string;
+      expiresOn: string | null;
+      notes: string;
+      file?: File | null;
+      currentFilePath?: string;
+    }) => {
+      let filePath = params.currentFilePath ?? "";
+      let fileName = "";
+      let fileSize = 0;
+      let mimeType = "";
+      const docId = params.id ?? crypto.randomUUID();
+
+      if (params.file) {
+        const cleanName = params.file.name.replace(/[^\w.\-]+/g, "_");
+        const newPath = `${params.spId}/${docId}/${Date.now()}_${cleanName}`;
+        const { error: upErr } = await supabase.storage
+          .from("sp-compliance")
+          .upload(newPath, params.file, { upsert: false, contentType: params.file.type });
+        if (upErr) throw upErr;
+        // Remove old file if replacing
+        if (params.currentFilePath && params.currentFilePath !== newPath) {
+          await supabase.storage.from("sp-compliance").remove([params.currentFilePath]);
+        }
+        filePath = newPath;
+        fileName = params.file.name;
+        fileSize = params.file.size;
+        mimeType = params.file.type;
+      }
+
+      const payload: any = {
+        id: docId,
+        sp_id: params.spId,
+        name: params.name,
+        document_type: params.documentType,
+        expires_on: params.expiresOn,
+        notes: params.notes,
+      };
+      if (params.file) {
+        payload.file_path = filePath;
+        payload.file_name = fileName;
+        payload.file_size = fileSize;
+        payload.mime_type = mimeType;
+      }
+
+      const { error } = await supabase
+        .from("sp_compliance_documents" as any)
+        .upsert(payload);
+      if (error) throw error;
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ["sp_compliance_documents", vars.spId] });
+      toast({ title: "Document saved" });
+    },
+    onError: (err: any) => toast({ title: "Couldn't save", description: err.message, variant: "destructive" }),
+  });
+}
+
+export function useDeleteSPComplianceDoc() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (params: { id: string; spId: string; filePath: string }) => {
+      if (params.filePath) {
+        await supabase.storage.from("sp-compliance").remove([params.filePath]);
+      }
+      const { error } = await supabase
+        .from("sp_compliance_documents" as any)
+        .delete()
+        .eq("id", params.id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ["sp_compliance_documents", vars.spId] });
+      toast({ title: "Document deleted" });
+    },
+    onError: (err: any) => toast({ title: "Couldn't delete", description: err.message, variant: "destructive" }),
+  });
+}
+
+export function useDownloadSPComplianceDoc() {
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (params: { filePath: string; fileName: string }) => {
+      const { data, error } = await supabase.storage
+        .from("sp-compliance")
+        .createSignedUrl(params.filePath, 60);
+      if (error) throw error;
+      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    },
+    onError: (err: any) => toast({ title: "Couldn't open file", description: err.message, variant: "destructive" }),
+  });
+}

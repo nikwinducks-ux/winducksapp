@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { useServiceProvider, useJobs, useToggleSPStatus, useUpdateSPColor } from "@/hooks/useSupabaseData";
+import { useServiceProvider, useJobs, useToggleSPStatus, useUpdateSPColor, useSPComplianceDocs } from "@/hooks/useSupabaseData";
 import { formatAddress } from "@/data/mockData";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
@@ -11,8 +11,10 @@ import { ArrowLeft, MapPin, Pencil, Eye } from "lucide-react";
 import SPLoginAccess from "@/components/admin/SPLoginAccess";
 import SPAvailabilityEditor from "@/components/admin/SPAvailabilityEditor";
 import SPReviewsTab from "@/components/admin/SPReviewsTab";
+import SPComplianceDocuments from "@/components/admin/SPComplianceDocuments";
 import { SPColorPicker } from "@/components/admin/SPColorPicker";
 import { PALETTE_LABELS, type PaletteKey } from "@/components/calendar/spColors";
+import { complianceStateForDate, complianceLabel, complianceBadgeVariant, worstComplianceState } from "@/lib/compliance";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -92,8 +94,10 @@ export default function SPDetail() {
   const { id } = useParams();
   const { data: sp, isLoading } = useServiceProvider(id);
   const { data: jobs = [] } = useJobs();
+  const { data: complianceDocs = [] } = useSPComplianceDocs(id);
   const toggleStatus = useToggleSPStatus();
   const updateColor = useUpdateSPColor();
+  const [activeTab, setActiveTab] = useState("profile");
 
   if (isLoading) return <div className="py-20 text-center text-muted-foreground">Loading...</div>;
 
@@ -108,6 +112,12 @@ export default function SPDetail() {
 
   const suspended = sp.status === "Suspended";
   const spJobs = jobs.filter((j) => j.assignedSpId === sp.id);
+
+  // Roll up overall compliance from documents
+  const docStates = complianceDocs.map((d) => complianceStateForDate(d.expiresOn));
+  const overallCompliance = worstComplianceState(docStates);
+  const overallLabel = complianceDocs.length === 0 ? "No documents" : complianceLabel(overallCompliance);
+  const overallVariant = complianceDocs.length === 0 ? "neutral" : complianceBadgeVariant(overallCompliance);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -124,7 +134,14 @@ export default function SPDetail() {
             <div className="flex items-center gap-2">
               <h1 className="page-header">{sp.name}</h1>
               <StatusBadge label={sp.status} variant={suspended ? "error" : "valid"} />
-              <StatusBadge label={sp.complianceStatus} variant={sp.complianceStatus === "Valid" ? "valid" : sp.complianceStatus === "Expiring" ? "warning" : "error"} />
+              <button
+                type="button"
+                onClick={() => setActiveTab("compliance")}
+                className="rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-opacity hover:opacity-80"
+                title="View compliance documents"
+              >
+                <StatusBadge label={overallLabel} variant={overallVariant as any} />
+              </button>
             </div>
             <p className="text-sm text-muted-foreground">{sp.email} · {sp.phone}</p>
           </div>
@@ -143,7 +160,7 @@ export default function SPDetail() {
         </div>
       </div>
 
-      <Tabs defaultValue="profile">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <TabsList className="w-max">
             <TabsTrigger value="profile">Profile</TabsTrigger>
@@ -224,13 +241,7 @@ export default function SPDetail() {
         </TabsContent>
 
         <TabsContent value="compliance">
-          <div className="metric-card space-y-4 mt-4">
-            <h2 className="section-title">Compliance Details</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div><p className="text-xs text-muted-foreground mb-1">Insurance Expiry</p><p className="text-sm font-medium">{sp.insuranceExpiry}</p></div>
-              <div><p className="text-xs text-muted-foreground mb-1">Compliance Status</p><StatusBadge label={sp.complianceStatus} variant={sp.complianceStatus === "Valid" ? "valid" : sp.complianceStatus === "Expiring" ? "warning" : "error"} /></div>
-            </div>
-          </div>
+          <SPComplianceDocuments spId={sp.id} />
         </TabsContent>
 
         <TabsContent value="performance">
