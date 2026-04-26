@@ -138,6 +138,7 @@ function AppRoutes() {
         <Route path="/admin/readiness" element={isAdmin ? <LaunchReadiness /> : <Navigate to="/" replace />} />
         <Route path="/admin/owner-setup" element={isAdmin ? <OwnerSetup /> : <Navigate to="/" replace />} />
         <Route path="/admin/calendar" element={isAdmin ? <AdminCalendar /> : <Navigate to="/" replace />} />
+        <Route path="/admin/payouts" element={isAdmin ? <Payouts /> : <Navigate to="/" replace />} />
 
         <Route path="*" element={<NotFound />} />
       </Routes>
