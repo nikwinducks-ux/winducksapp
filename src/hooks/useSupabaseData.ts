@@ -105,6 +105,7 @@ function dbToSP(row: any): ServiceProvider {
     notes: row.notes,
     archived: row.status === "Archived",
     calendarColor: row.calendar_color ?? null,
+    payoutFeePercent: row.payout_fee_percent != null ? Number(row.payout_fee_percent) : null,
   };
 }
 
