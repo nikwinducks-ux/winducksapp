@@ -83,6 +83,7 @@ export default function JobForm() {
     newFiles: [], newCaptions: [], keepIds: [], updatedCaptions: {},
   });
   const [crewMembers, setCrewMembers] = useState<CrewPickerValue[]>([]);
+  const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
 
   const [form, setForm] = useState({
     customerId: "",
