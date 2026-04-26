@@ -360,7 +360,12 @@ export default function JobForm() {
           <h2 className="section-title">Job Info</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
-              <Label>Customer</Label>
+              <div className="flex items-center justify-between">
+                <Label>Customer</Label>
+                <Button type="button" variant="outline" size="sm" onClick={() => setQuickCustomerOpen(true)}>
+                  <Plus className="h-4 w-4 mr-1" /> New customer
+                </Button>
+              </div>
               <Select value={form.customerId} onValueChange={(v) => update("customerId", v)}>
                 <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
                 <SelectContent>
