@@ -1796,3 +1796,137 @@ export function useEndVisit() {
     },
   });
 }
+
+// ===== SP Invoices / Payouts =====
+
+export interface SPInvoice {
+  id: string;
+  jobId: string;
+  spId: string;
+  customerId: string | null;
+  grossAmount: number;
+  feePercent: number;
+  feeAmount: number;
+  netAmount: number;
+  status: "Unpaid" | "Paid";
+  paidAt: string | null;
+  paidByUserId: string | null;
+  paymentMethod: string;
+  paymentReference: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function dbToInvoice(row: any): SPInvoice {
+  return {
+    id: row.id,
+    jobId: row.job_id,
+    spId: row.sp_id,
+    customerId: row.customer_id ?? null,
+    grossAmount: Number(row.gross_amount),
+    feePercent: Number(row.fee_percent),
+    feeAmount: Number(row.fee_amount),
+    netAmount: Number(row.net_amount),
+    status: row.status,
+    paidAt: row.paid_at ?? null,
+    paidByUserId: row.paid_by_user_id ?? null,
+    paymentMethod: row.payment_method ?? "",
+    paymentReference: row.payment_reference ?? "",
+    notes: row.notes ?? "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function useSPInvoices(filters?: { spId?: string; status?: "Unpaid" | "Paid" | "All"; jobId?: string }) {
+  return useQuery({
+    queryKey: ["sp_invoices", filters ?? {}],
+    queryFn: async () => {
+      let q = supabase.from("sp_invoices" as any).select("*").order("created_at", { ascending: false });
+      if (filters?.spId) q = q.eq("sp_id", filters.spId);
+      if (filters?.jobId) q = q.eq("job_id", filters.jobId);
+      if (filters?.status && filters.status !== "All") q = q.eq("status", filters.status);
+      const { data, error } = await q;
+      if (error) throw error;
+      return ((data ?? []) as any[]).map(dbToInvoice);
+    },
+  });
+}
+
+export function useMarkInvoicePaid() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (params: { id: string; paymentMethod?: string; paymentReference?: string; notes?: string }) => {
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("sp_invoices" as any)
+        .update({
+          status: "Paid",
+          paid_at: new Date().toISOString(),
+          paid_by_user_id: auth.user?.id ?? null,
+          payment_method: params.paymentMethod ?? "",
+          payment_reference: params.paymentReference ?? "",
+          notes: params.notes ?? "",
+        })
+        .eq("id", params.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sp_invoices"] });
+      toast({ title: "Marked as paid" });
+    },
+    onError: (err: any) => toast({ title: "Couldn't mark paid", description: err.message, variant: "destructive" }),
+  });
+}
+
+export function useMarkInvoiceUnpaid() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("sp_invoices" as any)
+        .update({ status: "Unpaid", paid_at: null, paid_by_user_id: null, payment_method: "", payment_reference: "" })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sp_invoices"] });
+      toast({ title: "Reverted to unpaid" });
+    },
+    onError: (err: any) => toast({ title: "Couldn't update", description: err.message, variant: "destructive" }),
+  });
+}
+
+export function useAppSettings() {
+  return useQuery({
+    queryKey: ["app_settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("app_settings" as any).select("*").eq("id", 1).maybeSingle();
+      if (error) throw error;
+      return {
+        defaultPayoutFeePercent: Number((data as any)?.default_payout_fee_percent ?? 0),
+      };
+    },
+  });
+}
+
+export function useUpdateAppSettings() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (params: { defaultPayoutFeePercent: number }) => {
+      const { error } = await supabase
+        .from("app_settings" as any)
+        .upsert({ id: 1, default_payout_fee_percent: params.defaultPayoutFeePercent });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["app_settings"] });
+      toast({ title: "Settings saved" });
+    },
+    onError: (err: any) => toast({ title: "Couldn't save", description: err.message, variant: "destructive" }),
+  });
+}
