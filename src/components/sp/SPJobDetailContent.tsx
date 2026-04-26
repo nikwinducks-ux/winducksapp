@@ -8,11 +8,11 @@ import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { JobServicesDisplay } from "@/components/JobServicesDisplay";
 import { JobPhotosCard } from "@/components/JobPhotosCard";
 import { CrewTeammates } from "@/components/sp/CrewTeammates";
+import { JobVisitsCard } from "@/components/sp/JobVisitsCard";
 import {
   useServiceProviders,
   useActiveServiceCategories,
   useServiceCategories,
-  useUpdateJobStatus,
   useJobCrew,
 } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
