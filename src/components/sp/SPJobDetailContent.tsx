@@ -91,8 +91,8 @@ export function SPJobDetailContent({ job, variant = "page", hideHeader = false }
         </div>
       )}
 
-      {/* In panel mode, surface status actions near the top */}
-      {variant === "panel" && inlineStatusActions}
+      {/* In panel mode, surface visit actions near the top so they're always reachable */}
+      {variant === "panel" && isMyJob && <JobVisitsCard job={job} variant="panel" />}
 
       {/* Job Details */}
       <div className="metric-card space-y-4">
