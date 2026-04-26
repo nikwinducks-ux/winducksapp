@@ -882,6 +882,7 @@ export function useCreateSP() {
       street: string; city: string; province: string; postalCode: string; country: string;
       lat: string; lng: string; travelRadius: string; maxJobsPerDay: string;
       notes: string; categories: string[]; calendarColor?: string | null;
+      payoutFeePercent?: string | null;
     }) => {
       const { error } = await supabase.from("service_providers").insert({
         name: form.name, email: form.email, phone: form.phone, status: form.status,
@@ -893,6 +894,7 @@ export function useCreateSP() {
         max_jobs_per_day: parseInt(form.maxJobsPerDay) || 5,
         notes: form.notes, categories: form.categories,
         calendar_color: form.calendarColor ?? null,
+        payout_fee_percent: form.payoutFeePercent != null && form.payoutFeePercent !== "" ? Number(form.payoutFeePercent) : null,
       });
       if (error) throw error;
     },
