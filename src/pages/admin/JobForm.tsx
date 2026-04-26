@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Info, MapPin, Radio, Users } from "lucide-react";
+import { ArrowLeft, Info, MapPin, Plus, Radio, Users } from "lucide-react";
+import { QuickCustomerDialog } from "@/components/admin/QuickCustomerDialog";
 import { autofillCoords, SUPPORTED_CITIES } from "@/lib/coord-autofill";
 import { useToast } from "@/hooks/use-toast";
 import { normalizeUrgency } from "@/components/UrgencyBadge";
@@ -82,6 +83,7 @@ export default function JobForm() {
     newFiles: [], newCaptions: [], keepIds: [], updatedCaptions: {},
   });
   const [crewMembers, setCrewMembers] = useState<CrewPickerValue[]>([]);
+  const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
 
   const [form, setForm] = useState({
     customerId: "",
@@ -358,7 +360,12 @@ export default function JobForm() {
           <h2 className="section-title">Job Info</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
-              <Label>Customer</Label>
+              <div className="flex items-center justify-between">
+                <Label>Customer</Label>
+                <Button type="button" variant="outline" size="sm" onClick={() => setQuickCustomerOpen(true)}>
+                  <Plus className="h-4 w-4 mr-1" /> New customer
+                </Button>
+              </div>
               <Select value={form.customerId} onValueChange={(v) => update("customerId", v)}>
                 <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
                 <SelectContent>
@@ -553,6 +560,15 @@ export default function JobForm() {
           <Link to="/admin/jobs"><Button type="button" variant="outline">Cancel</Button></Link>
         </div>
       </form>
+
+      <QuickCustomerDialog
+        open={quickCustomerOpen}
+        onOpenChange={setQuickCustomerOpen}
+        onCreated={(newId) => {
+          update("customerId", newId);
+          update("customerPropertyId", "");
+        }}
+      />
     </div>
   );
 }
