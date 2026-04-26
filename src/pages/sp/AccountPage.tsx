@@ -206,6 +206,8 @@ export default function AccountPage() {
 
         <Button type="submit" disabled={saving}>{saving ? "Saving..." : "Save Changes"}</Button>
       </form>
+
+      <SPComplianceDocuments spId={sp.id} readOnly />
     </div>
   );
 }
