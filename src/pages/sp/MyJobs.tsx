@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { JobServicesSummary } from "@/components/JobServicesDisplay";
-import { SPVisibilityDiagnostics } from "@/components/sp/SPVisibilityDiagnostics";
+
 import { CrewTeammates } from "@/components/sp/CrewTeammates";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { MapPin, Clock, DollarSign, Calendar, FileText, Users } from "lucide-react";
@@ -18,7 +18,7 @@ function ScheduleText({ job }: { job: any }) {
 
 export default function MyJobs() {
   const { user } = useAuth();
-  const { data: jobs = [], isLoading, status: jobsStatus, error: jobsError } = useJobs();
+  const { data: jobs = [], isLoading } = useJobs();
   const { data: sp } = useServiceProvider(user?.spId);
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get("tab") === "past" ? "past" : "active";
@@ -48,13 +48,6 @@ export default function MyJobs() {
           Logged in as <span className="font-medium text-foreground">{sp?.name ?? user?.email ?? "—"}</span> · {activeJobs.length} active, {pastJobs.length} past
         </p>
       </div>
-
-      <SPVisibilityDiagnostics
-        jobs={jobs}
-        context="my-jobs"
-        queryState={jobsStatus as any}
-        queryError={jobsError ? (jobsError as any).message ?? String(jobsError) : null}
-      />
 
       <Tabs
         value={tab}
