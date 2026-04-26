@@ -27,6 +27,7 @@ export default function SPForm() {
     street: string; city: string; province: string; postalCode: string; country: string;
     lat: string; lng: string; travelRadius: string; maxJobsPerDay: string;
     notes: string; categories: string[]; calendarColor: string | null;
+    payoutFeePercent: string;
   }>(null);
 
   const formData = form ?? (isEdit && existing ? {
@@ -40,11 +41,13 @@ export default function SPForm() {
     maxJobsPerDay: existing.maxJobsPerDay?.toString() ?? "5",
     notes: existing.notes ?? "", categories: existing.serviceCategories ?? [],
     calendarColor: existing.calendarColor ?? null,
+    payoutFeePercent: existing.payoutFeePercent != null ? String(existing.payoutFeePercent) : "",
   } : {
     name: "", email: "", phone: "", status: "Active",
     street: "", city: "", province: "AB", postalCode: "", country: "Canada",
     lat: "", lng: "", travelRadius: "30", maxJobsPerDay: "5",
     notes: "", categories: [], calendarColor: null,
+    payoutFeePercent: "",
   });
 
   if (isEdit && isLoading) return <div className="py-20 text-center text-muted-foreground">Loading...</div>;
@@ -150,6 +153,25 @@ export default function SPForm() {
             />
           </div>
           <div className="space-y-1.5"><Label>Notes</Label><Textarea value={formData.notes} onChange={(e) => update("notes", e.target.value)} rows={3} /></div>
+        </div>
+
+        <div className="metric-card space-y-4">
+          <h2 className="section-title">Payouts</h2>
+          <div className="space-y-1.5">
+            <Label>Platform fee % (override)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              value={formData.payoutFeePercent}
+              onChange={(e) => update("payoutFeePercent", e.target.value)}
+              placeholder="Leave blank to use global default"
+            />
+            <p className="text-xs text-muted-foreground">
+              Applied to this SP's gross payout when a job is completed. Leave blank to use the global default in Admin → Allocation settings.
+            </p>
+          </div>
         </div>
 
         <div className="flex gap-3">

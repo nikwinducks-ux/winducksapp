@@ -186,6 +186,24 @@ export type Database = {
           },
         ]
       }
+      app_settings: {
+        Row: {
+          default_payout_fee_percent: number
+          id: number
+          updated_at: string
+        }
+        Insert: {
+          default_payout_fee_percent?: number
+          id?: number
+          updated_at?: string
+        }
+        Update: {
+          default_payout_fee_percent?: number
+          id?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       availability_events: {
         Row: {
           changed_at: string
@@ -1186,6 +1204,7 @@ export type Database = {
           name: string
           notes: string
           on_time_rate: number
+          payout_fee_percent: number | null
           phone: string
           rating: number
           reliability_score: number
@@ -1222,6 +1241,7 @@ export type Database = {
           name: string
           notes?: string
           on_time_rate?: number
+          payout_fee_percent?: number | null
           phone?: string
           rating?: number
           reliability_score?: number
@@ -1258,6 +1278,7 @@ export type Database = {
           name?: string
           notes?: string
           on_time_rate?: number
+          payout_fee_percent?: number | null
           phone?: string
           rating?: number
           reliability_score?: number
@@ -1305,6 +1326,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sp_invoices: {
+        Row: {
+          created_at: string
+          customer_id: string | null
+          fee_amount: number
+          fee_percent: number
+          gross_amount: number
+          id: string
+          job_id: string
+          net_amount: number
+          notes: string
+          paid_at: string | null
+          paid_by_user_id: string | null
+          payment_method: string
+          payment_reference: string
+          sp_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id?: string | null
+          fee_amount?: number
+          fee_percent?: number
+          gross_amount?: number
+          id?: string
+          job_id: string
+          net_amount?: number
+          notes?: string
+          paid_at?: string | null
+          paid_by_user_id?: string | null
+          payment_method?: string
+          payment_reference?: string
+          sp_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string | null
+          fee_amount?: number
+          fee_percent?: number
+          gross_amount?: number
+          id?: string
+          job_id?: string
+          net_amount?: number
+          notes?: string
+          paid_at?: string | null
+          paid_by_user_id?: string | null
+          payment_method?: string
+          payment_reference?: string
+          sp_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       sp_unavailable_blocks: {
         Row: {

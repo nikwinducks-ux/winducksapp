@@ -22,6 +22,7 @@ import PerformancePage from "./pages/sp/PerformancePage";
 import MyJobs from "./pages/sp/MyJobs";
 import SPJobDetail from "./pages/sp/SPJobDetail";
 import AccountPage from "./pages/sp/AccountPage";
+import Earnings from "./pages/sp/Earnings";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -45,6 +46,7 @@ import CategoryDetail from "./pages/admin/CategoryDetail";
 import LaunchReadiness from "./pages/admin/LaunchReadiness";
 import OwnerSetup from "./pages/admin/OwnerSetup";
 import AdminCalendar from "./pages/admin/AdminCalendar";
+import Payouts from "./pages/admin/Payouts";
 import SPCalendar from "./pages/sp/SPCalendar";
 import ReviewSubmit from "./pages/ReviewSubmit";
 import Unsubscribe from "./pages/Unsubscribe";
@@ -107,6 +109,7 @@ function AppRoutes() {
         <Route path="/sp/jobs/:id" element={!isAdmin ? <SPJobDetail /> : <Navigate to="/admin" replace />} />
         <Route path="/account" element={!isAdmin ? <AccountPage /> : <Navigate to="/admin" replace />} />
         <Route path="/calendar" element={!isAdmin ? <SPCalendar /> : <Navigate to="/admin" replace />} />
+        <Route path="/earnings" element={!isAdmin ? <Earnings /> : <Navigate to="/admin" replace />} />
 
         {/* Admin Routes — accessible to admin and owner roles */}
         <Route path="/admin" element={isAdmin ? <AdminDashboard /> : <Navigate to="/" replace />} />
@@ -135,6 +138,7 @@ function AppRoutes() {
         <Route path="/admin/readiness" element={isAdmin ? <LaunchReadiness /> : <Navigate to="/" replace />} />
         <Route path="/admin/owner-setup" element={isAdmin ? <OwnerSetup /> : <Navigate to="/" replace />} />
         <Route path="/admin/calendar" element={isAdmin ? <AdminCalendar /> : <Navigate to="/" replace />} />
+        <Route path="/admin/payouts" element={isAdmin ? <Payouts /> : <Navigate to="/" replace />} />
 
         <Route path="*" element={<NotFound />} />
       </Routes>
