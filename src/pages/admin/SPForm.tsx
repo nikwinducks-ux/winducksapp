@@ -155,6 +155,25 @@ export default function SPForm() {
           <div className="space-y-1.5"><Label>Notes</Label><Textarea value={formData.notes} onChange={(e) => update("notes", e.target.value)} rows={3} /></div>
         </div>
 
+        <div className="metric-card space-y-4">
+          <h2 className="section-title">Payouts</h2>
+          <div className="space-y-1.5">
+            <Label>Platform fee % (override)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              value={formData.payoutFeePercent}
+              onChange={(e) => update("payoutFeePercent", e.target.value)}
+              placeholder="Leave blank to use global default"
+            />
+            <p className="text-xs text-muted-foreground">
+              Applied to this SP's gross payout when a job is completed. Leave blank to use the global default in Admin → Allocation settings.
+            </p>
+          </div>
+        </div>
+
         <div className="flex gap-3">
           <Button type="submit" disabled={isSaving}>{isSaving ? "Saving..." : isEdit ? "Update" : "Create"} Provider</Button>
           <Link to="/admin/providers"><Button type="button" variant="outline">Cancel</Button></Link>
