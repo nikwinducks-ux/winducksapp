@@ -109,6 +109,7 @@ function AppRoutes() {
         <Route path="/sp/jobs/:id" element={!isAdmin ? <SPJobDetail /> : <Navigate to="/admin" replace />} />
         <Route path="/account" element={!isAdmin ? <AccountPage /> : <Navigate to="/admin" replace />} />
         <Route path="/calendar" element={!isAdmin ? <SPCalendar /> : <Navigate to="/admin" replace />} />
+        <Route path="/earnings" element={!isAdmin ? <Earnings /> : <Navigate to="/admin" replace />} />
 
         {/* Admin Routes — accessible to admin and owner roles */}
         <Route path="/admin" element={isAdmin ? <AdminDashboard /> : <Navigate to="/" replace />} />
