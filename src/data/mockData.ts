@@ -81,6 +81,8 @@ export interface ServiceProvider {
   archived?: boolean;
   /** Admin-picked palette key (e.g. "blue", "violet"); null = auto-hash. */
   calendarColor?: string | null;
+  /** Per-SP override for platform fee % on payouts. null = use global default. */
+  payoutFeePercent?: number | null;
 }
 
 // ===== JOBS =====
