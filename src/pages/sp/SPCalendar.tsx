@@ -7,7 +7,7 @@ import {
 } from "date-fns";
 import { ChevronLeft, ChevronRight, ExternalLink, Settings } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useJobs, useServiceProviders, useUpdateJobStatus } from "@/hooks/useSupabaseData";
+import { useJobs, useServiceProviders } from "@/hooks/useSupabaseData";
 import { useSpOffers, useAcceptOffer, useDeclineOffer } from "@/hooks/useOfferData";
 import {
   useSpUnavailableBlocks,
