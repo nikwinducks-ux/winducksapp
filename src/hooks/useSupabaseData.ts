@@ -1709,3 +1709,90 @@ export function useGlobalActivityLog(limit = 200) {
     },
   });
 }
+
+// ===== Job Visits =====
+
+export interface JobVisit {
+  id: string;
+  jobId: string;
+  spId: string;
+  startedAt: string;
+  endedAt: string | null;
+  durationSecs: number | null;
+  notes: string;
+}
+
+function mapVisit(r: any): JobVisit {
+  return {
+    id: r.id,
+    jobId: r.job_id,
+    spId: r.sp_id,
+    startedAt: r.started_at,
+    endedAt: r.ended_at,
+    durationSecs: r.duration_secs,
+    notes: r.notes ?? "",
+  };
+}
+
+export function useJobVisits(jobId: string | undefined) {
+  return useQuery({
+    queryKey: ["job_visits", jobId],
+    queryFn: async (): Promise<JobVisit[]> => {
+      if (!jobId) return [];
+      const { data, error } = await (supabase as any)
+        .from("job_visits")
+        .select("*")
+        .eq("job_id", jobId)
+        .order("started_at", { ascending: true });
+      if (error) throw error;
+      return ((data ?? []) as any[]).map(mapVisit);
+    },
+    enabled: !!jobId,
+  });
+}
+
+export function useStartVisit() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ jobId, spId }: { jobId: string; spId: string }) => {
+      const { data, error } = await (supabase as any)
+        .from("job_visits")
+        .insert({ job_id: jobId, sp_id: spId })
+        .select()
+        .single();
+      if (error) throw error;
+      return mapVisit(data);
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["job_visits", v.jobId] });
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      toast({ title: "Visit started" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Couldn't start visit", description: err.message, variant: "destructive" });
+    },
+  });
+}
+
+export function useEndVisit() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ visitId, jobId }: { visitId: string; jobId: string }) => {
+      const { error } = await (supabase as any)
+        .from("job_visits")
+        .update({ ended_at: new Date().toISOString() })
+        .eq("id", visitId);
+      if (error) throw error;
+      return { visitId, jobId };
+    },
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["job_visits", r.jobId] });
+      toast({ title: "Visit ended" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Couldn't end visit", description: err.message, variant: "destructive" });
+    },
+  });
+}
