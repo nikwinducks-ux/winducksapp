@@ -24,6 +24,7 @@ const spLinks = [
   { to: "/my-jobs", icon: ClipboardList, label: "My Jobs" },
   { to: "/calendar", icon: CalendarDays, label: "Calendar" },
   { to: "/jobs", icon: Briefcase, label: "Job Offers" },
+  { to: "/earnings", icon: TrendingUp, label: "Earnings" },
   { to: "/performance", icon: TrendingUp, label: "Performance" },
   { to: "/account", icon: Settings, label: "Account" },
 ];
@@ -32,6 +33,7 @@ const adminLinks = [
   { to: "/admin", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/admin/jobs", icon: Briefcase, label: "Jobs" },
   { to: "/admin/calendar", icon: CalendarDays, label: "Calendar" },
+  { to: "/admin/payouts", icon: Scale, label: "Payouts" },
   { to: "/admin/categories", icon: Tag, label: "Service Categories" },
   { to: "/admin/allocation", icon: Sliders, label: "Allocation" },
   { to: "/admin/providers", icon: Users, label: "Service Providers" },
