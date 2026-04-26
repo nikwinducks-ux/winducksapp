@@ -152,27 +152,6 @@ export default function SPCalendar() {
     setSelectedJob(null);
   }
 
-  async function markInProgress() {
-    if (!selectedJob || !spId) return;
-    await updateStatus.mutateAsync({
-      jobDbId: selectedJob.dbId,
-      oldStatus: selectedJob.status,
-      newStatus: "InProgress",
-      spId,
-    });
-    setSelectedJob(null);
-  }
-
-  async function markCompleted() {
-    if (!selectedJob || !spId) return;
-    await updateStatus.mutateAsync({
-      jobDbId: selectedJob.dbId,
-      oldStatus: selectedJob.status,
-      newStatus: "Completed",
-      spId,
-    });
-    setSelectedJob(null);
-  }
 
   function handleCreateUnavailable(date: Date, start: string, end: string) {
     setDialogInitial({ date: dateToISO(date), start, end, reason: "" });
