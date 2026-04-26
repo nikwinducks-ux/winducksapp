@@ -204,65 +204,8 @@ export function SPJobDetailContent({ job, variant = "page", hideHeader = false }
       {/* Photos */}
       <JobPhotosCard jobId={job.dbId} />
 
-      {/* Page-mode status actions: inline (desktop) + sticky bottom (mobile) */}
-      {variant === "page" && isMyJob && (canMarkInProgress || canMarkCompleted) && (
-        <>
-          <div className="metric-card space-y-4 hidden lg:block">
-            <h2 className="section-title">Update Status</h2>
-            <div className="flex gap-3">
-              {canMarkInProgress && (
-                <Button
-                  variant="outline"
-                  onClick={() => handleStatusUpdate("InProgress")}
-                  disabled={updateStatus.isPending}
-                >
-                  {updateStatus.isPending ? "Updating..." : "Mark In Progress"}
-                </Button>
-              )}
-              {canMarkCompleted && (
-                <Button
-                  onClick={() => handleStatusUpdate("Completed")}
-                  disabled={updateStatus.isPending}
-                >
-                  {updateStatus.isPending ? "Updating..." : "Mark Completed"}
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Mobile sticky bottom CTA — sits above the bottom tab bar */}
-          <div
-            className="fixed inset-x-0 z-30 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 p-3 lg:hidden"
-            style={{ bottom: "calc(env(safe-area-inset-bottom) + 56px)" }}
-          >
-            <div className="mx-auto flex max-w-3xl gap-2">
-              {canMarkInProgress && (
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="flex-1"
-                  onClick={() => handleStatusUpdate("InProgress")}
-                  disabled={updateStatus.isPending}
-                >
-                  {updateStatus.isPending ? "..." : "In Progress"}
-                </Button>
-              )}
-              {canMarkCompleted && (
-                <Button
-                  size="lg"
-                  className="flex-1"
-                  onClick={() => handleStatusUpdate("Completed")}
-                  disabled={updateStatus.isPending}
-                >
-                  {updateStatus.isPending ? "..." : "Mark Completed"}
-                </Button>
-              )}
-            </div>
-          </div>
-          {/* Spacer so content isn't hidden behind sticky bar on mobile */}
-          <div className="h-20 lg:hidden" aria-hidden />
-        </>
-      )}
+      {/* Page-mode visit/complete actions */}
+      {variant === "page" && isMyJob && <JobVisitsCard job={job} variant="page" />}
 
       {job.status === "Completed" && (
         <div className="metric-card border-success/30 bg-success/5 text-center py-6">
