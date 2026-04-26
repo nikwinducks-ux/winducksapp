@@ -241,13 +241,7 @@ export default function SPDetail() {
         </TabsContent>
 
         <TabsContent value="compliance">
-          <div className="metric-card space-y-4 mt-4">
-            <h2 className="section-title">Compliance Details</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div><p className="text-xs text-muted-foreground mb-1">Insurance Expiry</p><p className="text-sm font-medium">{sp.insuranceExpiry}</p></div>
-              <div><p className="text-xs text-muted-foreground mb-1">Compliance Status</p><StatusBadge label={sp.complianceStatus} variant={sp.complianceStatus === "Valid" ? "valid" : sp.complianceStatus === "Expiring" ? "warning" : "error"} /></div>
-            </div>
-          </div>
+          <SPComplianceDocuments spId={sp.id} />
         </TabsContent>
 
         <TabsContent value="performance">
