@@ -46,6 +46,7 @@ import CategoryDetail from "./pages/admin/CategoryDetail";
 import LaunchReadiness from "./pages/admin/LaunchReadiness";
 import OwnerSetup from "./pages/admin/OwnerSetup";
 import AdminCalendar from "./pages/admin/AdminCalendar";
+import Payouts from "./pages/admin/Payouts";
 import SPCalendar from "./pages/sp/SPCalendar";
 import ReviewSubmit from "./pages/ReviewSubmit";
 import Unsubscribe from "./pages/Unsubscribe";
