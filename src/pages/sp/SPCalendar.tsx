@@ -41,7 +41,7 @@ export default function SPCalendar() {
   const { user } = useAuth();
   const spId = user?.spId ?? null;
 
-  const { data: jobs = [], isLoading, status: jobsStatus, error: jobsError } = useJobs();
+  const { data: jobs = [], isLoading } = useJobs();
   const { data: providers = [] } = useServiceProviders();
   const { data: spOffers = [] } = useSpOffers(spId);
   const { data: unavailableBlocks = [] } = useSpUnavailableBlocks(spId);
@@ -231,7 +231,7 @@ export default function SPCalendar() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="hidden sm:flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">My Calendar</h1>
           <p className="text-sm text-muted-foreground">
