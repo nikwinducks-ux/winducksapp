@@ -66,7 +66,6 @@ export function SPJobDetailContent({ job, variant = "page", hideHeader = false }
   const { data: providers = [] } = useServiceProviders();
   const activeCategories = useActiveServiceCategories();
   const { data: allCategories = [] } = useServiceCategories();
-  const updateStatus = useUpdateJobStatus();
   const { data: crew = [] } = useJobCrew(job.dbId);
 
   const currentSp = providers.find((sp) => sp.id === user?.spId);
@@ -79,48 +78,8 @@ export function SPJobDetailContent({ job, variant = "page", hideHeader = false }
 
   const isCrewMember = crew.some((c) => c.spId === user?.spId);
   const isMyJob = job.assignedSpId === user?.spId || isCrewMember;
-  const canMarkInProgress = isMyJob && ["Assigned", "Accepted"].includes(job.status);
-  const canMarkCompleted = isMyJob && ["Assigned", "Accepted", "InProgress"].includes(job.status);
   const isCrew = crew.length > 1;
   const myShare = isCrew ? Math.round((job.payout / crew.length) * 100) / 100 : job.payout;
-
-  const handleStatusUpdate = (newStatus: string) => {
-    if (!user?.spId) return;
-    updateStatus.mutate({
-      jobDbId: job.dbId,
-      oldStatus: job.status,
-      newStatus,
-      spId: user.spId,
-    });
-  };
-
-  const inlineStatusActions =
-    isMyJob && (canMarkInProgress || canMarkCompleted) ? (
-      <div className="metric-card space-y-3">
-        <h2 className="section-title">Update Status</h2>
-        <div className="flex gap-2">
-          {canMarkInProgress && (
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => handleStatusUpdate("InProgress")}
-              disabled={updateStatus.isPending}
-            >
-              {updateStatus.isPending ? "Updating..." : "Mark In Progress"}
-            </Button>
-          )}
-          {canMarkCompleted && (
-            <Button
-              className="flex-1"
-              onClick={() => handleStatusUpdate("Completed")}
-              disabled={updateStatus.isPending}
-            >
-              {updateStatus.isPending ? "Updating..." : "Mark Completed"}
-            </Button>
-          )}
-        </div>
-      </div>
-    ) : null;
 
   return (
     <div className="space-y-6">
