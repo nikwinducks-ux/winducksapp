@@ -1327,6 +1327,54 @@ export type Database = {
           },
         ]
       }
+      sp_compliance_documents: {
+        Row: {
+          created_at: string
+          created_by_user_id: string | null
+          document_type: string
+          expires_on: string | null
+          file_name: string
+          file_path: string
+          file_size: number
+          id: string
+          mime_type: string
+          name: string
+          notes: string
+          sp_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id?: string | null
+          document_type?: string
+          expires_on?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          id?: string
+          mime_type?: string
+          name: string
+          notes?: string
+          sp_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string | null
+          document_type?: string
+          expires_on?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          id?: string
+          mime_type?: string
+          name?: string
+          notes?: string
+          sp_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sp_invoices: {
         Row: {
           created_at: string
