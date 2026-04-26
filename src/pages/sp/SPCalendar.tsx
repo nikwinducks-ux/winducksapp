@@ -231,8 +231,8 @@ export default function SPCalendar() {
 
   return (
     <div className="space-y-4">
-      <div className="hidden sm:flex items-center justify-between flex-wrap gap-3">
-        <div>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="hidden sm:block">
           <h1 className="text-2xl font-bold">My Calendar</h1>
           <p className="text-sm text-muted-foreground">
             {isAvailability
@@ -264,13 +264,6 @@ export default function SPCalendar() {
         <AvailabilitySettings />
       ) : (
         <>
-          <SPVisibilityDiagnostics
-            jobs={jobs}
-            context="calendar"
-            queryState={jobsStatus as any}
-            queryError={jobsError ? (jobsError as any).message ?? String(jobsError) : null}
-          />
-
           <div className="flex items-center gap-1">
             <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
               <ChevronLeft className="h-4 w-4" />
