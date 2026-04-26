@@ -560,6 +560,15 @@ export default function JobForm() {
           <Link to="/admin/jobs"><Button type="button" variant="outline">Cancel</Button></Link>
         </div>
       </form>
+
+      <QuickCustomerDialog
+        open={quickCustomerOpen}
+        onOpenChange={setQuickCustomerOpen}
+        onCreated={(newId) => {
+          update("customerId", newId);
+          update("customerPropertyId", "");
+        }}
+      />
     </div>
   );
 }
