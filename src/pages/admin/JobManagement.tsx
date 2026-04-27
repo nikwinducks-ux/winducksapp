@@ -150,6 +150,8 @@ export default function JobManagement() {
     filtered = [...filtered].sort((a, b) => (URGENCY_PRIORITY[a.urgency || "Scheduled"] ?? 2) - (URGENCY_PRIORITY[b.urgency || "Scheduled"] ?? 2));
   } else if (sortBy === "scheduled") {
     filtered = [...filtered].sort((a, b) => (a.scheduledDate || "").localeCompare(b.scheduledDate || ""));
+  } else if (sortBy === "recent") {
+    filtered = [...filtered].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
   }
 
   const visibleIds = useMemo(() => filtered.map((j) => j.dbId), [filtered]);
