@@ -198,10 +198,12 @@ function PctInput({
   label,
   value,
   onChange,
+  hint,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  hint?: string;
 }) {
   return (
     <div className="space-y-1.5">
@@ -214,6 +216,7 @@ function PctInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   );
 }
