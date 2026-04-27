@@ -252,6 +252,8 @@ const emptyDraft: DraftExpense = {
 
 function ExpensesCard({ spId, readOnly }: { spId: string; readOnly: boolean }) {
   const { data: expenses = [], isLoading } = useSPExpenses(spId);
+  const { data: settings } = useAppSettings();
+  const subscriptionFee = settings?.defaultSubscriptionFeeMonthly ?? 0;
   const upsert = useUpsertSPExpense();
   const remove = useDeleteSPExpense();
   const toggle = useToggleSPExpense();
