@@ -2277,3 +2277,145 @@ export function useReopenJob() {
     onError: (err: any) => toast({ title: "Re-open failed", description: err.message, variant: "destructive" }),
   });
 }
+
+// ===== SP Compensation =====
+export type SPExpenseType = "percent_of_sp" | "monthly_fixed";
+export interface SPExpense {
+  id: string;
+  spId: string;
+  name: string;
+  expenseType: SPExpenseType;
+  value: number;
+  active: boolean;
+}
+
+export function useUpdateSPCompensation() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (params: {
+      spId: string;
+      compPlatformFeePct: number;
+      compMarketingPct: number;
+      compSpPortionPct: number;
+    }) => {
+      const total =
+        params.compPlatformFeePct + params.compMarketingPct + params.compSpPortionPct;
+      if (Math.abs(total - 100) > 0.01) {
+        throw new Error(`Compensation percentages must total 100% (currently ${total}%).`);
+      }
+      const { error } = await supabase
+        .from("service_providers")
+        .update({
+          comp_platform_fee_pct: params.compPlatformFeePct,
+          comp_marketing_pct: params.compMarketingPct,
+          comp_sp_portion_pct: params.compSpPortionPct,
+        })
+        .eq("id", params.spId);
+      if (error) throw error;
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ["service_providers"] });
+      qc.invalidateQueries({ queryKey: ["service_provider", vars.spId] });
+      toast({ title: "Compensation saved" });
+    },
+    onError: (err: any) =>
+      toast({ title: "Couldn't save", description: err.message, variant: "destructive" }),
+  });
+}
+
+export function useSPExpenses(spId?: string) {
+  return useQuery({
+    queryKey: ["sp_compensation_expenses", spId ?? null],
+    enabled: !!spId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sp_compensation_expenses" as any)
+        .select("*")
+        .eq("sp_id", spId!)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return ((data ?? []) as any[]).map((r) => ({
+        id: r.id,
+        spId: r.sp_id,
+        name: r.name ?? "",
+        expenseType: r.expense_type as SPExpenseType,
+        value: Number(r.value ?? 0),
+        active: !!r.active,
+      })) as SPExpense[];
+    },
+  });
+}
+
+export function useUpsertSPExpense() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (params: {
+      id?: string;
+      spId: string;
+      name: string;
+      expenseType: SPExpenseType;
+      value: number;
+      active: boolean;
+    }) => {
+      const row: any = {
+        sp_id: params.spId,
+        name: params.name,
+        expense_type: params.expenseType,
+        value: params.value,
+        active: params.active,
+      };
+      if (params.id) row.id = params.id;
+      const { error } = await supabase
+        .from("sp_compensation_expenses" as any)
+        .upsert(row);
+      if (error) throw error;
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ["sp_compensation_expenses", vars.spId] });
+      toast({ title: "Expense saved" });
+    },
+    onError: (err: any) =>
+      toast({ title: "Couldn't save expense", description: err.message, variant: "destructive" }),
+  });
+}
+
+export function useDeleteSPExpense() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (params: { id: string; spId: string }) => {
+      const { error } = await supabase
+        .from("sp_compensation_expenses" as any)
+        .delete()
+        .eq("id", params.id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ["sp_compensation_expenses", vars.spId] });
+      toast({ title: "Expense deleted" });
+    },
+    onError: (err: any) =>
+      toast({ title: "Couldn't delete", description: err.message, variant: "destructive" }),
+  });
+}
+
+export function useToggleSPExpense() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (params: { id: string; spId: string; active: boolean }) => {
+      const { error } = await supabase
+        .from("sp_compensation_expenses" as any)
+        .update({ active: params.active })
+        .eq("id", params.id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ["sp_compensation_expenses", vars.spId] });
+    },
+    onError: (err: any) =>
+      toast({ title: "Couldn't update", description: err.message, variant: "destructive" }),
+  });
+}
