@@ -216,6 +216,18 @@ export default function JobForm() {
     // Use computed total if payout is empty, otherwise use manual payout
     const finalPayout = form.payout ? form.payout : String(computedTotal);
 
+    // Auto-fill coordinates from the city if missing — keeps allocation
+    // proximity scoring accurate when admins forget to drop a pin.
+    let effectiveLat = form.lat;
+    let effectiveLng = form.lng;
+    if ((!effectiveLat || !effectiveLng) && form.city) {
+      const auto = autofillCoords(form.city);
+      if (auto) {
+        effectiveLat = String(auto.lat);
+        effectiveLng = String(auto.lng);
+      }
+    }
+
     const payload: any = {
       customerId: form.customerId,
       customerPropertyId: form.customerPropertyId,
@@ -226,8 +238,8 @@ export default function JobForm() {
       province: form.province,
       postalCode: form.postalCode,
       country: form.country,
-      lat: form.lat,
-      lng: form.lng,
+      lat: effectiveLat,
+      lng: effectiveLng,
       scheduledDate: form.scheduledDate,
       scheduledTime: form.scheduledTime,
       estimatedDuration,
