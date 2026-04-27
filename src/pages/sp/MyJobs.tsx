@@ -1,4 +1,5 @@
-import { useJobs, useServiceProvider, useSPInvoices } from "@/hooks/useSupabaseData";
+import { useState } from "react";
+import { useJobs, useServiceProvider, useSPInvoices, useReopenJob } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
@@ -6,8 +7,16 @@ import { JobServicesSummary } from "@/components/JobServicesDisplay";
 
 import { CrewTeammates } from "@/components/sp/CrewTeammates";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { MapPin, Clock, DollarSign, Calendar, FileText, Users } from "lucide-react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { MapPin, Clock, DollarSign, Calendar, FileText, Users, RotateCcw, CalendarPlus } from "lucide-react";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import ScheduledVisitDialog, { type ScheduledVisitValue } from "@/components/sp/ScheduledVisitDialog";
+import { useCreateScheduledVisit } from "@/hooks/useSupabaseData";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import type { Job } from "@/data/mockData";
 
 function ScheduleText({ job }: { job: any }) {
   const urgency = job.urgency || "Scheduled";
@@ -126,38 +135,138 @@ export default function MyJobs() {
               const inv = invoiceByJob.get(job.dbId);
               const paid = inv?.status === "Paid";
               return (
-                <Link key={job.id} to={`/sp/jobs/${job.dbId}`} className="block">
-                  <div className="metric-card opacity-90 flex items-center gap-4 hover:border-primary/30 transition-colors cursor-pointer">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-semibold truncate">{job.id}</p>
-                        <StatusBadge label={job.status} variant="valid" />
-                        <UrgencyBadge urgency={job.urgency} />
-                        {inv && (
-                          <StatusBadge
-                            label={paid ? "Paid" : "Unpaid"}
-                            variant={paid ? "valid" : "warning"}
-                          />
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground truncate mt-0.5">
-                        {job.customerName} · {job.services && job.services.length > 0 ? job.services.map(s => s.service_category).join(", ") : job.serviceCategory} · {job.scheduledDate || "—"}
-                      </p>
-                      {paid && inv?.paidAt && (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Paid {new Date(inv.paidAt).toLocaleDateString()}
-                          {inv.paymentMethod ? ` · ${inv.paymentMethod}` : ""}
-                        </p>
-                      )}
-                    </div>
-                    <p className="text-lg font-bold">${(inv?.netAmount ?? job.payout).toFixed(2)}</p>
-                  </div>
-                </Link>
+                <PastJobCard
+                  key={job.id}
+                  job={job}
+                  inv={inv}
+                  paid={paid}
+                />
               );
             })
           )}
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function PastJobCard({ job, inv, paid }: { job: Job; inv: any; paid: boolean }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const reopen = useReopenJob();
+  const createVisit = useCreateScheduledVisit();
+  const [confirmReopen, setConfirmReopen] = useState(false);
+  const [visitOpen, setVisitOpen] = useState(false);
+
+  const isMine = user?.spId
+    ? job.assignedSpId === user.spId || (job.crew ?? []).some((c) => c.spId === user.spId)
+    : false;
+
+  function go() { navigate(`/sp/jobs/${job.dbId}`); }
+
+  async function handleSaveVisit(v: ScheduledVisitValue) {
+    if (!user?.spId) return;
+    await createVisit.mutateAsync({
+      jobId: job.dbId, spId: user.spId, userId: user.id,
+      visitDate: v.visitDate, startTime: v.startTime,
+      durationMin: v.durationMin, note: v.note,
+    });
+    setVisitOpen(false);
+  }
+
+  function doReopen() {
+    if (!user?.spId) return;
+    reopen.mutate(
+      { jobDbId: job.dbId, spId: user.spId, oldStatus: job.status },
+      { onSuccess: () => setConfirmReopen(false) },
+    );
+  }
+
+  return (
+    <>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={go}
+        onKeyDown={(e) => { if (e.key === "Enter") go(); }}
+        className="metric-card opacity-90 hover:border-primary/30 transition-colors cursor-pointer space-y-3"
+      >
+        <div className="flex items-start gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-semibold truncate">{job.id}</p>
+              <StatusBadge label={job.status} variant="valid" />
+              <UrgencyBadge urgency={job.urgency} />
+              {inv && (
+                <StatusBadge
+                  label={paid ? "Paid" : "Unpaid"}
+                  variant={paid ? "valid" : "warning"}
+                />
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground truncate mt-0.5">
+              {job.customerName} · {job.services && job.services.length > 0 ? job.services.map(s => s.service_category).join(", ") : job.serviceCategory} · {job.scheduledDate || "—"}
+            </p>
+            {paid && inv?.paidAt && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Paid {new Date(inv.paidAt).toLocaleDateString()}
+                {inv.paymentMethod ? ` · ${inv.paymentMethod}` : ""}
+              </p>
+            )}
+          </div>
+          <p className="text-lg font-bold">${(inv?.netAmount ?? job.payout).toFixed(2)}</p>
+        </div>
+
+        {isMine && (
+          <div
+            className="flex flex-wrap gap-2 pt-2 border-t"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => { e.stopPropagation(); setVisitOpen(true); }}
+            >
+              <CalendarPlus className="mr-1.5 h-3.5 w-3.5" /> Schedule visit
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => { e.stopPropagation(); setConfirmReopen(true); }}
+            >
+              <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Re-open job
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <ScheduledVisitDialog
+        open={visitOpen}
+        initial={null}
+        jobLabel={`${job.id} · ${job.customerName}`}
+        saving={createVisit.isPending}
+        onClose={() => setVisitOpen(false)}
+        onSave={handleSaveVisit}
+      />
+
+      <AlertDialog open={confirmReopen} onOpenChange={setConfirmReopen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Re-open {job.id}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The job will move back to your Active jobs as <strong>Assigned</strong>. Existing
+              invoices and payment status are not changed automatically — contact your admin if
+              billing needs to be adjusted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={doReopen} disabled={reopen.isPending}>
+              {reopen.isPending ? "Re-opening..." : "Re-open job"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

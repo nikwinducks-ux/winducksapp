@@ -762,6 +762,48 @@ export type Database = {
           },
         ]
       }
+      job_scheduled_visits: {
+        Row: {
+          created_at: string
+          created_by_user_id: string | null
+          duration_min: number
+          id: string
+          job_id: string
+          note: string
+          sp_id: string
+          start_time: string
+          status: string
+          updated_at: string
+          visit_date: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id?: string | null
+          duration_min?: number
+          id?: string
+          job_id: string
+          note?: string
+          sp_id: string
+          start_time?: string
+          status?: string
+          updated_at?: string
+          visit_date: string
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string | null
+          duration_min?: number
+          id?: string
+          job_id?: string
+          note?: string
+          sp_id?: string
+          start_time?: string
+          status?: string
+          updated_at?: string
+          visit_date?: string
+        }
+        Relationships: []
+      }
       job_services: {
         Row: {
           created_at: string

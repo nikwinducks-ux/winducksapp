@@ -9,11 +9,13 @@ import { JobServicesDisplay } from "@/components/JobServicesDisplay";
 import { JobPhotosCard } from "@/components/JobPhotosCard";
 import { CrewTeammates } from "@/components/sp/CrewTeammates";
 import { JobVisitsCard } from "@/components/sp/JobVisitsCard";
+import { JobScheduledVisitsCard } from "@/components/sp/JobScheduledVisitsCard";
 import {
   useServiceProviders,
   useActiveServiceCategories,
   useServiceCategories,
   useJobCrew,
+  useReopenJob,
 } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { computeProximityResult, DISTANCE_SOURCE_LABELS } from "@/lib/proximity";
@@ -204,13 +206,34 @@ export function SPJobDetailContent({ job, variant = "page", hideHeader = false }
       {/* Photos */}
       <JobPhotosCard jobId={job.dbId} />
 
+      {/* Follow-up visits — visible on active and completed jobs */}
+      {isMyJob && <JobScheduledVisitsCard job={job} />}
+
       {/* Page-mode visit/complete actions */}
       {variant === "page" && isMyJob && <JobVisitsCard job={job} variant="page" />}
 
       {job.status === "Completed" && (
-        <div className="metric-card border-success/30 bg-success/5 text-center py-6">
-          <p className="text-lg font-semibold text-success">✓ Job Completed</p>
-        </div>
+        <CompletedBanner job={job} canReopen={isMyJob} />
+      )}
+    </div>
+  );
+}
+
+function CompletedBanner({ job, canReopen }: { job: Job; canReopen: boolean }) {
+  const { user } = useAuth();
+  const reopen = useReopenJob();
+  return (
+    <div className="metric-card border-success/30 bg-success/5 text-center py-6 space-y-3">
+      <p className="text-lg font-semibold text-success">✓ Job Completed</p>
+      {canReopen && user?.spId && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => reopen.mutate({ jobDbId: job.dbId, spId: user.spId!, oldStatus: job.status })}
+          disabled={reopen.isPending}
+        >
+          {reopen.isPending ? "Re-opening..." : "Re-open job"}
+        </Button>
       )}
     </div>
   );
