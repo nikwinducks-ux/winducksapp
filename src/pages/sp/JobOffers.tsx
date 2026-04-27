@@ -314,7 +314,7 @@ export default function JobOffers() {
                     )}
                   </Link>
                   <div className="flex sm:flex-col items-end gap-2 shrink-0">
-                    <p className="text-xl font-bold text-primary flex items-center gap-1"><DollarSign className="h-4 w-4" />{job.payout}</p>
+                    <p className="text-xl font-bold text-primary flex items-center gap-1"><DollarSign className="h-4 w-4" />{(job.payoutShare ?? job.payout).toFixed(2)}</p>
                     <div className="flex gap-2">
                       <Button asChild size="sm" variant="outline">
                         <Link to={`/jobs/${job.dbId}?offer=${offer.id}`}>
@@ -358,7 +358,7 @@ export default function JobOffers() {
                         : job.serviceCategory} · {job.scheduledDate}
                     </p>
                   </div>
-                  <p className="text-lg font-bold">${job.payout}</p>
+                  <p className="text-lg font-bold">${(job.payoutShare ?? job.payout).toFixed(2)}</p>
                 </div>
               );
             })

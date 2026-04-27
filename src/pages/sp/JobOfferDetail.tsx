@@ -131,7 +131,7 @@ export default function JobOfferDetail() {
             <div><p className="text-xs text-muted-foreground">Schedule</p><ScheduleDisplay job={job} /></div>
           </div>
           <div className="flex items-center gap-3"><Clock className="h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Duration</p><p className="font-medium">{job.estimatedDuration}</p></div></div>
-          <div className="flex items-center gap-3"><DollarSign className="h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Payout</p><p className="text-xl font-bold text-primary">{formatCAD(job.payout)}</p></div></div>
+          <div className="flex items-center gap-3"><DollarSign className="h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Your payout</p><p className="text-xl font-bold text-primary">{formatCAD(job.payoutShare ?? job.payout)}</p></div></div>
           <div className="flex items-center gap-3">
             <MapPin className="h-4 w-4 text-muted-foreground" />
             <div>
