@@ -63,6 +63,44 @@ export default function JobDetail() {
   const [addCrewSpId, setAddCrewSpId] = useState("");
   const convertToInvoice = useConvertJobToInvoice();
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const { data: timeline = [], isLoading: timelineLoading } = useJobTimeline(id);
+  const { data: jobMeta } = useQuery({
+    queryKey: ["job_meta", id],
+    queryFn: async () => {
+      if (!id) return null;
+      const { data } = await supabase.from("jobs")
+        .select("source_estimate_id")
+        .eq("id", id).maybeSingle();
+      return data;
+    },
+    enabled: !!id,
+  });
+  const { data: linkedInvoiceId } = useQuery({
+    queryKey: ["linked_invoice_for_job", id],
+    queryFn: async () => {
+      if (!id) return null;
+      const { data } = await supabase.from("customer_invoices")
+        .select("id").eq("job_id", id)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
+      return data?.id ?? null;
+    },
+    enabled: !!id,
+  });
+  const markReady = useMutation({
+    mutationFn: async (jobId: string) => {
+      const { data, error } = await supabase.rpc("mark_job_ready_to_invoice", { _job_id: jobId });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["job_timeline", id] });
+      toast({ title: "Marked ready to invoice" });
+    },
+    onError: (err: any) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
+  });
 
   const job = jobs.find((j) => j.dbId === id);
   const [showAssign, setShowAssign] = useState(searchParams.get("assign") === "true");
