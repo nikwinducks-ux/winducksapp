@@ -60,7 +60,7 @@ export function ConvertEstimateDialog({
                 <SelectTrigger><SelectValue placeholder="Pick a job" /></SelectTrigger>
                 <SelectContent>
                   {candidateJobs.map((j) => (
-                    <SelectItem key={j.id} value={j.id}>{j.jobNumber} — {j.serviceCategory || "(no category)"}</SelectItem>
+                    <SelectItem key={j.dbId} value={j.dbId}>{j.id} — {j.serviceCategory || "(no category)"}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
