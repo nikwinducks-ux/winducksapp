@@ -484,6 +484,13 @@ export default function AdminCalendar() {
           <span className="ml-3 text-sm font-medium">{rangeLabel()}</span>
         </div>
 
+        {view === "week" && weekTotal > 0 && (
+          <div className="ml-auto text-sm font-medium text-muted-foreground">
+            Week total:{" "}
+            <span className="text-primary font-semibold">{formatCADWhole(weekTotal)}</span>
+          </div>
+        )}
+
         <div className="flex items-center gap-2">
           <Label className="text-xs">SP:</Label>
           <Select value={spFilter} onValueChange={setSpFilter}>
