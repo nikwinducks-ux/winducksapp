@@ -103,16 +103,20 @@ function parseLocalDate(s: string): Date {
 
 import { formatCADWhole } from "@/lib/currency";
 
+function sumPayoutShare(jobs: Job[]): number {
+  return jobs.reduce((sum, j) => sum + (Number(j.payoutShare ?? j.payout) || 0), 0);
+}
+
 function formatDayTotal(jobs: Job[]): string | null {
   if (!jobs.length) return null;
-  const total = jobs.reduce((sum, j) => sum + (Number(j.payout) || 0), 0);
+  const total = sumPayoutShare(jobs);
   if (total <= 0) return null;
   return formatCADWhole(total);
 }
 
 function formatCompactCAD(jobs: Job[]): string | null {
   if (!jobs.length) return null;
-  const total = jobs.reduce((sum, j) => sum + (Number(j.payout) || 0), 0);
+  const total = sumPayoutShare(jobs);
   if (total <= 0) return null;
   if (total < 1000) return `$${Math.round(total)}`;
   if (total < 10000) return `$${(total / 1000).toFixed(1)}k`;

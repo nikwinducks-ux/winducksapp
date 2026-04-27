@@ -1,34 +1,28 @@
-# Show Payout Amount on Calendar Overview
+# Show Day Total as SP Payout Share on Calendar
 
 ## Goal
-On the calendar's job blocks, display the **SP payout amount** (the SP's net portion after platform + marketing fees) instead of the **Total Invoice** amount.
+The per-day total amount displayed in the top-right of each calendar day cell currently sums **total invoice** values (`job.payout`). Update it to sum the **SP payout share** (`job.payoutShare`) — matching the change just made to individual job blocks.
 
 ## Where
-`src/components/calendar/JobBlock.tsx` — line 223 currently renders:
-```tsx
-<span className="font-semibold shrink-0">{formatCAD(job.payout)}</span>
-```
+`src/components/calendar/JobCalendar.tsx` — two helpers both reduce on `j.payout`:
 
-This component is shared by both the Admin Calendar and the SP Calendar.
+- `formatDayTotal` (line 106) — used in the larger month view
+- `formatCompactCAD` (line 113) — used in the compact day cells
 
 ## Change
-Swap `job.payout` for `job.payoutShare`, falling back to `job.payout` when no share has been computed yet (e.g. unassigned job):
+Replace both reducers to use `j.payoutShare ?? j.payout` (fallback preserves behavior for unassigned jobs where no share has been computed). Extract the sum into a small shared helper to keep both formatters in sync:
 
 ```tsx
-<span className="font-semibold shrink-0">
-  {formatCAD(job.payoutShare ?? job.payout)}
-</span>
+function sumPayoutShare(jobs: Job[]): number {
+  return jobs.reduce((sum, j) => sum + (Number(j.payoutShare ?? j.payout) || 0), 0);
+}
 ```
 
-`payoutShare` is already computed live by the `useJobs` hook (`src/hooks/useSupabaseData.ts`) using `spShareForJob`, so:
-- Admin sees the SP's take-home for each job on the calendar.
-- SPs see their own portion (consistent with the rest of the SP portal).
-- Past and future jobs both reflect current global/per-SP split percentages automatically.
+Then have both `formatDayTotal` and `formatCompactCAD` call `sumPayoutShare(jobs)` instead of inlining the reduce.
 
 ## Files to edit
-- `src/components/calendar/JobBlock.tsx` (1-line change)
+- `src/components/calendar/JobCalendar.tsx` (replace lines 106–120)
 
 ## Out of scope
 - No DB or schema changes.
-- No changes to admin Job Detail / Job Management (those already show full breakdown / both values).
-- Tooltip/secondary label not added — keeping the block compact as today.
+- No changes to admin Job Detail "Payout" line (that one intentionally shows the total invoice context).
