@@ -203,6 +203,23 @@ export default function AdminCalendar() {
     });
   }, [scheduledJobs, spFilter, statusFilters]);
 
+  // Week total: sum of SP payout shares for all visible-week jobs (Mon–Sun).
+  // Mirrors the per-day totals shown in JobCalendar header.
+  const weekTotal = useMemo(() => {
+    const start = startOfWeek(currentDate, { weekStartsOn: 1 });
+    const end = endOfWeek(currentDate, { weekStartsOn: 1 });
+    return filteredJobs
+      .filter((j) => {
+        if (!j.scheduledDate) return false;
+        try {
+          return isWithinInterval(parseLocalDate(j.scheduledDate), { start, end });
+        } catch {
+          return false;
+        }
+      })
+      .reduce((sum, j) => sum + (Number(j.payoutShare ?? j.payout) || 0), 0);
+  }, [filteredJobs, currentDate]);
+
   // Range diagnostics: jobs in/out of view + nearest neighbours
   const rangeDiagnostics = useMemo(() => {
     const range = getViewRange(view, currentDate);
