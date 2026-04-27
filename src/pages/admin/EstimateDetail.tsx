@@ -45,6 +45,8 @@ export default function EstimateDetail() {
   const { data: appliedCodes = [] } = useEstimateAppliedCodes(id);
   const { data: customers = [] } = useCustomers();
   const { data: products = [] } = useProducts();
+  const { data: events = [], isLoading: eventsLoading } = useEstimateEvents(id);
+  const { data: linkedInvoiceId } = useLinkedInvoiceForEstimate(id);
 
   const update = useUpdateEstimate();
   const upsertPkg = useUpsertPackage();
