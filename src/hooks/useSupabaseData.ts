@@ -106,6 +106,9 @@ function dbToSP(row: any): ServiceProvider {
     archived: row.status === "Archived",
     calendarColor: row.calendar_color ?? null,
     payoutFeePercent: row.payout_fee_percent != null ? Number(row.payout_fee_percent) : null,
+    compPlatformFeePct: row.comp_platform_fee_pct != null ? Number(row.comp_platform_fee_pct) : null,
+    compMarketingPct: row.comp_marketing_pct != null ? Number(row.comp_marketing_pct) : null,
+    compSpPortionPct: row.comp_sp_portion_pct != null ? Number(row.comp_sp_portion_pct) : null,
   };
 }
 
