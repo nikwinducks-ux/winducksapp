@@ -74,6 +74,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/review/:token" element={<ReviewSubmit />} />
         <Route path="/unsubscribe" element={<Unsubscribe />} />
+        <Route path="/invoice/:token" element={<PublicInvoice />} />
         <Route path="*" element={<Login />} />
       </Routes>
     );
@@ -99,6 +100,7 @@ function AppRoutes() {
         {/* Public routes (also accessible while logged in) */}
         <Route path="/review/:token" element={<ReviewSubmit />} />
         <Route path="/unsubscribe" element={<Unsubscribe />} />
+        <Route path="/invoice/:token" element={<PublicInvoice />} />
         <Route path="/install" element={<Install />} />
 
         {/* SP Routes — only accessible to SP role */}
@@ -142,6 +144,8 @@ function AppRoutes() {
         <Route path="/admin/owner-setup" element={isAdmin ? <OwnerSetup /> : <Navigate to="/" replace />} />
         <Route path="/admin/calendar" element={isAdmin ? <AdminCalendar /> : <Navigate to="/" replace />} />
         <Route path="/admin/payouts" element={isAdmin ? <Payouts /> : <Navigate to="/" replace />} />
+        <Route path="/admin/invoices" element={isAdmin ? <InvoicesList /> : <Navigate to="/" replace />} />
+        <Route path="/admin/invoices/:id" element={isAdmin ? <InvoiceDetail /> : <Navigate to="/" replace />} />
 
         <Route path="*" element={<NotFound />} />
       </Routes>
