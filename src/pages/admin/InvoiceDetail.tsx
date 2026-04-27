@@ -33,6 +33,9 @@ import { RecordPaymentDialog } from "@/components/invoices/RecordPaymentDialog";
 import { ManualDiscountDialog } from "@/components/invoices/ManualDiscountDialog";
 import { DiscountCodeInput } from "@/components/estimates/DiscountCodeInput";
 import { computeInvoiceTotals } from "@/lib/invoiceTotals";
+import { WorkflowStepper, buildInvoiceStages } from "@/components/workflow/WorkflowStepper";
+import { ActivityTimelineCard } from "@/components/workflow/ActivityTimeline";
+import { useInvoiceTimeline } from "@/hooks/useWorkflowEvents";
 
 const STATUS_VARIANT: Record<string, "neutral" | "info" | "valid" | "warning" | "error"> = {
   Draft: "neutral", Sent: "info", Viewed: "info", "Partially Paid": "warning",
