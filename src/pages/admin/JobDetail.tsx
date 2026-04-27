@@ -765,6 +765,8 @@ export default function JobDetail() {
           </div>
         </CollapsibleContent>
       </Collapsible>
+
+      <ActivityTimelineCard events={timeline} loading={timelineLoading} emptyMessage="No job activity yet." />
     </div>
   );
 }
