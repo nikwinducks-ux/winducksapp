@@ -83,6 +83,10 @@ export interface ServiceProvider {
   calendarColor?: string | null;
   /** Per-SP override for platform fee % on payouts. null = use global default. */
   payoutFeePercent?: number | null;
+  /** Compensation split (per-SP). All null = fall back to global defaults. Must sum to 100 when set. */
+  compPlatformFeePct?: number | null;
+  compMarketingPct?: number | null;
+  compSpPortionPct?: number | null;
 }
 
 // ===== JOBS =====

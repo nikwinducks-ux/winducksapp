@@ -188,17 +188,26 @@ export type Database = {
       }
       app_settings: {
         Row: {
+          default_marketing_pct: number
           default_payout_fee_percent: number
+          default_platform_fee_pct: number
+          default_sp_portion_pct: number
           id: number
           updated_at: string
         }
         Insert: {
+          default_marketing_pct?: number
           default_payout_fee_percent?: number
+          default_platform_fee_pct?: number
+          default_sp_portion_pct?: number
           id?: number
           updated_at?: string
         }
         Update: {
+          default_marketing_pct?: number
           default_payout_fee_percent?: number
+          default_platform_fee_pct?: number
+          default_sp_portion_pct?: number
           id?: number
           updated_at?: string
         }
@@ -1233,6 +1242,9 @@ export type Database = {
           cancellation_rate: number
           categories: string[]
           certifications: string[]
+          comp_marketing_pct: number | null
+          comp_platform_fee_pct: number | null
+          comp_sp_portion_pct: number | null
           completion_rate: number
           compliance_status: string
           created_at: string
@@ -1270,6 +1282,9 @@ export type Database = {
           cancellation_rate?: number
           categories?: string[]
           certifications?: string[]
+          comp_marketing_pct?: number | null
+          comp_platform_fee_pct?: number | null
+          comp_sp_portion_pct?: number | null
           completion_rate?: number
           compliance_status?: string
           created_at?: string
@@ -1307,6 +1322,9 @@ export type Database = {
           cancellation_rate?: number
           categories?: string[]
           certifications?: string[]
+          comp_marketing_pct?: number | null
+          comp_platform_fee_pct?: number | null
+          comp_sp_portion_pct?: number | null
           completion_rate?: number
           compliance_status?: string
           created_at?: string
@@ -1369,6 +1387,39 @@ export type Database = {
           },
         ]
       }
+      sp_compensation_expenses: {
+        Row: {
+          active: boolean
+          created_at: string
+          expense_type: string
+          id: string
+          name: string
+          sp_id: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          expense_type?: string
+          id?: string
+          name?: string
+          sp_id: string
+          updated_at?: string
+          value?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          expense_type?: string
+          id?: string
+          name?: string
+          sp_id?: string
+          updated_at?: string
+          value?: number
+        }
+        Relationships: []
+      }
       sp_compliance_documents: {
         Row: {
           created_at: string
@@ -1421,17 +1472,21 @@ export type Database = {
         Row: {
           created_at: string
           customer_id: string | null
+          expense_deduction_amount: number
           fee_amount: number
           fee_percent: number
           gross_amount: number
+          gross_sp_amount: number
           id: string
           job_id: string
+          marketing_amount: number
           net_amount: number
           notes: string
           paid_at: string | null
           paid_by_user_id: string | null
           payment_method: string
           payment_reference: string
+          platform_fee_amount: number
           sp_id: string
           status: string
           updated_at: string
@@ -1439,17 +1494,21 @@ export type Database = {
         Insert: {
           created_at?: string
           customer_id?: string | null
+          expense_deduction_amount?: number
           fee_amount?: number
           fee_percent?: number
           gross_amount?: number
+          gross_sp_amount?: number
           id?: string
           job_id: string
+          marketing_amount?: number
           net_amount?: number
           notes?: string
           paid_at?: string | null
           paid_by_user_id?: string | null
           payment_method?: string
           payment_reference?: string
+          platform_fee_amount?: number
           sp_id: string
           status?: string
           updated_at?: string
@@ -1457,17 +1516,21 @@ export type Database = {
         Update: {
           created_at?: string
           customer_id?: string | null
+          expense_deduction_amount?: number
           fee_amount?: number
           fee_percent?: number
           gross_amount?: number
+          gross_sp_amount?: number
           id?: string
           job_id?: string
+          marketing_amount?: number
           net_amount?: number
           notes?: string
           paid_at?: string | null
           paid_by_user_id?: string | null
           payment_method?: string
           payment_reference?: string
+          platform_fee_amount?: number
           sp_id?: string
           status?: string
           updated_at?: string

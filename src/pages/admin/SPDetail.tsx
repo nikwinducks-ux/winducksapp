@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArrowLeft, MapPin, Pencil, Eye } from "lucide-react";
 import SPLoginAccess from "@/components/admin/SPLoginAccess";
+import SPCompensationTab from "@/components/admin/SPCompensationTab";
 import SPAvailabilityEditor from "@/components/admin/SPAvailabilityEditor";
 import SPReviewsTab from "@/components/admin/SPReviewsTab";
 import SPComplianceDocuments from "@/components/admin/SPComplianceDocuments";
@@ -170,6 +171,7 @@ export default function SPDetail() {
             <TabsTrigger value="compliance">Compliance</TabsTrigger>
             <TabsTrigger value="performance">Performance</TabsTrigger>
             <TabsTrigger value="reviews">Reviews</TabsTrigger>
+            <TabsTrigger value="compensation">Compensation</TabsTrigger>
             <TabsTrigger value="login">Login & Access</TabsTrigger>
           </TabsList>
         </div>
@@ -263,6 +265,10 @@ export default function SPDetail() {
 
         <TabsContent value="reviews">
           <SPReviewsTab spId={sp.id} />
+        </TabsContent>
+
+        <TabsContent value="compensation">
+          <SPCompensationTab spId={sp.id} readOnly={false} />
         </TabsContent>
 
         <TabsContent value="login">
