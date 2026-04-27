@@ -48,9 +48,14 @@ export default function Payouts() {
 
       <div className="metric-card space-y-3">
         <h2 className="section-title flex items-center gap-2"><DollarSign className="h-4 w-4" /> Global default platform fee</h2>
+        <p className="text-xs text-muted-foreground">
+          This percentage of each completed job's invoice goes to the platform. It is automatically used as the
+          <span className="font-medium"> Global Platform Fee %</span> in every Service Provider's Compensation section,
+          unless that SP has a custom override. Changes apply to future jobs only.
+        </p>
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1.5">
-            <Label>Default fee % (applies when SP has no override)</Label>
+            <Label>Default platform fee % (applies to all SPs without an override)</Label>
             <Input
               type="number" step="0.01" min="0" max="100"
               value={feeInput !== "" ? feeInput : String(currentFee)}
@@ -59,7 +64,10 @@ export default function Payouts() {
             />
           </div>
           <Button
-            onClick={() => updateSettings.mutate({ defaultPayoutFeePercent: Number(feeInput || currentFee) })}
+            onClick={() => updateSettings.mutate(
+              { defaultPlatformFeePct: Number(feeInput || currentFee) },
+              { onSuccess: () => setFeeInput("") },
+            )}
             disabled={updateSettings.isPending}
             className="gap-1.5"
           >
