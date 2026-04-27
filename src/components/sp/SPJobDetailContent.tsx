@@ -78,10 +78,11 @@ export function SPJobDetailContent({ job, variant = "page", hideHeader = false }
     return computeProximityResult(currentSp.baseAddress, job.jobAddress);
   }, [job, currentSp]);
 
+  const { data: settings } = useAppSettings();
   const isCrewMember = crew.some((c) => c.spId === user?.spId);
   const isMyJob = job.assignedSpId === user?.spId || isCrewMember;
   const isCrew = crew.length > 1;
-  const myShare = isCrew ? Math.round((job.payout / crew.length) * 100) / 100 : job.payout;
+  const myShare = spShareForJob(job.payout, currentSp ?? null, settings ?? null, isCrew ? crew.length : 1);
 
   return (
     <div className="space-y-6">
