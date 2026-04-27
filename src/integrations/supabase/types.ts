@@ -954,6 +954,8 @@ export type Database = {
           job_lat: number | null
           job_lng: number | null
           job_number: string
+          marketing_recipient: string
+          marketing_recipient_name: string
           notes: string
           payout: number
           scheduled_date: string | null
@@ -984,6 +986,8 @@ export type Database = {
           job_lat?: number | null
           job_lng?: number | null
           job_number?: string
+          marketing_recipient?: string
+          marketing_recipient_name?: string
           notes?: string
           payout?: number
           scheduled_date?: string | null
@@ -1014,6 +1018,8 @@ export type Database = {
           job_lat?: number | null
           job_lng?: number | null
           job_number?: string
+          marketing_recipient?: string
+          marketing_recipient_name?: string
           notes?: string
           payout?: number
           scheduled_date?: string | null
