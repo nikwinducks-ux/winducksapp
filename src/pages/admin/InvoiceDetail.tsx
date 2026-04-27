@@ -33,6 +33,9 @@ import { RecordPaymentDialog } from "@/components/invoices/RecordPaymentDialog";
 import { ManualDiscountDialog } from "@/components/invoices/ManualDiscountDialog";
 import { DiscountCodeInput } from "@/components/estimates/DiscountCodeInput";
 import { computeInvoiceTotals } from "@/lib/invoiceTotals";
+import { WorkflowStepper, buildInvoiceStages } from "@/components/workflow/WorkflowStepper";
+import { ActivityTimelineCard } from "@/components/workflow/ActivityTimeline";
+import { useInvoiceTimeline } from "@/hooks/useWorkflowEvents";
 
 const STATUS_VARIANT: Record<string, "neutral" | "info" | "valid" | "warning" | "error"> = {
   Draft: "neutral", Sent: "info", Viewed: "info", "Partially Paid": "warning",
@@ -45,6 +48,7 @@ export default function InvoiceDetail() {
   const { toast } = useToast();
 
   const { data: invoice, isLoading } = useCustomerInvoice(id);
+  const { data: timeline = [], isLoading: timelineLoading } = useInvoiceTimeline(id);
   const { data: packages = [] } = useInvoicePackages(id);
   const pkgIds = useMemo(() => packages.map((p) => p.id), [packages]);
   const { data: dbItems = [] } = useInvoiceLineItems(pkgIds);
@@ -319,6 +323,15 @@ export default function InvoiceDetail() {
         </div>
       </div>
 
+      <WorkflowStepper stages={buildInvoiceStages({
+        status: invoice.status,
+        source_estimate_id: (invoice as any).source_estimate_id,
+        job_id: invoice.job_id,
+        sent_at: (invoice as any).sent_at,
+        amount_paid: (invoice as any).amount_paid,
+        total: (invoice as any).total,
+      })} />
+
       {isVoid && (
         <div className="metric-card flex items-center gap-3 border-destructive/30 bg-destructive/5">
           <Ban className="h-5 w-5 text-destructive" />
@@ -579,6 +592,8 @@ export default function InvoiceDetail() {
           </div>
         </div>
       )}
+
+      <ActivityTimelineCard events={timeline} loading={timelineLoading} emptyMessage="No invoice activity yet." />
 
       <RecordPaymentDialog
         open={paymentDialog} onOpenChange={setPaymentDialog}

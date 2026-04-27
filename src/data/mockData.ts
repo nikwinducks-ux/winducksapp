@@ -112,7 +112,7 @@ export interface Job {
   scheduledDate: string;
   scheduledTime: string;
   payout: number;
-  status: "Created" | "Offered" | "Assigned" | "Accepted" | "InProgress" | "Completed" | "Cancelled" | "Expired" | "Archived" | "ConvertedToInvoice" | "InvoiceSent";
+  status: "Created" | "Offered" | "Assigned" | "Accepted" | "InProgress" | "Completed" | "ReadyToInvoice" | "Cancelled" | "Expired" | "Archived" | "ConvertedToInvoice" | "InvoiceSent";
   assignedSpId?: string;
   distance?: number;
   scores?: AllocationScores;

@@ -23,6 +23,29 @@ import { DiscountCodeInput } from "@/components/estimates/DiscountCodeInput";
 import { DepositConfig } from "@/components/estimates/DepositConfig";
 import { ConvertEstimateDialog } from "@/components/estimates/ConvertEstimateDialog";
 import { computePackageTotals } from "@/lib/estimateTotals";
+import { WorkflowStepper, buildEstimateStages } from "@/components/workflow/WorkflowStepper";
+import { ActivityTimelineCard } from "@/components/workflow/ActivityTimeline";
+import { useEstimateEvents } from "@/hooks/useWorkflowEvents";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+
+function useLinkedInvoiceForEstimate(estimateId: string | undefined) {
+  return useQuery({
+    queryKey: ["linked_invoice_for_estimate", estimateId],
+    queryFn: async () => {
+      if (!estimateId) return null;
+      const { data } = await supabase
+        .from("customer_invoices")
+        .select("id")
+        .eq("source_estimate_id", estimateId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data?.id ?? null;
+    },
+    enabled: !!estimateId,
+  });
+}
 
 const STATUS_VARIANT: Record<string, "neutral" | "info" | "valid" | "warning" | "error"> = {
   Draft: "neutral", Sent: "info", Viewed: "info", Accepted: "valid",
@@ -41,6 +64,8 @@ export default function EstimateDetail() {
   const { data: appliedCodes = [] } = useEstimateAppliedCodes(id);
   const { data: customers = [] } = useCustomers();
   const { data: products = [] } = useProducts();
+  const { data: events = [], isLoading: eventsLoading } = useEstimateEvents(id);
+  const { data: linkedInvoiceId } = useLinkedInvoiceForEstimate(id);
 
   const update = useUpdateEstimate();
   const upsertPkg = useUpsertPackage();
@@ -259,6 +284,8 @@ export default function EstimateDetail() {
         </div>
       </div>
 
+      <WorkflowStepper stages={buildEstimateStages(estimate, { invoiceId: linkedInvoiceId })} />
+
       {/* Header card */}
       <div className="metric-card grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">
@@ -379,6 +406,8 @@ export default function EstimateDetail() {
           </p>
         </div>
       )}
+
+      <ActivityTimelineCard events={events} loading={eventsLoading} emptyMessage="No estimate activity yet." />
 
       <ConvertEstimateDialog
         open={convertOpen}

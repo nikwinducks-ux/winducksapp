@@ -2,11 +2,14 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useCustomer, useJobs, useCustomerTags, tagColorClass } from "@/hooks/useSupabaseData";
 import { formatAddress } from "@/data/mockData";
+import { formatCAD } from "@/lib/currency";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CustomerActivityLog } from "@/components/CustomerActivityLog";
-import { ArrowLeft, MapPin, Pencil, History, Star, Mail, Phone, Building2 } from "lucide-react";
+import { ArrowLeft, MapPin, Pencil, History, Star, Mail, Phone, Building2, FileText, Receipt } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function CustomerDetail() {
   const { id } = useParams();
@@ -14,6 +17,29 @@ export default function CustomerDetail() {
   const { data: jobs = [] } = useJobs();
   const { data: tagCatalog = [] } = useCustomerTags();
   const [logOpen, setLogOpen] = useState(false);
+
+  const { data: estimates = [] } = useQuery({
+    queryKey: ["customer_estimates", id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data } = await supabase.from("estimates")
+        .select("id,estimate_number,status,estimate_date,accepted_total")
+        .eq("customer_id", id).order("created_at", { ascending: false });
+      return data ?? [];
+    },
+    enabled: !!id,
+  });
+  const { data: invoices = [] } = useQuery({
+    queryKey: ["customer_invoices_list", id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data } = await supabase.from("customer_invoices")
+        .select("id,invoice_number,status,invoice_date,total,balance_due")
+        .eq("customer_id", id).order("created_at", { ascending: false });
+      return data ?? [];
+    },
+    enabled: !!id,
+  });
 
   if (isLoading) return <div className="py-20 text-center text-muted-foreground">Loading...</div>;
 
@@ -173,6 +199,53 @@ export default function CustomerDetail() {
                   <span className="text-muted-foreground ml-2">{j.serviceCategory} · {j.scheduledDate}</span>
                 </div>
                 <StatusBadge label={j.status === "InProgress" ? "In Progress" : j.status} variant={j.status === "Completed" ? "valid" : j.status === "Created" ? "neutral" : "info"} />
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="metric-card space-y-4">
+        <h2 className="section-title flex items-center gap-2"><FileText className="h-4 w-4" />Estimates</h2>
+        {estimates.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No estimates on record.</p>
+        ) : (
+          <div className="space-y-2">
+            {estimates.map((e: any) => (
+              <Link key={e.id} to={`/admin/estimates/${e.id}`}
+                className="flex items-center justify-between rounded-lg bg-secondary/50 p-3 text-sm hover:bg-secondary transition-colors">
+                <div>
+                  <span className="font-medium text-primary">{e.estimate_number}</span>
+                  <span className="text-muted-foreground ml-2">{e.estimate_date}</span>
+                  {e.accepted_total != null && (
+                    <span className="text-muted-foreground ml-2">· {formatCAD(Number(e.accepted_total))}</span>
+                  )}
+                </div>
+                <StatusBadge label={e.status} variant={e.status === "Accepted" || e.status === "Converted" ? "valid" : e.status === "Declined" || e.status === "Expired" ? "error" : "info"} />
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="metric-card space-y-4">
+        <h2 className="section-title flex items-center gap-2"><Receipt className="h-4 w-4" />Invoices</h2>
+        {invoices.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No invoices on record.</p>
+        ) : (
+          <div className="space-y-2">
+            {invoices.map((inv: any) => (
+              <Link key={inv.id} to={`/admin/invoices/${inv.id}`}
+                className="flex items-center justify-between rounded-lg bg-secondary/50 p-3 text-sm hover:bg-secondary transition-colors">
+                <div>
+                  <span className="font-medium text-primary">{inv.invoice_number}</span>
+                  <span className="text-muted-foreground ml-2">{inv.invoice_date}</span>
+                  <span className="text-muted-foreground ml-2">· {formatCAD(Number(inv.total ?? 0))}</span>
+                  {Number(inv.balance_due ?? 0) > 0 && (
+                    <span className="text-warning ml-2">· {formatCAD(Number(inv.balance_due))} due</span>
+                  )}
+                </div>
+                <StatusBadge label={inv.status} variant={inv.status === "Paid" ? "valid" : inv.status === "Overdue" || inv.status === "Void" ? "error" : "info"} />
               </Link>
             ))}
           </div>

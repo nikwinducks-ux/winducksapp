@@ -2793,6 +2793,7 @@ export type Database = {
       }
       mark_estimate_sent: { Args: { _estimate_id: string }; Returns: Json }
       mark_invoice_viewed_by_token: { Args: { _token: string }; Returns: Json }
+      mark_job_ready_to_invoice: { Args: { _job_id: string }; Returns: Json }
       move_to_dlq: {
         Args: {
           dlq_name: string

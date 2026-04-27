@@ -25,6 +25,10 @@ import { CrewPicker } from "@/components/admin/CrewPicker";
 import { useConvertJobToInvoice } from "@/hooks/useCustomerInvoices";
 import { JobDepositCard } from "@/components/admin/JobDepositCard";
 import { useNavigate } from "react-router-dom";
+import { WorkflowStepper, buildJobStages } from "@/components/workflow/WorkflowStepper";
+import { ActivityTimelineCard } from "@/components/workflow/ActivityTimeline";
+import { useJobTimeline } from "@/hooks/useWorkflowEvents";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 function ScheduleDisplay({ job }: { job: any }) {
   const urgency = job.urgency || "Scheduled";
@@ -59,6 +63,44 @@ export default function JobDetail() {
   const [addCrewSpId, setAddCrewSpId] = useState("");
   const convertToInvoice = useConvertJobToInvoice();
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const { data: timeline = [], isLoading: timelineLoading } = useJobTimeline(id);
+  const { data: jobMeta } = useQuery({
+    queryKey: ["job_meta", id],
+    queryFn: async () => {
+      if (!id) return null;
+      const { data } = await supabase.from("jobs")
+        .select("source_estimate_id")
+        .eq("id", id).maybeSingle();
+      return data;
+    },
+    enabled: !!id,
+  });
+  const { data: linkedInvoiceId } = useQuery({
+    queryKey: ["linked_invoice_for_job", id],
+    queryFn: async () => {
+      if (!id) return null;
+      const { data } = await supabase.from("customer_invoices")
+        .select("id").eq("job_id", id)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
+      return data?.id ?? null;
+    },
+    enabled: !!id,
+  });
+  const markReady = useMutation({
+    mutationFn: async (jobId: string) => {
+      const { data, error } = await supabase.rpc("mark_job_ready_to_invoice", { _job_id: jobId });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["job_timeline", id] });
+      toast({ title: "Marked ready to invoice" });
+    },
+    onError: (err: any) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
+  });
 
   const job = jobs.find((j) => j.dbId === id);
   const [showAssign, setShowAssign] = useState(searchParams.get("assign") === "true");
@@ -235,6 +277,11 @@ export default function JobDetail() {
           <Button variant="outline" size="sm"><Pencil className="h-4 w-4 mr-1" />Edit</Button>
         </Link>
       </div>
+
+      <WorkflowStepper stages={buildJobStages(
+        { status: job.status, assignedSpId: job.assignedSpId, source_estimate_id: jobMeta?.source_estimate_id ?? null },
+        { estimateId: jobMeta?.source_estimate_id ?? null, invoiceId: linkedInvoiceId },
+      )} />
 
       {/* Customer summary */}
       <div className="metric-card space-y-3">
@@ -480,16 +527,43 @@ export default function JobDetail() {
       </div>
 
       {/* ====== INVOICE ACTIONS ====== */}
-      {["Completed", "ConvertedToInvoice", "InvoiceSent"].includes(job.status) && (
+      {["Completed", "ReadyToInvoice", "ConvertedToInvoice", "InvoiceSent"].includes(job.status) && (
         <div className="metric-card space-y-3">
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
             <h2 className="section-title">Invoice</h2>
           </div>
           {job.status === "Completed" && (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => id && markReady.mutate(id)}
+                disabled={markReady.isPending}
+              >
+                {markReady.isPending ? "Marking..." : "Mark ready to invoice"}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (!id) return;
+                  convertToInvoice.mutate(id, {
+                    onSuccess: (res) => {
+                      if (res?.invoice_id) navigate(`/admin/invoices/${res.invoice_id}`);
+                    },
+                  });
+                }}
+                disabled={convertToInvoice.isPending}
+              >
+                <FileText className="h-4 w-4 mr-1" />
+                {convertToInvoice.isPending ? "Converting..." : "Create invoice"}
+              </Button>
+            </div>
+          )}
+          {job.status === "ReadyToInvoice" && (
             <>
               <p className="text-sm text-muted-foreground">
-                Job is complete. Convert it into a customer invoice — line items will be copied from job services and tax applied per settings.
+                Job has been reviewed and is ready to invoice.
               </p>
               <Button
                 size="sm"
@@ -504,7 +578,7 @@ export default function JobDetail() {
                 disabled={convertToInvoice.isPending}
               >
                 <FileText className="h-4 w-4 mr-1" />
-                {convertToInvoice.isPending ? "Converting..." : "Convert to invoice"}
+                {convertToInvoice.isPending ? "Converting..." : "Create invoice"}
               </Button>
             </>
           )}
@@ -516,17 +590,8 @@ export default function JobDetail() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={async () => {
-                  if (!id) return;
-                  const { data } = await supabase
-                    .from("customer_invoices")
-                    .select("id")
-                    .eq("job_id", id)
-                    .order("created_at", { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
-                  if (data?.id) navigate(`/admin/invoices/${data.id}`);
-                }}
+                onClick={() => linkedInvoiceId && navigate(`/admin/invoices/${linkedInvoiceId}`)}
+                disabled={!linkedInvoiceId}
               >
                 <FileText className="h-4 w-4 mr-1" />Open invoice
               </Button>
@@ -700,6 +765,8 @@ export default function JobDetail() {
           </div>
         </CollapsibleContent>
       </Collapsible>
+
+      <ActivityTimelineCard events={timeline} loading={timelineLoading} emptyMessage="No job activity yet." />
     </div>
   );
 }
