@@ -201,6 +201,7 @@ export type Database = {
           default_subscription_fee_monthly: number
           default_tax_pct: number
           id: number
+          next_estimate_number: number
           next_invoice_number: number
           updated_at: string
         }
@@ -218,6 +219,7 @@ export type Database = {
           default_subscription_fee_monthly?: number
           default_tax_pct?: number
           id?: number
+          next_estimate_number?: number
           next_invoice_number?: number
           updated_at?: string
         }
@@ -235,6 +237,7 @@ export type Database = {
           default_subscription_fee_monthly?: number
           default_tax_pct?: number
           id?: number
+          next_estimate_number?: number
           next_invoice_number?: number
           updated_at?: string
         }
@@ -632,6 +635,54 @@ export type Database = {
         }
         Relationships: []
       }
+      discount_codes: {
+        Row: {
+          active: boolean
+          applies_to: string
+          code: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          kind: string
+          max_uses: number | null
+          min_subtotal: number
+          notes: string
+          updated_at: string
+          uses_count: number
+          value: number
+        }
+        Insert: {
+          active?: boolean
+          applies_to?: string
+          code: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          kind?: string
+          max_uses?: number | null
+          min_subtotal?: number
+          notes?: string
+          updated_at?: string
+          uses_count?: number
+          value?: number
+        }
+        Update: {
+          active?: boolean
+          applies_to?: string
+          code?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          kind?: string
+          max_uses?: number | null
+          min_subtotal?: number
+          notes?: string
+          updated_at?: string
+          uses_count?: number
+          value?: number
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string
@@ -716,6 +767,354 @@ export type Database = {
           id?: string
           token?: string
           used_at?: string | null
+        }
+        Relationships: []
+      }
+      estimate_applied_codes: {
+        Row: {
+          amount_applied: number
+          applied_at: string
+          applies_to: string
+          code_snapshot: string
+          discount_code_id: string | null
+          estimate_id: string
+          id: string
+          kind: string
+          value: number
+        }
+        Insert: {
+          amount_applied?: number
+          applied_at?: string
+          applies_to?: string
+          code_snapshot?: string
+          discount_code_id?: string | null
+          estimate_id: string
+          id?: string
+          kind?: string
+          value?: number
+        }
+        Update: {
+          amount_applied?: number
+          applied_at?: string
+          applies_to?: string
+          code_snapshot?: string
+          discount_code_id?: string | null
+          estimate_id?: string
+          id?: string
+          kind?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimate_applied_codes_discount_code_id_fkey"
+            columns: ["discount_code_id"]
+            isOneToOne: false
+            referencedRelation: "discount_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimate_applied_codes_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      estimate_discounts: {
+        Row: {
+          created_at: string
+          estimate_id: string
+          id: string
+          kind: string
+          package_id: string | null
+          reason: string
+          scope: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          estimate_id: string
+          id?: string
+          kind?: string
+          package_id?: string | null
+          reason?: string
+          scope?: string
+          value?: number
+        }
+        Update: {
+          created_at?: string
+          estimate_id?: string
+          id?: string
+          kind?: string
+          package_id?: string | null
+          reason?: string
+          scope?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimate_discounts_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimate_discounts_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "estimate_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      estimate_events: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          customer_ip: string
+          details: Json
+          estimate_id: string
+          event_type: string
+          id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          customer_ip?: string
+          details?: Json
+          estimate_id: string
+          event_type: string
+          id?: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          customer_ip?: string
+          details?: Json
+          estimate_id?: string
+          event_type?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimate_events_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      estimate_line_items: {
+        Row: {
+          catalog_ref_id: string | null
+          created_at: string
+          description: string
+          discount_allowed: boolean
+          display_order: number
+          id: string
+          image_url: string
+          is_optional: boolean
+          is_selected: boolean
+          item_type: string
+          name: string
+          package_id: string
+          quantity: number
+          taxable: boolean
+          unit_price: number
+        }
+        Insert: {
+          catalog_ref_id?: string | null
+          created_at?: string
+          description?: string
+          discount_allowed?: boolean
+          display_order?: number
+          id?: string
+          image_url?: string
+          is_optional?: boolean
+          is_selected?: boolean
+          item_type?: string
+          name?: string
+          package_id: string
+          quantity?: number
+          taxable?: boolean
+          unit_price?: number
+        }
+        Update: {
+          catalog_ref_id?: string | null
+          created_at?: string
+          description?: string
+          discount_allowed?: boolean
+          display_order?: number
+          id?: string
+          image_url?: string
+          is_optional?: boolean
+          is_selected?: boolean
+          item_type?: string
+          name?: string
+          package_id?: string
+          quantity?: number
+          taxable?: boolean
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimate_line_items_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "estimate_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      estimate_packages: {
+        Row: {
+          created_at: string
+          description: string
+          display_order: number
+          estimate_id: string
+          id: string
+          is_recommended: boolean
+          is_selected: boolean
+          name: string
+          package_discount_kind: string
+          package_discount_reason: string
+          package_discount_value: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          display_order?: number
+          estimate_id: string
+          id?: string
+          is_recommended?: boolean
+          is_selected?: boolean
+          name?: string
+          package_discount_kind?: string
+          package_discount_reason?: string
+          package_discount_value?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          display_order?: number
+          estimate_id?: string
+          id?: string
+          is_recommended?: boolean
+          is_selected?: boolean
+          name?: string
+          package_discount_kind?: string
+          package_discount_reason?: string
+          package_discount_value?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimate_packages_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      estimates: {
+        Row: {
+          accepted_at: string | null
+          accepted_deposit: number | null
+          accepted_package_id: string | null
+          accepted_total: number | null
+          assigned_sp_id: string | null
+          converted_at: string | null
+          converted_job_id: string | null
+          created_at: string
+          created_by_user_id: string | null
+          customer_id: string | null
+          customer_notes: string
+          customer_property_id: string | null
+          decline_reason: string
+          declined_at: string | null
+          deposit_kind: string
+          deposit_value: number
+          estimate_date: string
+          estimate_number: string
+          expires_at: string | null
+          id: string
+          internal_notes: string
+          job_id: string | null
+          share_token: string
+          snapshot_json: Json | null
+          status: string
+          tax_pct: number
+          terms: string
+          updated_at: string
+          viewed_at: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_deposit?: number | null
+          accepted_package_id?: string | null
+          accepted_total?: number | null
+          assigned_sp_id?: string | null
+          converted_at?: string | null
+          converted_job_id?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          customer_id?: string | null
+          customer_notes?: string
+          customer_property_id?: string | null
+          decline_reason?: string
+          declined_at?: string | null
+          deposit_kind?: string
+          deposit_value?: number
+          estimate_date?: string
+          estimate_number: string
+          expires_at?: string | null
+          id?: string
+          internal_notes?: string
+          job_id?: string | null
+          share_token?: string
+          snapshot_json?: Json | null
+          status?: string
+          tax_pct?: number
+          terms?: string
+          updated_at?: string
+          viewed_at?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_deposit?: number | null
+          accepted_package_id?: string | null
+          accepted_total?: number | null
+          assigned_sp_id?: string | null
+          converted_at?: string | null
+          converted_job_id?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          customer_id?: string | null
+          customer_notes?: string
+          customer_property_id?: string | null
+          decline_reason?: string
+          declined_at?: string | null
+          deposit_kind?: string
+          deposit_value?: number
+          estimate_date?: string
+          estimate_number?: string
+          expires_at?: string | null
+          id?: string
+          internal_notes?: string
+          job_id?: string | null
+          share_token?: string
+          snapshot_json?: Json | null
+          status?: string
+          tax_pct?: number
+          terms?: string
+          updated_at?: string
+          viewed_at?: string | null
         }
         Relationships: []
       }
@@ -1258,6 +1657,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      products: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string
+          display_order: number
+          id: string
+          image_url: string
+          name: string
+          sku: string
+          taxable: boolean
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string
+          display_order?: number
+          id?: string
+          image_url?: string
+          name: string
+          sku?: string
+          taxable?: boolean
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string
+          display_order?: number
+          id?: string
+          image_url?: string
+          name?: string
+          sku?: string
+          taxable?: boolean
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       push_subscriptions: {
         Row: {
@@ -1813,7 +2254,38 @@ export type Database = {
         Returns: undefined
       }
       accept_offer: { Args: { _offer_id: string }; Returns: Json }
+      apply_discount_code: {
+        Args: { _code: string; _estimate_id: string }
+        Returns: Json
+      }
+      convert_estimate_to_job: {
+        Args: { _estimate_id: string; _existing_job_id?: string; _mode: string }
+        Returns: Json
+      }
       convert_job_to_invoice: { Args: { _job_id: string }; Returns: Json }
+      create_estimate: {
+        Args: {
+          _assigned_sp_id?: string
+          _customer_id?: string
+          _customer_property_id?: string
+          _job_id?: string
+        }
+        Returns: Json
+      }
+      customer_accept_estimate: {
+        Args: {
+          _accepted_deposit?: number
+          _accepted_total: number
+          _package_id: string
+          _selected_item_ids: string[]
+          _token: string
+        }
+        Returns: Json
+      }
+      customer_decline_estimate: {
+        Args: { _reason?: string; _token: string }
+        Returns: Json
+      }
       decline_offer: {
         Args: { _offer_id: string; _reason?: string }
         Returns: Json
@@ -1823,11 +2295,17 @@ export type Database = {
         Returns: boolean
       }
       delete_job: { Args: { _job_id: string }; Returns: Json }
+      duplicate_estimate: { Args: { _estimate_id: string }; Returns: string }
+      duplicate_estimate_package: {
+        Args: { _package_id: string }
+        Returns: string
+      }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
       get_customer_invoice_by_token: { Args: { _token: string }; Returns: Json }
+      get_estimate_by_token: { Args: { _token: string }; Returns: Json }
       get_review_by_token: { Args: { _token: string }; Returns: Json }
       get_user_sp_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
@@ -1848,6 +2326,7 @@ export type Database = {
         Args: { _invoice_id: string; _pdf_path?: string }
         Returns: Json
       }
+      mark_estimate_sent: { Args: { _estimate_id: string }; Returns: Json }
       move_to_dlq: {
         Args: {
           dlq_name: string
