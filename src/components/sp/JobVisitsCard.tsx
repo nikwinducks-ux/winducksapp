@@ -76,6 +76,10 @@ export function JobVisitsCard({ job, variant = "page" }: Props) {
 
   const handleComplete = () => {
     if (!user?.spId) return;
+    // If the job hasn't been accepted yet, the DB will reject Offered → Completed.
+    // Surface a clearer hint than the raw trigger error.
+    const effectiveOld =
+      job.status === "Offered" ? "InProgress" : job.status;
     // Safety: if a visit is somehow still open, close it first
     if (openVisit) {
       endVisit.mutate(
@@ -84,7 +88,7 @@ export function JobVisitsCard({ job, variant = "page" }: Props) {
           onSuccess: () =>
             updateStatus.mutate({
               jobDbId: job.dbId,
-              oldStatus: job.status,
+              oldStatus: effectiveOld,
               newStatus: "Completed",
               spId: user.spId!,
             }),
@@ -94,7 +98,7 @@ export function JobVisitsCard({ job, variant = "page" }: Props) {
     }
     updateStatus.mutate({
       jobDbId: job.dbId,
-      oldStatus: job.status,
+      oldStatus: effectiveOld,
       newStatus: "Completed",
       spId: user.spId,
     });
