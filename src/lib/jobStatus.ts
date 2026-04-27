@@ -65,6 +65,8 @@ export function getJobDisplayStatus(
     case "Completed":
       return { label: "Completed", variant: "valid" };
 
+    case "ReadyToInvoice":
+      return { label: "Ready to Invoice", variant: "info" };
     case "ConvertedToInvoice":
       return { label: "Converted to Invoice", variant: "info" };
 
