@@ -72,7 +72,7 @@ export default function JobManagement() {
   const [search, setSearch] = useState("");
   const [urgencyFilter, setUrgencyFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("default");
+  const [sortBy, setSortBy] = useState("recent");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string[] | null>(null);
