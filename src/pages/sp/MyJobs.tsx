@@ -122,22 +122,39 @@ export default function MyJobs() {
               <p className="text-muted-foreground">No completed jobs yet.</p>
             </div>
           ) : (
-            pastJobs.map((job) => (
-              <Link key={job.id} to={`/sp/jobs/${job.dbId}`} className="block">
-                <div className="metric-card opacity-90 flex items-center gap-4 hover:border-primary/30 transition-colors cursor-pointer">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold truncate">{job.id}</p>
-                      <StatusBadge label={job.status} variant="valid" />
-                      <UrgencyBadge urgency={job.urgency} />
+            pastJobs.map((job) => {
+              const inv = invoiceByJob.get(job.dbId);
+              const paid = inv?.status === "Paid";
+              return (
+                <Link key={job.id} to={`/sp/jobs/${job.dbId}`} className="block">
+                  <div className="metric-card opacity-90 flex items-center gap-4 hover:border-primary/30 transition-colors cursor-pointer">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold truncate">{job.id}</p>
+                        <StatusBadge label={job.status} variant="valid" />
+                        <UrgencyBadge urgency={job.urgency} />
+                        {inv && (
+                          <StatusBadge
+                            label={paid ? "Paid" : "Unpaid"}
+                            variant={paid ? "valid" : "warning"}
+                          />
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate mt-0.5">
+                        {job.customerName} · {job.services && job.services.length > 0 ? job.services.map(s => s.service_category).join(", ") : job.serviceCategory} · {job.scheduledDate || "—"}
+                      </p>
+                      {paid && inv?.paidAt && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Paid {new Date(inv.paidAt).toLocaleDateString()}
+                          {inv.paymentMethod ? ` · ${inv.paymentMethod}` : ""}
+                        </p>
+                      )}
                     </div>
-                    <p className="text-sm text-muted-foreground truncate mt-0.5">
-                      {job.customerName} · {job.services && job.services.length > 0 ? job.services.map(s => s.service_category).join(", ") : job.serviceCategory} · {job.scheduledDate || "—"}
-                    </p>
+                    <p className="text-lg font-bold">${(inv?.netAmount ?? job.payout).toFixed(2)}</p>
                   </div>
-                  <p className="text-lg font-bold">${job.payout}</p>
-                </div>
-              </Link>
+                </Link>
+              );
+            })
             ))
           )}
         </TabsContent>
