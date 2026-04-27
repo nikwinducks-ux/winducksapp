@@ -1479,6 +1479,10 @@ export type Database = {
           created_at: string
           customer_id: string | null
           customer_property_id: string | null
+          deposit_due: number
+          deposit_received: number
+          deposit_received_at: string | null
+          deposit_received_by_user_id: string | null
           estimated_duration: string
           id: string
           is_broadcast: boolean
@@ -1498,6 +1502,7 @@ export type Database = {
           scheduled_time: string
           scores: Json | null
           service_category: string
+          source_estimate_id: string | null
           started_at: string | null
           status: string
           updated_at: string
@@ -1511,6 +1516,10 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           customer_property_id?: string | null
+          deposit_due?: number
+          deposit_received?: number
+          deposit_received_at?: string | null
+          deposit_received_by_user_id?: string | null
           estimated_duration?: string
           id?: string
           is_broadcast?: boolean
@@ -1530,6 +1539,7 @@ export type Database = {
           scheduled_time?: string
           scores?: Json | null
           service_category?: string
+          source_estimate_id?: string | null
           started_at?: string | null
           status?: string
           updated_at?: string
@@ -1543,6 +1553,10 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           customer_property_id?: string | null
+          deposit_due?: number
+          deposit_received?: number
+          deposit_received_at?: string | null
+          deposit_received_by_user_id?: string | null
           estimated_duration?: string
           id?: string
           is_broadcast?: boolean
@@ -1562,6 +1576,7 @@ export type Database = {
           scheduled_time?: string
           scores?: Json | null
           service_category?: string
+          source_estimate_id?: string | null
           started_at?: string | null
           status?: string
           updated_at?: string
@@ -2345,6 +2360,10 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      record_job_deposit: {
+        Args: { _amount: number; _job_id: string; _method?: string }
+        Returns: Json
       }
       sp_eligible_for_broadcast_job: {
         Args: { _job_id: string; _sp_id: string }
