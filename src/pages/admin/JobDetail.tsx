@@ -278,6 +278,11 @@ export default function JobDetail() {
         </Link>
       </div>
 
+      <WorkflowStepper stages={buildJobStages(
+        { status: job.status, assignedSpId: job.assignedSpId, source_estimate_id: jobMeta?.source_estimate_id ?? null },
+        { estimateId: jobMeta?.source_estimate_id ?? null, invoiceId: linkedInvoiceId },
+      )} />
+
       {/* Customer summary */}
       <div className="metric-card space-y-3">
         <h2 className="section-title">Customer</h2>
