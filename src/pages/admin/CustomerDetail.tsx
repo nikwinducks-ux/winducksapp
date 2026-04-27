@@ -204,6 +204,53 @@ export default function CustomerDetail() {
           </div>
         )}
       </div>
+
+      <div className="metric-card space-y-4">
+        <h2 className="section-title flex items-center gap-2"><FileText className="h-4 w-4" />Estimates</h2>
+        {estimates.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No estimates on record.</p>
+        ) : (
+          <div className="space-y-2">
+            {estimates.map((e: any) => (
+              <Link key={e.id} to={`/admin/estimates/${e.id}`}
+                className="flex items-center justify-between rounded-lg bg-secondary/50 p-3 text-sm hover:bg-secondary transition-colors">
+                <div>
+                  <span className="font-medium text-primary">{e.estimate_number}</span>
+                  <span className="text-muted-foreground ml-2">{e.estimate_date}</span>
+                  {e.accepted_total != null && (
+                    <span className="text-muted-foreground ml-2">· {formatCAD(Number(e.accepted_total))}</span>
+                  )}
+                </div>
+                <StatusBadge label={e.status} variant={e.status === "Accepted" || e.status === "Converted" ? "valid" : e.status === "Declined" || e.status === "Expired" ? "error" : "info"} />
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="metric-card space-y-4">
+        <h2 className="section-title flex items-center gap-2"><Receipt className="h-4 w-4" />Invoices</h2>
+        {invoices.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No invoices on record.</p>
+        ) : (
+          <div className="space-y-2">
+            {invoices.map((inv: any) => (
+              <Link key={inv.id} to={`/admin/invoices/${inv.id}`}
+                className="flex items-center justify-between rounded-lg bg-secondary/50 p-3 text-sm hover:bg-secondary transition-colors">
+                <div>
+                  <span className="font-medium text-primary">{inv.invoice_number}</span>
+                  <span className="text-muted-foreground ml-2">{inv.invoice_date}</span>
+                  <span className="text-muted-foreground ml-2">· {formatCAD(Number(inv.total ?? 0))}</span>
+                  {Number(inv.balance_due ?? 0) > 0 && (
+                    <span className="text-warning ml-2">· {formatCAD(Number(inv.balance_due))} due</span>
+                  )}
+                </div>
+                <StatusBadge label={inv.status} variant={inv.status === "Paid" ? "valid" : inv.status === "Overdue" || inv.status === "Void" ? "error" : "info"} />
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
