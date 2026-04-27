@@ -375,6 +375,11 @@ export function runAllocation(
     if (a.eligibilityStatus !== b.eligibilityStatus) {
       return a.eligibilityStatus === "Eligible" ? -1 : 1;
     }
+    // Proximity-first ordering among eligible: closest SP wins.
+    // Null distances go last so SPs with known coords always beat unknowns.
+    const aDist = a.distKm ?? Number.POSITIVE_INFINITY;
+    const bDist = b.distKm ?? Number.POSITIVE_INFINITY;
+    if (aDist !== bDist) return aDist - bDist;
     return b.finalScore - a.finalScore;
   });
 
