@@ -504,6 +504,8 @@ function PayoutPreview({
   spPct: number;
 }) {
   const { data: expenses = [] } = useSPExpenses(spId);
+  const { data: settings } = useAppSettings();
+  const subscriptionFee = settings?.defaultSubscriptionFeeMonthly ?? 0;
   const [sample, setSample] = useState<string>("100");
   const invoice = Number(sample) || 0;
 
@@ -520,9 +522,12 @@ function PayoutPreview({
   const expenseDeduction = round2((grossSp * activePctTotal) / 100);
   const finalSp = round2(grossSp - expenseDeduction);
 
-  const monthlyFixed = expenses.filter(
-    (e) => e.active && e.expenseType === "monthly_fixed",
-  );
+  const monthlyFixed = [
+    { id: "__global_subscription__", name: "Subscription (global)", value: subscriptionFee },
+    ...expenses
+      .filter((e) => e.active && e.expenseType === "monthly_fixed")
+      .map((e) => ({ id: e.id, name: e.name, value: e.value })),
+  ];
   const monthlyTotal = monthlyFixed.reduce((s, e) => s + e.value, 0);
 
   return (
