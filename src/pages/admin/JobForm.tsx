@@ -104,6 +104,8 @@ export default function JobForm() {
     isBroadcast: false,
     broadcastRadiusKm: "100",
     broadcastNote: "",
+    marketingRecipient: "Winducks",
+    marketingRecipientName: "",
   });
 
   const [serviceItems, setServiceItems] = useState<ServiceLineItem[]>([
