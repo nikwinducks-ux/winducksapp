@@ -203,6 +203,7 @@ export type Database = {
           id: number
           next_estimate_number: number
           next_invoice_number: number
+          payment_instructions: string
           updated_at: string
         }
         Insert: {
@@ -221,6 +222,7 @@ export type Database = {
           id?: number
           next_estimate_number?: number
           next_invoice_number?: number
+          payment_instructions?: string
           updated_at?: string
         }
         Update: {
@@ -239,6 +241,7 @@ export type Database = {
           id?: number
           next_estimate_number?: number
           next_invoice_number?: number
+          payment_instructions?: string
           updated_at?: string
         }
         Relationships: []
@@ -407,75 +410,182 @@ export type Database = {
       }
       customer_invoices: {
         Row: {
+          amount_paid: number
+          archived_at: string | null
+          assigned_sp_id: string | null
+          balance_due: number
+          billing_address_city: string
+          billing_address_country: string
+          billing_address_postal: string
+          billing_address_region: string
+          billing_address_street: string
+          billing_same_as_service: boolean
           created_at: string
           created_by_user_id: string | null
+          customer_facing_notes: string
           customer_id: string | null
+          deposit_applied: number
+          discount_total: number
+          due_date: string | null
           id: string
+          internal_notes: string
+          invoice_date: string
           invoice_number: string
           job_id: string | null
           notes: string
           paid_at: string | null
           paid_by_user_id: string | null
+          parent_invoice_id: string | null
           payment_method: string
           payment_reference: string
           payment_terms: string
+          payment_terms_days: number
           pdf_storage_path: string
+          products_subtotal: number
+          selected_package_id: string | null
           sent_at: string | null
+          sent_by_user_id: string | null
+          service_address_city: string
+          service_address_country: string
+          service_address_postal: string
+          service_address_region: string
+          service_address_street: string
+          services_subtotal: number
           share_token: string
+          snapshot_json: Json | null
+          source_estimate_id: string | null
+          source_estimate_package_id: string | null
           status: string
           subtotal: number
           tax_amount: number
           tax_pct: number
+          terms: string
           total: number
           updated_at: string
+          viewed_at: string | null
+          voided_at: string | null
         }
         Insert: {
+          amount_paid?: number
+          archived_at?: string | null
+          assigned_sp_id?: string | null
+          balance_due?: number
+          billing_address_city?: string
+          billing_address_country?: string
+          billing_address_postal?: string
+          billing_address_region?: string
+          billing_address_street?: string
+          billing_same_as_service?: boolean
           created_at?: string
           created_by_user_id?: string | null
+          customer_facing_notes?: string
           customer_id?: string | null
+          deposit_applied?: number
+          discount_total?: number
+          due_date?: string | null
           id?: string
+          internal_notes?: string
+          invoice_date?: string
           invoice_number: string
           job_id?: string | null
           notes?: string
           paid_at?: string | null
           paid_by_user_id?: string | null
+          parent_invoice_id?: string | null
           payment_method?: string
           payment_reference?: string
           payment_terms?: string
+          payment_terms_days?: number
           pdf_storage_path?: string
+          products_subtotal?: number
+          selected_package_id?: string | null
           sent_at?: string | null
+          sent_by_user_id?: string | null
+          service_address_city?: string
+          service_address_country?: string
+          service_address_postal?: string
+          service_address_region?: string
+          service_address_street?: string
+          services_subtotal?: number
           share_token?: string
+          snapshot_json?: Json | null
+          source_estimate_id?: string | null
+          source_estimate_package_id?: string | null
           status?: string
           subtotal?: number
           tax_amount?: number
           tax_pct?: number
+          terms?: string
           total?: number
           updated_at?: string
+          viewed_at?: string | null
+          voided_at?: string | null
         }
         Update: {
+          amount_paid?: number
+          archived_at?: string | null
+          assigned_sp_id?: string | null
+          balance_due?: number
+          billing_address_city?: string
+          billing_address_country?: string
+          billing_address_postal?: string
+          billing_address_region?: string
+          billing_address_street?: string
+          billing_same_as_service?: boolean
           created_at?: string
           created_by_user_id?: string | null
+          customer_facing_notes?: string
           customer_id?: string | null
+          deposit_applied?: number
+          discount_total?: number
+          due_date?: string | null
           id?: string
+          internal_notes?: string
+          invoice_date?: string
           invoice_number?: string
           job_id?: string | null
           notes?: string
           paid_at?: string | null
           paid_by_user_id?: string | null
+          parent_invoice_id?: string | null
           payment_method?: string
           payment_reference?: string
           payment_terms?: string
+          payment_terms_days?: number
           pdf_storage_path?: string
+          products_subtotal?: number
+          selected_package_id?: string | null
           sent_at?: string | null
+          sent_by_user_id?: string | null
+          service_address_city?: string
+          service_address_country?: string
+          service_address_postal?: string
+          service_address_region?: string
+          service_address_street?: string
+          services_subtotal?: number
           share_token?: string
+          snapshot_json?: Json | null
+          source_estimate_id?: string | null
+          source_estimate_package_id?: string | null
           status?: string
           subtotal?: number
           tax_amount?: number
           tax_pct?: number
+          terms?: string
           total?: number
           updated_at?: string
+          viewed_at?: string | null
+          voided_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "customer_invoices_parent_invoice_id_fkey"
+            columns: ["parent_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "customer_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       customer_properties: {
         Row: {
@@ -1117,6 +1227,312 @@ export type Database = {
           viewed_at?: string | null
         }
         Relationships: []
+      }
+      invoice_applied_codes: {
+        Row: {
+          amount_applied: number
+          applied_at: string
+          applies_to: string
+          code_snapshot: string
+          discount_code_id: string | null
+          id: string
+          invoice_id: string
+          kind: string
+          value: number
+        }
+        Insert: {
+          amount_applied?: number
+          applied_at?: string
+          applies_to?: string
+          code_snapshot?: string
+          discount_code_id?: string | null
+          id?: string
+          invoice_id: string
+          kind?: string
+          value?: number
+        }
+        Update: {
+          amount_applied?: number
+          applied_at?: string
+          applies_to?: string
+          code_snapshot?: string
+          discount_code_id?: string | null
+          id?: string
+          invoice_id?: string
+          kind?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_applied_codes_discount_code_id_fkey"
+            columns: ["discount_code_id"]
+            isOneToOne: false
+            referencedRelation: "discount_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_applied_codes_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "customer_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_discounts: {
+        Row: {
+          created_at: string
+          id: string
+          invoice_id: string
+          kind: string
+          line_item_id: string | null
+          package_id: string | null
+          reason: string
+          scope: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invoice_id: string
+          kind?: string
+          line_item_id?: string | null
+          package_id?: string | null
+          reason?: string
+          scope?: string
+          value?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          kind?: string
+          line_item_id?: string | null
+          package_id?: string | null
+          reason?: string
+          scope?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_discounts_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "customer_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_discounts_line_item_id_fkey"
+            columns: ["line_item_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_line_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_discounts_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_events: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          customer_ip: string
+          details: Json
+          event_type: string
+          id: string
+          invoice_id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          customer_ip?: string
+          details?: Json
+          event_type: string
+          id?: string
+          invoice_id: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          customer_ip?: string
+          details?: Json
+          event_type?: string
+          id?: string
+          invoice_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_events_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "customer_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_line_items: {
+        Row: {
+          catalog_ref_id: string | null
+          created_at: string
+          description: string
+          discount_allowed: boolean
+          display_order: number
+          id: string
+          image_url: string
+          is_optional: boolean
+          is_selected: boolean
+          item_type: string
+          name: string
+          package_id: string
+          quantity: number
+          taxable: boolean
+          unit_price: number
+        }
+        Insert: {
+          catalog_ref_id?: string | null
+          created_at?: string
+          description?: string
+          discount_allowed?: boolean
+          display_order?: number
+          id?: string
+          image_url?: string
+          is_optional?: boolean
+          is_selected?: boolean
+          item_type?: string
+          name?: string
+          package_id: string
+          quantity?: number
+          taxable?: boolean
+          unit_price?: number
+        }
+        Update: {
+          catalog_ref_id?: string | null
+          created_at?: string
+          description?: string
+          discount_allowed?: boolean
+          display_order?: number
+          id?: string
+          image_url?: string
+          is_optional?: boolean
+          is_selected?: boolean
+          item_type?: string
+          name?: string
+          package_id?: string
+          quantity?: number
+          taxable?: boolean
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_line_items_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_packages: {
+        Row: {
+          created_at: string
+          description: string
+          display_order: number
+          id: string
+          invoice_id: string
+          is_recommended: boolean
+          is_selected: boolean
+          name: string
+          package_discount_kind: string
+          package_discount_reason: string
+          package_discount_value: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          display_order?: number
+          id?: string
+          invoice_id: string
+          is_recommended?: boolean
+          is_selected?: boolean
+          name?: string
+          package_discount_kind?: string
+          package_discount_reason?: string
+          package_discount_value?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          display_order?: number
+          id?: string
+          invoice_id?: string
+          is_recommended?: boolean
+          is_selected?: boolean
+          name?: string
+          package_discount_kind?: string
+          package_discount_reason?: string
+          package_discount_value?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_packages_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "customer_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          invoice_id: string
+          method: string
+          notes: string
+          payment_date: string
+          recorded_by_user_id: string | null
+          reference: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          invoice_id: string
+          method?: string
+          notes?: string
+          payment_date?: string
+          recorded_by_user_id?: string | null
+          reference?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          method?: string
+          notes?: string
+          payment_date?: string
+          recorded_by_user_id?: string | null
+          reference?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "customer_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       job_assignments: {
         Row: {
@@ -2269,8 +2685,29 @@ export type Database = {
         Returns: undefined
       }
       accept_offer: { Args: { _offer_id: string }; Returns: Json }
+      add_invoice_manual_discount: {
+        Args: {
+          _invoice_id: string
+          _kind: string
+          _line_item_id?: string
+          _package_id?: string
+          _reason?: string
+          _scope: string
+          _value: number
+        }
+        Returns: string
+      }
       apply_discount_code: {
         Args: { _code: string; _estimate_id: string }
+        Returns: Json
+      }
+      apply_invoice_discount_code: {
+        Args: { _code: string; _invoice_id: string }
+        Returns: Json
+      }
+      archive_invoice: { Args: { _invoice_id: string }; Returns: Json }
+      convert_estimate_to_invoice: {
+        Args: { _estimate_id: string }
         Returns: Json
       }
       convert_estimate_to_job: {
@@ -2284,6 +2721,15 @@ export type Database = {
           _customer_id?: string
           _customer_property_id?: string
           _job_id?: string
+        }
+        Returns: Json
+      }
+      create_invoice: {
+        Args: {
+          _assigned_sp_id?: string
+          _customer_id?: string
+          _job_id?: string
+          _parent_invoice_id?: string
         }
         Returns: Json
       }
@@ -2315,6 +2761,10 @@ export type Database = {
         Args: { _package_id: string }
         Returns: string
       }
+      duplicate_invoice_package: {
+        Args: { _package_id: string }
+        Returns: string
+      }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
@@ -2342,6 +2792,7 @@ export type Database = {
         Returns: Json
       }
       mark_estimate_sent: { Args: { _estimate_id: string }; Returns: Json }
+      mark_invoice_viewed_by_token: { Args: { _token: string }; Returns: Json }
       move_to_dlq: {
         Args: {
           dlq_name: string
@@ -2361,8 +2812,23 @@ export type Database = {
           read_ct: number
         }[]
       }
+      record_invoice_payment: {
+        Args: {
+          _amount: number
+          _invoice_id: string
+          _method?: string
+          _notes?: string
+          _payment_date?: string
+          _reference?: string
+        }
+        Returns: Json
+      }
       record_job_deposit: {
         Args: { _amount: number; _job_id: string; _method?: string }
+        Returns: Json
+      }
+      remove_invoice_applied_code: {
+        Args: { _applied_id: string }
         Returns: Json
       }
       sp_eligible_for_broadcast_job: {
@@ -2391,6 +2857,11 @@ export type Database = {
           _quality: number
           _token: string
         }
+        Returns: Json
+      }
+      unarchive_invoice: { Args: { _invoice_id: string }; Returns: Json }
+      void_invoice: {
+        Args: { _invoice_id: string; _reason?: string }
         Returns: Json
       }
     }
