@@ -1940,6 +1940,13 @@ export function useAppSettings() {
         defaultMarketingPct: Number(d.default_marketing_pct ?? 20),
         defaultSpPortionPct: Number(d.default_sp_portion_pct ?? 65),
         defaultSubscriptionFeeMonthly: Number(d.default_subscription_fee_monthly ?? 0),
+        defaultTaxPct: Number(d.default_tax_pct ?? 5),
+        defaultPaymentTerms: String(d.default_payment_terms ?? "Payment due within 15 days."),
+        companyName: String(d.company_name ?? ""),
+        companyAddress: String(d.company_address ?? ""),
+        companyEmail: String(d.company_email ?? ""),
+        companyPhone: String(d.company_phone ?? ""),
+        companyLogoUrl: String(d.company_logo_url ?? ""),
       };
     },
   });
