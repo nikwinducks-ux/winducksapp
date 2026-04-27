@@ -127,6 +127,11 @@ export default function SPCompensationTab({ spId, readOnly = false }: Props) {
                 label="Global Platform Fee %"
                 value={platform}
                 onChange={setPlatform}
+                hint={
+                  platformUsesDefault
+                    ? `Default ${defaults.platform}% from Payouts. Saving will create a per-SP override.`
+                    : "Per-SP override. Clear by matching the global default on the Payouts page."
+                }
               />
               <PctInput
                 label="Marketing %"
