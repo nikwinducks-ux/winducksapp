@@ -112,7 +112,11 @@ export default function SPCompensationTab({ spId, readOnly = false }: Props) {
 
         {!editing ? (
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Global Platform Fee %" value={`${effective.platform}%`} />
+            <Field
+              label="Global Platform Fee %"
+              value={`${effective.platform}%`}
+              hint={platformUsesDefault ? "Global default — set on Payouts page" : "Per-SP override"}
+            />
             <Field label="Marketing %" value={`${effective.marketing}%`} />
             <Field label="Service Provider Portion %" value={`${effective.sp}%`} />
           </div>
