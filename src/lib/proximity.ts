@@ -54,8 +54,14 @@ export function computeProximityResult(spAddr: Address, jobAddr: Address): Proxi
   if (addressesMatch(spAddr, jobAddr)) {
     return { distanceKm: 0, score: 100, source: "address_match" };
   }
-  // 3. No data available
-  return { distanceKm: null, score: 50, source: "fallback" };
+  // 3. Same-city fallback when coords are missing
+  const spCity = normalizeAddr(spAddr.city);
+  const jobCity = normalizeAddr(jobAddr.city);
+  if (spCity && jobCity && spCity === jobCity) {
+    return { distanceKm: null, score: 80, source: "fallback" };
+  }
+  // 4. No usable signal — different city or unknown
+  return { distanceKm: null, score: 0, source: "fallback" };
 }
 
 // Proximity score mapping: closer = higher score
@@ -83,7 +89,7 @@ export function proximityScore(distanceKm: number): number {
 }
 
 export const PROXIMITY_TOOLTIP =
-  "Proximity scoring: 0km = 100, 10km = 90, 25km = 70, 50km = 40, 75km = 10, >75km = 0. Calculated using straight-line (Haversine) distance between SP base address and job location. When coordinates are missing, exact address match = 0km/100%.";
+  "Proximity scoring: 0km = 100, 10km = 90, 25km = 70, 50km = 40, 75km = 10, >75km = 0. Calculated using straight-line (Haversine) distance between SP base and job. When coordinates are missing: same-city fallback = 80, exact address match = 100, different city = 0.";
 
 export const DISTANCE_SOURCE_LABELS: Record<DistanceSource, string> = {
   coordinates: "Coordinates",
