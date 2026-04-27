@@ -1912,8 +1912,12 @@ export function useAppSettings() {
     queryFn: async () => {
       const { data, error } = await supabase.from("app_settings" as any).select("*").eq("id", 1).maybeSingle();
       if (error) throw error;
+      const d: any = data ?? {};
       return {
-        defaultPayoutFeePercent: Number((data as any)?.default_payout_fee_percent ?? 0),
+        defaultPayoutFeePercent: Number(d.default_payout_fee_percent ?? 0),
+        defaultPlatformFeePct: Number(d.default_platform_fee_pct ?? 15),
+        defaultMarketingPct: Number(d.default_marketing_pct ?? 20),
+        defaultSpPortionPct: Number(d.default_sp_portion_pct ?? 65),
       };
     },
   });
@@ -1923,10 +1927,18 @@ export function useUpdateAppSettings() {
   const qc = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: async (params: { defaultPayoutFeePercent: number }) => {
-      const { error } = await supabase
-        .from("app_settings" as any)
-        .upsert({ id: 1, default_payout_fee_percent: params.defaultPayoutFeePercent });
+    mutationFn: async (params: {
+      defaultPayoutFeePercent?: number;
+      defaultPlatformFeePct?: number;
+      defaultMarketingPct?: number;
+      defaultSpPortionPct?: number;
+    }) => {
+      const patch: any = { id: 1 };
+      if (params.defaultPayoutFeePercent != null) patch.default_payout_fee_percent = params.defaultPayoutFeePercent;
+      if (params.defaultPlatformFeePct != null) patch.default_platform_fee_pct = params.defaultPlatformFeePct;
+      if (params.defaultMarketingPct != null) patch.default_marketing_pct = params.defaultMarketingPct;
+      if (params.defaultSpPortionPct != null) patch.default_sp_portion_pct = params.defaultSpPortionPct;
+      const { error } = await supabase.from("app_settings" as any).upsert(patch);
       if (error) throw error;
     },
     onSuccess: () => {
