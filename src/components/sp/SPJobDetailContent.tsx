@@ -9,11 +9,13 @@ import { JobServicesDisplay } from "@/components/JobServicesDisplay";
 import { JobPhotosCard } from "@/components/JobPhotosCard";
 import { CrewTeammates } from "@/components/sp/CrewTeammates";
 import { JobVisitsCard } from "@/components/sp/JobVisitsCard";
+import { JobScheduledVisitsCard } from "@/components/sp/JobScheduledVisitsCard";
 import {
   useServiceProviders,
   useActiveServiceCategories,
   useServiceCategories,
   useJobCrew,
+  useReopenJob,
 } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { computeProximityResult, DISTANCE_SOURCE_LABELS } from "@/lib/proximity";
