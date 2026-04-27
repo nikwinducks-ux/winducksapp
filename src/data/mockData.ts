@@ -119,6 +119,7 @@ export interface Job {
   broadcastNote?: string;
   services?: JobService[];
   completedAt?: string;
+  createdAt?: string;
   crew?: { spId: string; isLead: boolean }[];
   payoutShare?: number;
 }

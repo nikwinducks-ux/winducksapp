@@ -72,7 +72,7 @@ export default function JobManagement() {
   const [search, setSearch] = useState("");
   const [urgencyFilter, setUrgencyFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("default");
+  const [sortBy, setSortBy] = useState("recent");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string[] | null>(null);
@@ -150,6 +150,8 @@ export default function JobManagement() {
     filtered = [...filtered].sort((a, b) => (URGENCY_PRIORITY[a.urgency || "Scheduled"] ?? 2) - (URGENCY_PRIORITY[b.urgency || "Scheduled"] ?? 2));
   } else if (sortBy === "scheduled") {
     filtered = [...filtered].sort((a, b) => (a.scheduledDate || "").localeCompare(b.scheduledDate || ""));
+  } else if (sortBy === "recent") {
+    filtered = [...filtered].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
   }
 
   const visibleIds = useMemo(() => filtered.map((j) => j.dbId), [filtered]);
@@ -665,6 +667,7 @@ export default function JobManagement() {
         <Select value={sortBy} onValueChange={setSortBy}>
           <SelectTrigger className="w-[160px]"><SelectValue placeholder="Sort by" /></SelectTrigger>
           <SelectContent>
+            <SelectItem value="recent">Recently Created</SelectItem>
             <SelectItem value="default">Default</SelectItem>
             <SelectItem value="urgency">Urgency Priority</SelectItem>
             <SelectItem value="scheduled">Scheduled Date</SelectItem>
