@@ -261,6 +261,22 @@ function checkEligibility(
     return { eligible: false, reason: `Outside radius (${distKm}km > ${effectiveRadius}km)` };
   }
 
+  // When coordinates are missing on either side, fall back to a same-city
+  // (or matching postal-prefix) check. Otherwise every distant SP would
+  // silently slip through the radius cap.
+  if (distKm === null) {
+    const spCity = (sp.baseAddress.city || "").trim().toLowerCase();
+    const jobCity = (job.jobAddress.city || "").trim().toLowerCase();
+    const spPostal = (sp.baseAddress.postalCode || "").trim().toUpperCase().slice(0, 3);
+    const jobPostal = (job.jobAddress.postalCode || "").trim().toUpperCase().slice(0, 3);
+    if (!spCity || !jobCity) {
+      return { eligible: false, reason: "Unknown distance (missing coordinates and city)" };
+    }
+    if (spCity !== jobCity && (!spPostal || !jobPostal || spPostal !== jobPostal)) {
+      return { eligible: false, reason: `Different city (${sp.baseAddress.city} vs ${job.jobAddress.city})` };
+    }
+  }
+
   // Time off block check (hard exclusion when job has scheduled date+time)
   if (jobOverlapsAnyBlock(job, sp.id, unavailableMap)) {
     return { eligible: false, reason: "Time off blocked" };
