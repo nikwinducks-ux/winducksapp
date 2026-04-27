@@ -103,9 +103,31 @@ export default function Payouts() {
                 <Save className="h-4 w-4" /> Save
               </Button>
               <p className="text-xs text-muted-foreground">Currently: {currentMarketing}%</p>
+          </div>
+          <div className="space-y-2 rounded-md border p-3">
+            <Label>Default monthly subscription fee ($/mo, applies to all SPs)</Label>
+            <div className="flex flex-wrap items-center gap-3">
+              <Input
+                type="number" step="0.01" min="0"
+                value={subscriptionInput !== "" ? subscriptionInput : String(currentSubscription)}
+                onChange={(e) => setSubscriptionInput(e.target.value)}
+                className="w-40"
+              />
+              <Button
+                onClick={() => updateSettings.mutate(
+                  { defaultSubscriptionFeeMonthly: Number(subscriptionInput || currentSubscription) },
+                  { onSuccess: () => setSubscriptionInput("") },
+                )}
+                disabled={updateSettings.isPending}
+                className="gap-1.5"
+              >
+                <Save className="h-4 w-4" /> Save
+              </Button>
+              <p className="text-xs text-muted-foreground">Currently: {formatCAD(currentSubscription)}/mo</p>
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
