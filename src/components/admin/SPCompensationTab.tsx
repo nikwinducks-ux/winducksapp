@@ -56,6 +56,7 @@ export default function SPCompensationTab({ spId, readOnly = false }: Props) {
     sp?.compPlatformFeePct == null &&
     sp?.compMarketingPct == null &&
     sp?.compSpPortionPct == null;
+  const platformUsesDefault = sp?.compPlatformFeePct == null;
 
   // Edit state
   const [editing, setEditing] = useState(false);
@@ -111,7 +112,11 @@ export default function SPCompensationTab({ spId, readOnly = false }: Props) {
 
         {!editing ? (
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Global Platform Fee %" value={`${effective.platform}%`} />
+            <Field
+              label="Global Platform Fee %"
+              value={`${effective.platform}%`}
+              hint={platformUsesDefault ? "Global default — set on Payouts page" : "Per-SP override"}
+            />
             <Field label="Marketing %" value={`${effective.marketing}%`} />
             <Field label="Service Provider Portion %" value={`${effective.sp}%`} />
           </div>
@@ -122,6 +127,11 @@ export default function SPCompensationTab({ spId, readOnly = false }: Props) {
                 label="Global Platform Fee %"
                 value={platform}
                 onChange={setPlatform}
+                hint={
+                  platformUsesDefault
+                    ? `Default ${defaults.platform}% from Payouts. Saving will create a per-SP override.`
+                    : "Per-SP override. Clear by matching the global default on the Payouts page."
+                }
               />
               <PctInput
                 label="Marketing %"
@@ -174,11 +184,12 @@ export default function SPCompensationTab({ spId, readOnly = false }: Props) {
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div>
       <p className="text-xs text-muted-foreground mb-1">{label}</p>
       <p className="text-lg font-semibold">{value}</p>
+      {hint && <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   );
 }
@@ -187,10 +198,12 @@ function PctInput({
   label,
   value,
   onChange,
+  hint,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  hint?: string;
 }) {
   return (
     <div className="space-y-1.5">
@@ -203,6 +216,7 @@ function PctInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   );
 }
