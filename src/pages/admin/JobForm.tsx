@@ -420,8 +420,37 @@ export default function JobForm() {
               );
             })()}
             <div className="space-y-1.5">
-              <Label>Amount <span className="text-xs text-muted-foreground">(CAD — auto-calculated from services if empty)</span></Label>
+              <Label>Total Invoice <span className="text-xs text-muted-foreground">(CAD — what the customer pays. Auto-calculated from services if empty)</span></Label>
               <Input type="number" min="0" step="0.01" value={form.payout} onChange={(e) => update("payout", e.target.value)} placeholder={computedTotal > 0 ? `Auto: ${formatCAD(computedTotal)}` : "0.00"} />
+              <p className="text-[11px] text-muted-foreground">
+                The Winducks platform fee, marketing portion, and SP portion are all derived from this total
+                using the assigned SP's compensation split. See the breakdown on the Job Detail page.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Marketing portion goes to</Label>
+              <Select
+                value={form.marketingRecipient}
+                onValueChange={(v) => update("marketingRecipient", v)}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Winducks">Winducks</SelectItem>
+                  <SelectItem value="SP">Service Provider</SelectItem>
+                  <SelectItem value="Third-party">Third-party</SelectItem>
+                </SelectContent>
+              </Select>
+              {form.marketingRecipient === "Third-party" && (
+                <Input
+                  className="mt-1.5"
+                  placeholder="Third-party name (e.g. referral partner)"
+                  value={form.marketingRecipientName}
+                  onChange={(e) => update("marketingRecipientName", e.target.value)}
+                />
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Determines who receives the marketing % of the invoice. Defaults to Winducks.
+              </p>
             </div>
           </div>
         </div>
