@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatCAD } from "@/lib/currency";
+import { formatCAD, formatCADWhole } from "@/lib/currency";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   addDays, addMonths, addWeeks, format, startOfWeek, endOfWeek,
