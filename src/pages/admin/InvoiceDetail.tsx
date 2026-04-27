@@ -593,6 +593,8 @@ export default function InvoiceDetail() {
         </div>
       )}
 
+      <ActivityTimelineCard events={timeline} loading={timelineLoading} emptyMessage="No invoice activity yet." />
+
       <RecordPaymentDialog
         open={paymentDialog} onOpenChange={setPaymentDialog}
         invoiceId={invoice.id} balanceDue={totals.balanceDue}
