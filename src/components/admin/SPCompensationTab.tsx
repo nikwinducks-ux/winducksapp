@@ -118,7 +118,11 @@ export default function SPCompensationTab({ spId, readOnly = false }: Props) {
               value={`${effective.platform}%`}
               hint={platformUsesDefault ? "Global default — set on Payouts page" : "Per-SP override"}
             />
-            <Field label="Marketing %" value={`${effective.marketing}%`} />
+            <Field
+              label="Marketing %"
+              value={`${effective.marketing}%`}
+              hint={marketingUsesDefault ? "Global default — set on Payouts page" : "Per-SP override"}
+            />
             <Field label="Service Provider Portion %" value={`${effective.sp}%`} />
           </div>
         ) : (
