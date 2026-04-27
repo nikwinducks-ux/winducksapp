@@ -22,6 +22,8 @@ import { JobPhotosCard } from "@/components/JobPhotosCard";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { CrewPicker } from "@/components/admin/CrewPicker";
+import { useConvertJobToInvoice } from "@/hooks/useCustomerInvoices";
+import { useNavigate } from "react-router-dom";
 
 function ScheduleDisplay({ job }: { job: any }) {
   const urgency = job.urgency || "Scheduled";
