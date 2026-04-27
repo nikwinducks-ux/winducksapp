@@ -24,7 +24,7 @@ export function ConvertEstimateDialog({
   const convert = useConvertEstimateToJob();
   const { data: estimate } = useEstimate(estimateId);
   const acceptedPkgId = estimate?.accepted_package_id ?? null;
-  const { data: items = [] } = useEstimateLineItems(acceptedPkgId ?? undefined);
+  const { data: items = [] } = useEstimateLineItems(acceptedPkgId ? [acceptedPkgId] : []);
 
   const candidateJobs = jobs.filter((j) => j.customerId === customerId);
   const selectedItems = items.filter((i) => i.is_selected);
