@@ -1,66 +1,115 @@
-## Diagnosis
+# Compensation Tab — Flexible Structure with Expenses
 
-I traced JOB-1038 in the database. The root cause isn't the weights — it's missing coordinates and a soft fallback rule that lets distant SPs slip through.
+Add a new **Compensation** tab to the Service Provider profile (`SPDetail.tsx`) that lets Owner/Admin configure a per-SP compensation breakdown plus a list of expenses. Service Providers see the same tab in read-only mode (in their `AccountPage`). All settings apply only to **future** completed jobs — existing invoices are untouched.
 
-**What I found:**
-- **JOB-1038**: Edmonton, AB · `job_lat = NULL`, `job_lng = NULL`
-- **SP A**: Edmonton · `base_lat = NULL`, `base_lng = NULL`, radius 30 km
-- **Robert Kim** (assigned, AutoAccept): Calgary · has coords, radius 45 km
-- Offers were sent to 3 **Calgary** SPs (Robert Kim, Sarah Chen, Mike Thompson). **SP A was never offered the job.**
+## Compensation Model
 
-**Why SP A lost despite being in the same city:**
+Each SP gets three percentage fields that must sum to **100%**:
+- **Global Platform Fee %** (e.g. 15)
+- **Marketing %** (e.g. 20)
+- **Service Provider Portion %** (e.g. 65)
 
-1. The Edmonton address has no lat/lng — `coord-autofill.ts` only knows Calgary metro cities (Calgary/Cochrane/Airdrie/Okotoks/Chestermere). Edmonton was never geocoded.
-2. In `src/lib/allocation-engine.ts` the proximity helper returns `{distKm: null, score: 50, source: "fallback"}` whenever either side is missing coords.
-3. The eligibility check (lines 255–262) only enforces the radius cap **when `distKm !== null`** — so with null distance, **every SP nationwide becomes "eligible"**, and proximity contributes a flat 50 to everyone.
-4. With proximity neutralized, ranking falls to rating/reliability/job-history etc. SP A loses to high-rated Calgary SPs and never makes the Top-N. Robert Kim then auto-accepts.
+Plus a list of **Expenses**, each with:
+- Name (e.g. "Insurance fee")
+- Type: `percent_of_sp` (deducted from SP portion per job) OR `monthly_fixed` (tracked monthly, not per-job)
+- Value (number)
+- Active toggle
 
-So "SPs within job radius should override all other weights" can't even be evaluated today because the system has no idea where the job is.
+## Per-Job Payout Math (applied at job completion)
 
-## Fix Plan
+```text
+gross           = job.payout
+platform_fee    = gross * platform_fee_pct / 100
+marketing       = gross * marketing_pct / 100
+gross_sp        = gross * sp_portion_pct / 100
+percent_expense = sum(active percent_of_sp expenses) / 100 * gross_sp
+net_sp          = gross_sp - percent_expense
+```
 
-### 1. Geocoding fallback (so distance can actually be computed)
+Monthly fixed expenses are NOT subtracted from per-job invoices — they appear only in the preview as a separate "monthly deductions" line and are stored for future monthly reporting.
 
-- **Expand `src/lib/coord-autofill.ts`** with major AB cities at minimum: Edmonton, Red Deer, Lethbridge, Medicine Hat, St. Albert, Sherwood Park, Fort McMurray, Grande Prairie. (Same preset+jitter pattern.)
-- **Auto-fill missing coords on Job save and SP save** in `src/pages/admin/JobForm.tsx` and `src/pages/admin/SPForm.tsx` if lat/lng are blank but city is recognised. (Pattern already exists — extend it.)
-- **One-time backfill migration**: update existing `jobs.job_lat/lng` and `service_providers.base_lat/lng` rows where coords are NULL but the city matches a known preset. (Data update via insert tool, not schema migration.)
+## Database changes (migration)
 
-### 2. Make "within radius" a true hard override
+Add columns to `service_providers`:
+- `comp_platform_fee_pct numeric` (nullable — falls back to app default when null)
+- `comp_marketing_pct numeric` (nullable)
+- `comp_sp_portion_pct numeric` (nullable)
 
-In `src/lib/allocation-engine.ts → checkEligibility`:
+New table `sp_compensation_expenses`:
+- `id uuid pk`, `sp_id uuid not null`, `name text`, `expense_type text check in ('percent_of_sp','monthly_fixed')`, `value numeric`, `active boolean default true`, `created_at`, `updated_at`
+- RLS: Admin/Owner full access; SP can SELECT own rows.
 
-- When `distKm === null` AND both job + SP have a city, fall back to a **same-city** check. If cities don't match (and postal-prefix doesn't match), exclude the SP. This mirrors what `sp_eligible_for_broadcast_job` already does in SQL but only applies it to the broadcast path.
-- When `distKm === null` and there is no city to compare, **mark SP as Excluded with reason "Unknown distance"** rather than silently treating everyone as eligible.
+Extend `app_settings` with global defaults so the system has fallbacks:
+- `default_platform_fee_pct numeric default 15`
+- `default_marketing_pct numeric default 20`
+- `default_sp_portion_pct numeric default 65`
 
-In `src/lib/proximity.ts`:
+Update the invoice-generation trigger `tg_generate_invoices_on_complete`:
+- Read SP comp percentages (fallback to app defaults).
+- Compute platform_fee, marketing, gross_sp.
+- Sum active `percent_of_sp` expenses, deduct from gross_sp → net_sp.
+- Store on `sp_invoices` via new columns: `platform_fee_amount`, `marketing_amount`, `gross_sp_amount`, `expense_deduction_amount`. Keep existing `gross_amount`/`fee_amount`/`net_amount` populated for backward compatibility (`fee_amount` = platform_fee + marketing for legacy Payouts UI; `net_amount` = net_sp).
+- Trigger only fires on the transition to `Completed`, so it naturally applies to future jobs only.
 
-- When falling back, give same-city pairs a high proximity score (e.g. 80) and different-city pairs 0, instead of a flat 50 for everyone. Document this in `PROXIMITY_TOOLTIP`.
+## Frontend changes
 
-### 3. Strong proximity preference among eligible SPs
+**`src/pages/admin/SPDetail.tsx`**
+- Add `<TabsTrigger value="compensation">Compensation</TabsTrigger>` after Performance.
+- Add `<TabsContent value="compensation">` rendering a new `<SPCompensationTab spId={sp.id} readOnly={false} />`.
 
-The user's intent: "SPs within job radius should override other weights." Rather than rebalancing every weight slider, add a **proximity-first tie-break** in `runAllocation`:
+**New `src/components/admin/SPCompensationTab.tsx`**
+Two cards matching the existing `metric-card` profile layout:
 
-- Among eligible candidates, sort by `distKm` ascending **first**, then by `finalScore` descending. SPs with NULL distance go last.
-- This guarantees the closest in-radius SP always wins, while still using the weighted score to break ties between equidistant candidates.
+1. **Compensation Split card**
+   - View mode: three labeled rows showing each % and a total. Edit/Save/Cancel buttons match SP profile pattern.
+   - Edit mode: three numeric inputs. Live-computed total badge:
+     - Green "Total: 100%" when valid
+     - Red "Total: 97% (must equal 100%)" otherwise
+   - Save disabled when total ≠ 100. On save, writes the three columns to `service_providers`.
 
-(Alternative considered: bumping the proximity weight in the active policy. Rejected because it's a soft preference — a far-away SP with a great rating could still win. The tie-break rule is deterministic.)
+2. **Expenses card**
+   - Table of expenses (Name · Type · Value · Active toggle · Edit · Delete).
+   - "Add expense" button opens an inline row / dialog with name, type select (Percentage of SP portion / Monthly fixed $), value, active.
+   - Admins can add/edit/delete and toggle active. SPs see read-only list.
 
-### 4. Admin Job form warning
+3. **Job Payout Preview card** (always visible)
+   - Input: "Sample invoice amount" (default $100).
+   - Renders breakdown table:
+     ```
+     Total invoice                 $100.00
+     − Global Platform Fee (15%)  −$15.00
+     − Marketing (20%)            −$20.00
+     = Gross SP portion            $65.00
+     − Expense deductions (8%)    −$5.20
+     = Final SP earnings           $59.80
+     ```
+   - Below the per-job block, a "Monthly fixed deductions" section lists each `monthly_fixed` expense with totals (informational, not deducted from job preview).
 
-In `src/pages/admin/JobForm.tsx`, if the saved job has no coordinates after autofill, show a yellow warning banner: *"This job has no coordinates — allocation will fall back to city matching, which is less accurate."* Lets admins fix it before broadcasting.
+**Read-only mode for SPs**
+- In `src/pages/sp/AccountPage.tsx`, add a Compensation section/tab using the same `SPCompensationTab` with `readOnly`. Hides edit buttons, add-expense button, and active toggles become static badges.
 
-## Files touched
+**Permissions**
+- Reuse existing pattern: Admin RLS on tables already enforces server-side. UI gates edit affordances with `useRole()` (`role === "admin"`).
 
-- `src/lib/coord-autofill.ts` — add Alberta cities
-- `src/lib/proximity.ts` — smarter fallback scoring
-- `src/lib/allocation-engine.ts` — hard same-city eligibility + proximity-first sort
-- `src/pages/admin/JobForm.tsx` — autofill on save + missing-coords banner
-- `src/pages/admin/SPForm.tsx` — autofill on save
-- One data backfill (insert tool) for existing NULL-coord rows
-- Re-run allocation for JOB-1038 is **not** automatic — the user can re-broadcast after the fix to see SP A surface
+## Hooks (in `src/hooks/useSupabaseData.ts`)
 
-## Out of scope
+- `useSPCompensation(spId)` — selects the three pct columns from `service_providers` plus app-settings defaults.
+- `useUpdateSPCompensation()` — mutation patching the three columns.
+- `useSPExpenses(spId)` / `useUpsertSPExpense()` / `useDeleteSPExpense()` — CRUD for `sp_compensation_expenses`.
+- Extend `useAppSettings` / `useUpdateAppSettings` to include the three new global default columns.
 
-- Real geocoding API integration (Mapbox/Google) — keeping the city-preset approach consistent with the existing prototype pattern.
-- Changing weight sliders or the policy schema.
-- Modifying the SQL `sp_eligible_for_broadcast_job` function — it already has a city-match fallback; the gap is purely on the client-side allocation engine.
+## Validation & Edge Cases
+
+- Percentages restricted to 0–100 numeric inputs; sum validated client-side and (optionally) via a CHECK trigger server-side.
+- If any of the three SP pct columns is null, fall back to app-settings defaults so older SPs keep working.
+- Expense value must be ≥ 0; for `percent_of_sp`, capped at 100.
+- The trigger only runs on the `Created/InProgress → Completed` transition, so already-Completed jobs and existing invoices are never recalculated.
+- Existing `Payouts.tsx` page continues to work because legacy `fee_percent`/`fee_amount`/`net_amount` columns stay populated.
+
+## Files Touched
+
+- New migration: schema columns, new table, RLS, updated invoice trigger.
+- `src/hooks/useSupabaseData.ts` — new hooks + extended app settings.
+- `src/pages/admin/SPDetail.tsx` — new tab.
+- `src/components/admin/SPCompensationTab.tsx` — new (single component, used by both admin and SP read-only).
+- `src/pages/sp/AccountPage.tsx` — embed read-only Compensation view.
