@@ -2086,3 +2086,178 @@ export function useDownloadSPComplianceDoc() {
     onError: (err: any) => toast({ title: "Couldn't open file", description: err.message, variant: "destructive" }),
   });
 }
+
+// ===== Job Scheduled Visits (follow-up visits) =====
+
+export interface JobScheduledVisit {
+  id: string;
+  jobId: string;
+  spId: string;
+  visitDate: string;          // YYYY-MM-DD
+  startTime: string;          // HH:MM
+  durationMin: number;
+  status: "Scheduled" | "Completed" | "Cancelled";
+  note: string;
+  createdAt: string;
+}
+
+function rowToScheduledVisit(r: any): JobScheduledVisit {
+  return {
+    id: r.id,
+    jobId: r.job_id,
+    spId: r.sp_id,
+    visitDate: r.visit_date,
+    startTime: r.start_time ?? "09:00",
+    durationMin: r.duration_min ?? 60,
+    status: (r.status ?? "Scheduled") as JobScheduledVisit["status"],
+    note: r.note ?? "",
+    createdAt: r.created_at,
+  };
+}
+
+export function useJobScheduledVisits(jobId: string | undefined) {
+  return useQuery({
+    queryKey: ["job_scheduled_visits", "job", jobId],
+    queryFn: async () => {
+      if (!jobId) return [] as JobScheduledVisit[];
+      const { data, error } = await supabase
+        .from("job_scheduled_visits" as any)
+        .select("*")
+        .eq("job_id", jobId)
+        .order("visit_date", { ascending: true })
+        .order("start_time", { ascending: true });
+      if (error) throw error;
+      return ((data ?? []) as any[]).map(rowToScheduledVisit);
+    },
+    enabled: !!jobId,
+  });
+}
+
+export function useSPScheduledVisits(spId: string | undefined | null) {
+  return useQuery({
+    queryKey: ["job_scheduled_visits", "sp", spId],
+    queryFn: async () => {
+      if (!spId) return [] as JobScheduledVisit[];
+      const { data, error } = await supabase
+        .from("job_scheduled_visits" as any)
+        .select("*")
+        .eq("sp_id", spId)
+        .neq("status", "Cancelled")
+        .order("visit_date", { ascending: true });
+      if (error) throw error;
+      return ((data ?? []) as any[]).map(rowToScheduledVisit);
+    },
+    enabled: !!spId,
+  });
+}
+
+export function useCreateScheduledVisit() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (params: {
+      jobId: string; spId: string; visitDate: string;
+      startTime: string; durationMin: number; note?: string;
+      userId?: string | null;
+    }) => {
+      const { data, error } = await supabase
+        .from("job_scheduled_visits" as any)
+        .insert({
+          job_id: params.jobId,
+          sp_id: params.spId,
+          visit_date: params.visitDate,
+          start_time: params.startTime,
+          duration_min: params.durationMin,
+          note: params.note ?? "",
+          created_by_user_id: params.userId ?? null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["job_scheduled_visits", "job", v.jobId] });
+      qc.invalidateQueries({ queryKey: ["job_scheduled_visits", "sp", v.spId] });
+      toast({ title: "Follow-up visit scheduled" });
+    },
+    onError: (err: any) => toast({ title: "Couldn't schedule visit", description: err.message, variant: "destructive" }),
+  });
+}
+
+export function useUpdateScheduledVisit() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (params: {
+      id: string; jobId: string; spId: string;
+      visitDate?: string; startTime?: string; durationMin?: number;
+      note?: string; status?: JobScheduledVisit["status"];
+    }) => {
+      const patch: any = {};
+      if (params.visitDate !== undefined) patch.visit_date = params.visitDate;
+      if (params.startTime !== undefined) patch.start_time = params.startTime;
+      if (params.durationMin !== undefined) patch.duration_min = params.durationMin;
+      if (params.note !== undefined) patch.note = params.note;
+      if (params.status !== undefined) patch.status = params.status;
+      const { error } = await supabase
+        .from("job_scheduled_visits" as any)
+        .update(patch)
+        .eq("id", params.id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["job_scheduled_visits", "job", v.jobId] });
+      qc.invalidateQueries({ queryKey: ["job_scheduled_visits", "sp", v.spId] });
+      toast({ title: "Visit updated" });
+    },
+    onError: (err: any) => toast({ title: "Update failed", description: err.message, variant: "destructive" }),
+  });
+}
+
+export function useDeleteScheduledVisit() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (params: { id: string; jobId: string; spId: string }) => {
+      const { error } = await supabase
+        .from("job_scheduled_visits" as any)
+        .delete()
+        .eq("id", params.id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["job_scheduled_visits", "job", v.jobId] });
+      qc.invalidateQueries({ queryKey: ["job_scheduled_visits", "sp", v.spId] });
+      toast({ title: "Visit removed" });
+    },
+    onError: (err: any) => toast({ title: "Delete failed", description: err.message, variant: "destructive" }),
+  });
+}
+
+export function useReopenJob() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (params: { jobDbId: string; spId: string; oldStatus: string }) => {
+      const { error: jobErr } = await supabase
+        .from("jobs")
+        .update({ status: "Assigned" })
+        .eq("id", params.jobDbId);
+      if (jobErr) throw jobErr;
+      const { error: evtErr } = await supabase.from("job_status_events").insert({
+        job_id: params.jobDbId,
+        old_status: params.oldStatus,
+        new_status: "Assigned",
+        changed_by_sp_id: params.spId,
+        note: "Re-opened by SP",
+      });
+      if (evtErr) console.error("Reopen audit error:", evtErr);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      toast({ title: "Job re-opened" });
+    },
+    onError: (err: any) => toast({ title: "Re-open failed", description: err.message, variant: "destructive" }),
+  });
+}
