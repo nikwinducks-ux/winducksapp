@@ -61,11 +61,16 @@ export default function SPCalendar() {
   const [optimisticAcceptedJobId, setOptimisticAcceptedJobId] = useState<string | null>(null);
   // Always read live job from refetched jobs list so the sheet reflects the
   // current status (e.g. "Assigned" right after the SP accepts an offer).
+  const setSelectedJob = (j: Job | null) => {
+    if (!j) { setSelectedJobId(null); return; }
+    // Strip synthetic follow-up suffix so the sheet opens the real job
+    const realId = j.dbId.split("__visit__")[0];
+    setSelectedJobId(realId);
+  };
   const selectedJob = useMemo<Job | null>(
     () => (selectedJobId ? jobs.find((j) => j.dbId === selectedJobId) ?? null : null),
     [selectedJobId, jobs]
   );
-  const setSelectedJob = (j: Job | null) => setSelectedJobId(j?.dbId ?? null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogInitial, setDialogInitial] = useState<UnavailableDialogValue | null>(null);
 
@@ -78,14 +83,39 @@ export default function SPCalendar() {
 
   // Filter: scheduled + (assigned to me OR on crew OR I have a pending offer)
   const myCalendarJobs = useMemo(() => {
-    return jobs.filter((j) => {
+    const baseJobs = jobs.filter((j) => {
       if (j.urgency !== "Scheduled" || !j.scheduledDate) return false;
       if (j.assignedSpId === spId) return true;
       if (j.crew?.some((c) => c.spId === spId)) return true;
       if (pendingOfferJobIds.has(j.dbId)) return true;
       return false;
     });
-  }, [jobs, spId, pendingOfferJobIds]);
+
+    // Build synthetic Job entries for each scheduled follow-up visit so they
+    // appear on the calendar alongside the original job.
+    const jobByDbId = new Map(jobs.map((j) => [j.dbId, j]));
+    const followupJobs: Job[] = [];
+    for (const v of scheduledVisits) {
+      const parent = jobByDbId.get(v.jobId);
+      if (!parent) continue;
+      const hours = v.durationMin / 60;
+      const durationLabel = hours >= 1 && Number.isInteger(hours)
+        ? `${hours}h`
+        : `${v.durationMin}m`;
+      followupJobs.push({
+        ...parent,
+        id: `${parent.id} ↻`,
+        dbId: `${parent.dbId}__visit__${v.id}`,
+        scheduledDate: v.visitDate,
+        scheduledTime: v.startTime,
+        estimatedDuration: durationLabel,
+        urgency: "Scheduled",
+        // Mark with a status hint via notes — JobBlock reads job.status for color
+        notes: v.note ? `Follow-up visit: ${v.note}` : "Follow-up visit",
+      });
+    }
+    return [...baseJobs, ...followupJobs];
+  }, [jobs, spId, pendingOfferJobIds, scheduledVisits]);
 
   const selectedOffer = useMemo(() => {
     if (!selectedJob) return null;
