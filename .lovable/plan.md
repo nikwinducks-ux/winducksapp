@@ -1,116 +1,112 @@
-## Overview
+## Goal
 
-Today's invoices are a thin shell (description / qty / price / one tax / Draft|Sent|Paid|Overdue|Cancelled). We will rebuild them to match the depth of the Estimates module while keeping existing rows working: invoice_packages as variations, rich line items, discount codes + manual discounts, deposits, multiple payments, a full status lifecycle, and conversion from accepted estimates as well as jobs.
+Stitch the existing Estimate → Job → SP → Completion → Invoice pieces into one cohesive, visible end-to-end workflow. The data plumbing (RPCs, snapshots, conversions) is already in place; this plan focuses on closing the UX gaps that make the flow feel disconnected today.
 
-## Status lifecycle
+## Current state (already built)
 
-`Draft → Sent → Viewed → Partially Paid → Paid` plus `Overdue` (auto when due_date passes with balance > 0), `Void`, `Archived`. Overdue is computed on read; Void/Archived are explicit admin actions.
+- Estimate creation, packages, line items (services/products), discounts, taxes, deposit, snapshots on send/accept — DONE
+- Public estimate page (accept / decline / select package / select optional items) — DONE
+- `convert_estimate_to_job` RPC (carries customer, address, package, selected line items, totals, deposit, links job → estimate) — DONE
+- "Convert to job" button on EstimateDetail — DONE
+- Job detail with deposit recording, crew, offers, status — DONE
+- SP can mark visits / completion via `JobVisitsCard` — DONE
+- `convert_job_to_invoice` RPC (routes through source estimate when present, otherwise builds from job_services) — DONE
+- Invoices list, detail, packages, payments, public invoice — DONE
 
-## Database changes (one migration)
+## Gaps to close
 
-**Extend `customer_invoices`**
+1. No "Ready to Invoice" intermediate status — only `Completed`
+2. SP `JobVisitsCard` exists but `SPJobDetailContent` doesn't expose a clear "Mark Job Complete" CTA on `panel` variant
+3. JobDetail's "Convert to invoice" only appears once status is exactly `Completed` — admins can't trigger it from `Ready to Invoice`
+4. No workflow timeline on EstimateDetail / JobDetail / InvoiceDetail (events tables exist but aren't displayed)
+5. CustomerDetail shows jobs only — no estimates or invoices
+6. SPJobDetail doesn't show which line items came from the accepted estimate package vs ad-hoc
+7. No clear visual workflow stepper showing where a record sits in the pipeline
 
-- `due_date date`, `payment_terms_days int default 15`
-- `service_address_*` columns (street/city/region/postal/country) + `billing_address_same_as_service bool default true`
-- `assigned_sp_id uuid`, `source_estimate_id uuid`, `source_estimate_package_id uuid`, `parent_invoice_id uuid` (for sibling variations — kept even though we also use packages, so a "Deposit invoice" can live as a separate document if needed later)
-- `selected_package_id uuid` (which package is the active/sent one)
-- `services_subtotal numeric`, `products_subtotal numeric`, `discount_total numeric`, `deposit_applied numeric`, `amount_paid numeric`, `balance_due numeric`
-- `snapshot_json jsonb` (frozen at send), `sent_by_user_id uuid`, `viewed_at timestamptz`, `voided_at timestamptz`, `archived_at timestamptz`
-- New statuses allowed: add `Viewed`, `Partially Paid`, `Void`, `Archived` (validation trigger, not CHECK)
+## Plan
 
-**New tables (mirroring estimates)**
+### 1. Workflow status alignment
 
-- `invoice_packages` — id, invoice_id, name, description, display_order, is_selected, is_recommended, package_discount_kind/value/reason
-- `invoice_line_items` — id, package_id, item_type (`service`|`product`), catalog_ref_id, name, description, quantity, unit_price, taxable, is_optional, is_selected, discount_allowed, image_url, display_order
-- `invoice_discounts` — manual discounts; scope (`invoice`|`package`|`line`), kind (`fixed`|`percent`), value, reason, package_id/line_item_id nullable
-- `invoice_applied_codes` — discount_code_id, code_snapshot, kind, value, applies_to, amount_applied
-- `invoice_payments` — id, invoice_id, amount, payment_date, method, reference, notes, recorded_by_user_id, created_at
-- `invoice_events` — audit log (created/sent/viewed/payment_recorded/voided/archived/etc.)
+- Add `'ReadyToInvoice'` as a recognized job status alongside existing `Completed`, `ConvertedToInvoice`, `InvoiceSent`
+- `convert_job_to_invoice` RPC: also accept `ReadyToInvoice` (currently `Completed`/`ConvertedToInvoice`/`InvoiceSent`)
+- `getJobDisplayStatus` mapping: render as "Ready to invoice"
+- Job status filter chips in `JobManagement` updated to include the new bucket
 
-All with RLS: admin/owner full access; SP `SELECT` on rows where `assigned_sp_id = get_user_sp_id(auth.uid())` (mirrors estimates). Public read continues via the existing token RPC.
+### 2. SP completion UX
 
-**Update `customer_invoice_line_items`** — keep table for backward compatibility but stop writing to it for new invoices. Existing rows readable via a view if needed; `InvoiceDetail` falls back to legacy lines when no `invoice_packages` exist.
+- In `SPJobDetailContent` (panel + page variants), add prominent "Mark Job Complete" button when `status` is `Assigned`/`Accepted`/`InProgress` and SP is on the job
+- Use existing `useUpdateJobStatus` hook to transition `→ Completed`
+- After completion, show a follow-up card: "Awaiting admin invoicing"
+- Optional: completion notes textarea, persisted via `job_status_events.note`
 
-**New / updated RPCs**
+### 3. Admin Job → Invoice CTA
 
-- `create_invoice` — blank invoice + one default package
-- `convert_estimate_to_invoice(_estimate_id)` — only if estimate `Accepted`; copies accepted package + selected line items + applied codes + manual discounts + deposit_applied (from `accepted_deposit`); sets `source_estimate_id` / `source_estimate_package_id`; preserves snapshot
-- Replace `convert_job_to_invoice` to use new packages/line_items model and prefer the job's `source_estimate_id` if present
-- `duplicate_invoice_package(_package_id)` — for variations
-- `apply_invoice_discount_code(_invoice_id, _code)` / `remove_invoice_discount_code`
-- `record_invoice_payment(_invoice_id, _amount, _method, _reference, _notes, _date)` — inserts into `invoice_payments`, recomputes `amount_paid`/`balance_due`/status (`Partially Paid` / `Paid`)
-- `mark_customer_invoice_sent` — extend to freeze snapshot of selected package + totals, set `sent_by_user_id`, `due_date` if null
-- `mark_invoice_viewed_by_token` — public RPC called from `PublicInvoice`
-- `void_invoice` / `archive_invoice` / `unarchive_invoice`
-- `get_customer_invoice_by_token` — extend to return packages, line items, discounts, payments, deposit_applied, balance_due, company payment instructions
+- In `JobDetail.tsx`, broaden the gate from `["Completed","ConvertedToInvoice","InvoiceSent"]` to also include `ReadyToInvoice`
+- Add an admin-only "Mark Ready to Invoice" button when status is `Completed` (signals completion was reviewed)
+- Keep existing "Convert to invoice" wired to `useConvertJobToInvoice`
 
-## Totals engine
+### 4. Workflow stepper component
 
-New `src/lib/invoiceTotals.ts` mirroring `estimateTotals.ts` exactly:
+- New `src/components/workflow/WorkflowStepper.tsx`: horizontal pill stepper with 7 stages — Estimate Drafted · Sent · Accepted · Job Created · Assigned · Completed · Invoiced
+- Stage states: `done` / `current` / `upcoming` / `skipped`
+- Mount at top of `EstimateDetail`, `JobDetail`, `InvoiceDetail` driven by record's status + linked IDs
+- Click a completed stage → navigate to that record (estimate → job → invoice)
 
-```
-selectedItems = items where !is_optional || is_selected
-servicesSubtotal / productsSubtotal split by item_type
-- line discounts (manual, on lines flagged discount_allowed)
-- package discount
-+ tax on taxable portion (after pro-rated discount)
-- whole-invoice discount + applied codes
-= invoiceTotal
-- depositApplied
-- sum(invoice_payments.amount)
-= balanceDue
-```
+### 5. Activity timeline component
 
-Used identically by admin builder and customer public view so numbers always match.
+- New `src/components/workflow/ActivityTimeline.tsx`
+- Reads from `estimate_events` (for estimate page), `job_status_events` + `job_assignments` (for job page), `invoice_events` + `invoice_payments` (for invoice page)
+- Renders a vertical timeline with icon, title, actor, timestamp, optional details JSON
+- Add new hooks: `useEstimateEvents`, `useJobTimeline`, `useInvoiceEvents`
+- Place in collapsible card on each detail page
 
-## Frontend changes
+### 6. CustomerDetail cross-links
 
-**Reusable components (new in `src/components/invoices/`)**
+- Query estimates and customer_invoices by `customer_id`
+- Add three side-by-side cards (or stacked on mobile): "Estimates", "Jobs", "Invoices"
+- Each row links to the appropriate detail page with status badge and total
+- Show running totals: total quoted / total billed / outstanding balance
 
-- `InvoicePackageCard.tsx` — package header, line item rows with type/name/desc/qty/price/taxable/optional/selected/discount_allowed, reorder/duplicate/delete, "Add product from catalog" / "Add service" / "Add free-form line"
-- `InvoiceLineItemRow.tsx`
-- `InvoiceTotals.tsx` — services/products subtotals, discounts, tax, total, deposit applied, payments received, balance due
-- `DiscountCodeInput.tsx` — reuse the estimates one (extract to `src/components/shared/` and re-export from both modules)
-- `ManualDiscountDialog.tsx`
-- `RecordPaymentDialog.tsx` — amount, date, method, reference, notes; defaults amount to `balance_due`
-- `InvoiceVariationsBar.tsx` — package tabs (Full / Deposit / Progress / Final / Product-only / Service-only); duplicate & rename; pick "active" (the one that's sent)
-- `ConvertEstimateToInvoiceDialog.tsx` — preview totals/deposit carryover
+### 7. SP job detail clarifications
 
-**Hooks (extend `src/hooks/useCustomerInvoices.ts`)**
+- In `SPJobDetailContent`, surface line items from `job_services` clearly labelled with category, qty, unit price (price visibility gated by SP financial-permission flag if applicable; otherwise show qty + description only)
+- Banner if job came from an accepted estimate: "From estimate ESTxxxx — accepted by customer on <date>"
 
-Add `useInvoicePackages`, `useInvoiceLineItems`, `useInvoicePayments`, `useInvoiceDiscounts`, `useInvoiceAppliedCodes`, `useConvertEstimateToInvoice`, `useRecordInvoicePayment`, `useDuplicateInvoicePackage`, `useVoidInvoice`, `useArchiveInvoice`, `useApplyInvoiceCode`. Keep current hooks compatible.
+### 8. Validation hardening (server)
 
-**Pages**
+Single new migration:
 
-- `src/pages/admin/InvoicesList.tsx` — add columns: Amount paid, Balance due, Due date, Estimate (link), Job (link), SP. Add status filters for Viewed / Partially Paid / Void / Archived; "Show archived" toggle (default off). Bulk actions remain View/Edit. Row actions menu: View, Edit, Duplicate, Send, Record Payment, Copy link, Void, Archive.
-- `src/pages/admin/InvoiceDetail.tsx` — full rebuild around packages: header (customer, billing/service address, dates, terms, SP, related estimate/job, internal/customer notes, T&Cs), variations bar, package builder, totals card, payments list with "Record payment" CTA, deposit carry-over banner, send/copy-link/print actions. Print stylesheet drives the PDF.
-- `src/pages/PublicInvoice.tsx` — rewrite to use new RPC payload: package summary, selectable add-ons read-only display, totals breakdown with deposit/payments, balance due big, "Request payment instructions" button (reveals dialog with `app_settings` payment instructions: e-Transfer email, mailing address, etc.), "Download PDF" → `window.print()`. On load, call `mark_invoice_viewed_by_token` once.
-- `src/pages/admin/JobDetail.tsx` — update "Convert to invoice" button: if job has `source_estimate_id` and that estimate is Accepted, route through `convert_estimate_to_invoice`; otherwise current job→invoice path (now using new schema).
-- `src/pages/admin/EstimateDetail.tsx` — when status `Accepted`, show "Create invoice from estimate" CTA using the new dialog.
+- `convert_estimate_to_job`: explicitly forbid running again if estimate already has `converted_job_id` (return error unless an `_allow_duplicate` flag is true; UI doesn't pass it)
+- `convert_job_to_invoice`: accept `ReadyToInvoice` status; refuse jobs that already have an `Invoiced` linked invoice unless reusing the existing draft (already handled)
+- Add `job_status_events` row whenever admin marks a job Ready to Invoice
 
-**Settings**
+## Technical details
 
-Add `payment_instructions text` to `app_settings` (e.g., e-Transfer recipient, mailing address). Surface on Payouts/Settings page and in PublicInvoice "Request payment instructions" dialog.
+**Files to create**
 
-## Permissions
+- `src/components/workflow/WorkflowStepper.tsx`
+- `src/components/workflow/ActivityTimeline.tsx`
+- `src/hooks/useWorkflowEvents.ts` (estimate/job/invoice event hooks)
+- `supabase/migrations/<ts>_workflow_polish.sql`
 
-- Admin/Owner: full CRUD, send, void, archive, record payment.
-- SP: SELECT only on invoices where `assigned_sp_id = their sp_id` (RLS).
-- Customer: existing token-based public view; no auth needed.
+**Files to edit**
 
-## Backward compatibility
+- `src/pages/admin/EstimateDetail.tsx` — mount stepper + timeline
+- `src/pages/admin/JobDetail.tsx` — stepper + timeline + Ready-to-Invoice button + relax convert gate
+- `src/pages/admin/InvoiceDetail.tsx` — stepper + timeline
+- `src/pages/admin/CustomerDetail.tsx` — add Estimates and Invoices cards
+- `src/pages/admin/JobManagement.tsx` — include `ReadyToInvoice` bucket
+- `src/pages/sp/SPJobDetailContent.tsx` (or sibling) — add "Mark Job Complete" CTA + estimate-source banner
+- `src/lib/jobStatus.ts` — extend `getJobDisplayStatus` with `ReadyToInvoice`
+- `src/hooks/useSupabaseData.ts` — extend `useUpdateJobStatus` allowed values if gated
 
-- Existing invoices keep their legacy `customer_invoice_line_items`. `InvoiceDetail` detects "no packages → legacy mode" and renders the old simple editor (read-only after this release; offers "Upgrade to packages" button that creates a default package and copies legacy lines).
-- `convert_job_to_invoice` keeps the same name + signature so existing UI keeps working; internals upgraded.
+**Out of scope** (already shipped or separate request)
 
-## Out of scope (called out)
+- Stripe / online payment processing (kept as "Request payment instructions")
+- Customer e-signature capture (acceptance click-through is the current confirmation)
+- Change orders / extras after acceptance
+- PDF email send transport (uses share link + browser print today)
 
-- No real online payment processing. Pay Now shows manual payment instructions only.
-- No SMS sending (button is hidden until SMS provider exists).
-- PDF is browser print-to-PDF; no edge-rendered PDF storage.
+## Result
 
-## Verification
-
-- TypeScript build (`tsc --noEmit`).
-- Run Supabase linter post-migration.
-- Manual sanity: create blank invoice → add package + lines → apply code + manual discount → send → open public link (status flips to Viewed) → record partial payment (status → Partially Paid, balance updates) → record remaining (status → Paid). Then: accept an estimate with deposit → "Create invoice from estimate" → confirm deposit shows as already applied and balance is correct.
+After this work, every stage of the lifecycle is reachable with one click from the previous stage, every detail page shows where it sits in the pipeline and what happened, and the customer page becomes the single hub linking estimates, jobs, and invoices.
