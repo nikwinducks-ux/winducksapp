@@ -274,10 +274,66 @@ export default function JobDetail() {
           </div>
           <div className="flex items-center gap-3">
             <DollarSign className="h-4 w-4 text-muted-foreground" />
-            <div><p className="text-xs text-muted-foreground">Payout</p><p className="text-xl font-bold text-primary">{formatCAD(job.payout)}</p></div>
+            <div><p className="text-xs text-muted-foreground">Total Invoice</p><p className="text-xl font-bold text-primary">{formatCAD(job.payout)}</p></div>
           </div>
         </div>
       </div>
+
+      {/* Compensation Breakdown */}
+      {(() => {
+        const assignedSp = providers.find((p) => p.id === job.assignedSpId);
+        const pcts = effectiveCompSplit(assignedSp ?? null, settings ?? null);
+        const split = splitInvoice(job.payout, pcts);
+        const recipientLabel = formatMarketingRecipient(job.marketingRecipient, job.marketingRecipientName, assignedSp?.name);
+        const crewSize = Math.max(1, crew.length);
+        const perSp = Math.round((split.sp / crewSize) * 100) / 100;
+        return (
+          <div className="metric-card space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h2 className="section-title">Compensation Breakdown</h2>
+              {assignedSp ? (
+                <Link to={`/admin/providers/${assignedSp.id}?tab=compensation`} className="text-xs text-primary hover:underline">
+                  View {assignedSp.name}'s compensation settings →
+                </Link>
+              ) : (
+                <span className="text-xs text-muted-foreground">No SP assigned — using global defaults</span>
+              )}
+            </div>
+            <table className="w-full text-sm">
+              <tbody>
+                <tr>
+                  <td className="py-1.5 font-semibold">Total Invoice</td>
+                  <td className="py-1.5 text-right font-semibold">{formatCAD(split.total)}</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 text-muted-foreground">− Winducks (Platform Fee {pcts.platformPct}%)</td>
+                  <td className="py-1.5 text-right text-muted-foreground">−{formatCAD(split.platform)}</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 text-muted-foreground">
+                    − Marketing ({pcts.marketingPct}%) → <span className="font-medium text-foreground">{recipientLabel}</span>
+                  </td>
+                  <td className="py-1.5 text-right text-muted-foreground">−{formatCAD(split.marketing)}</td>
+                </tr>
+                <tr className="border-t">
+                  <td className="py-2 font-semibold">= SP Portion ({pcts.spPct}%)</td>
+                  <td className="py-2 text-right text-lg font-bold text-success">{formatCAD(split.sp)}</td>
+                </tr>
+                {crew.length > 1 && (
+                  <tr>
+                    <td className="py-1.5 text-xs text-muted-foreground">Per crew member ({crew.length} SPs)</td>
+                    <td className="py-1.5 text-right text-xs text-muted-foreground">{formatCAD(perSp)} each</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            <p className="text-[11px] text-muted-foreground">
+              Percentages come from {assignedSp ? `${assignedSp.name}'s compensation settings` : "the global defaults on the Payouts page"}.
+              Changing the global % updates this breakdown for all jobs (past and future) automatically.
+            </p>
+          </div>
+        );
+      })()}
 
       {/* Services */}
       {directJobServices.length > 0 && (
