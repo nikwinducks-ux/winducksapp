@@ -27,6 +27,25 @@ import { WorkflowStepper, buildEstimateStages } from "@/components/workflow/Work
 import { ActivityTimelineCard } from "@/components/workflow/ActivityTimeline";
 import { useEstimateEvents } from "@/hooks/useWorkflowEvents";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+
+function useLinkedInvoiceForEstimate(estimateId: string | undefined) {
+  return useQuery({
+    queryKey: ["linked_invoice_for_estimate", estimateId],
+    queryFn: async () => {
+      if (!estimateId) return null;
+      const { data } = await supabase
+        .from("customer_invoices")
+        .select("id")
+        .eq("source_estimate_id", estimateId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data?.id ?? null;
+    },
+    enabled: !!estimateId,
+  });
+}
 
 const STATUS_VARIANT: Record<string, "neutral" | "info" | "valid" | "warning" | "error"> = {
   Draft: "neutral", Sent: "info", Viewed: "info", Accepted: "valid",
