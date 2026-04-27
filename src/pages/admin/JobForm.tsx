@@ -459,6 +459,15 @@ export default function JobForm() {
           <Button type="button" variant="outline" size="sm" onClick={handleAutofillCoords} className="gap-1.5">
             <MapPin className="h-3.5 w-3.5" /> Auto-fill coordinates (approx)
           </Button>
+          {(!form.lat || !form.lng) && (
+            <div className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning-foreground">
+              <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-warning" />
+              <span>
+                This job has no coordinates. Allocation will fall back to city matching, which is less
+                accurate. Click <strong>Auto-fill coordinates</strong> or enter them manually before broadcasting.
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Urgency & Scheduling */}
