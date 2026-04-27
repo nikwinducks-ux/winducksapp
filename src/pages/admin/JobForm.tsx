@@ -252,6 +252,8 @@ export default function JobForm() {
       isBroadcast: form.isBroadcast,
       broadcastRadiusKm: parseInt(form.broadcastRadiusKm) || 100,
       broadcastNote: form.broadcastNote,
+      marketingRecipient: form.marketingRecipient,
+      marketingRecipientName: form.marketingRecipient === "Third-party" ? form.marketingRecipientName : "",
     };
 
     const servicesPayload = serviceItems
