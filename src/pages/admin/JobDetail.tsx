@@ -25,6 +25,10 @@ import { CrewPicker } from "@/components/admin/CrewPicker";
 import { useConvertJobToInvoice } from "@/hooks/useCustomerInvoices";
 import { JobDepositCard } from "@/components/admin/JobDepositCard";
 import { useNavigate } from "react-router-dom";
+import { WorkflowStepper, buildJobStages } from "@/components/workflow/WorkflowStepper";
+import { ActivityTimelineCard } from "@/components/workflow/ActivityTimeline";
+import { useJobTimeline } from "@/hooks/useWorkflowEvents";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 function ScheduleDisplay({ job }: { job: any }) {
   const urgency = job.urgency || "Scheduled";
