@@ -54,8 +54,14 @@ export function computeProximityResult(spAddr: Address, jobAddr: Address): Proxi
   if (addressesMatch(spAddr, jobAddr)) {
     return { distanceKm: 0, score: 100, source: "address_match" };
   }
-  // 3. No data available
-  return { distanceKm: null, score: 50, source: "fallback" };
+  // 3. Same-city fallback when coords are missing
+  const spCity = normalizeAddr(spAddr.city);
+  const jobCity = normalizeAddr(jobAddr.city);
+  if (spCity && jobCity && spCity === jobCity) {
+    return { distanceKm: null, score: 80, source: "fallback" };
+  }
+  // 4. No usable signal — different city or unknown
+  return { distanceKm: null, score: 0, source: "fallback" };
 }
 
 // Proximity score mapping: closer = higher score
