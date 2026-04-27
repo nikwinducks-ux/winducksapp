@@ -48,6 +48,7 @@ export default function InvoiceDetail() {
   const { toast } = useToast();
 
   const { data: invoice, isLoading } = useCustomerInvoice(id);
+  const { data: timeline = [], isLoading: timelineLoading } = useInvoiceTimeline(id);
   const { data: packages = [] } = useInvoicePackages(id);
   const pkgIds = useMemo(() => packages.map((p) => p.id), [packages]);
   const { data: dbItems = [] } = useInvoiceLineItems(pkgIds);
