@@ -138,6 +138,8 @@ export default function JobForm() {
           isBroadcast: (data as any).is_broadcast ?? false,
           broadcastRadiusKm: String((data as any).broadcast_radius_km ?? 100),
           broadcastNote: (data as any).broadcast_note ?? "",
+          marketingRecipient: (data as any).marketing_recipient ?? "Winducks",
+          marketingRecipientName: (data as any).marketing_recipient_name ?? "",
         });
       }
       setLoadingExisting(false);
