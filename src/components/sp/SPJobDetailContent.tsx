@@ -82,6 +82,12 @@ export function SPJobDetailContent({ job, variant = "page", hideHeader = false }
       {/* In panel mode, surface visit actions near the top so they're always reachable */}
       {variant === "panel" && isMyJob && <JobVisitsCard job={job} variant="panel" />}
 
+      {(job as any).source_estimate_id && (
+        <div className="metric-card border-success/30 bg-success/5 text-sm">
+          ✓ Customer accepted this work via an estimate. Pricing and selected line items below reflect what was agreed.
+        </div>
+      )}
+
       {/* Job Details */}
       <div className="metric-card space-y-4">
         <h2 className="section-title">Job Details</h2>
