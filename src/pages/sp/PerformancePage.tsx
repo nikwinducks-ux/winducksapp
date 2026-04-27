@@ -44,7 +44,7 @@ export default function PerformancePage() {
     });
     return {
       totalCompleted: filtered.length,
-      totalRevenue: filtered.reduce((sum, j) => sum + (j.payout || 0), 0),
+      totalRevenue: filtered.reduce((sum, j) => sum + (j.payoutShare ?? j.payout ?? 0), 0),
     };
   }, [jobs, sp, startDate, endDate]);
 
