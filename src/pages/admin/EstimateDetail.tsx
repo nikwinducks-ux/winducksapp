@@ -407,6 +407,8 @@ export default function EstimateDetail() {
         </div>
       )}
 
+      <ActivityTimelineCard events={events} loading={eventsLoading} emptyMessage="No estimate activity yet." />
+
       <ConvertEstimateDialog
         open={convertOpen}
         onOpenChange={setConvertOpen}
