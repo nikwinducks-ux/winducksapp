@@ -192,6 +192,7 @@ export type Database = {
           default_payout_fee_percent: number
           default_platform_fee_pct: number
           default_sp_portion_pct: number
+          default_subscription_fee_monthly: number
           id: number
           updated_at: string
         }
@@ -200,6 +201,7 @@ export type Database = {
           default_payout_fee_percent?: number
           default_platform_fee_pct?: number
           default_sp_portion_pct?: number
+          default_subscription_fee_monthly?: number
           id?: number
           updated_at?: string
         }
@@ -208,6 +210,7 @@ export type Database = {
           default_payout_fee_percent?: number
           default_platform_fee_pct?: number
           default_sp_portion_pct?: number
+          default_subscription_fee_monthly?: number
           id?: number
           updated_at?: string
         }
