@@ -171,6 +171,7 @@ export default function SPDetail() {
             <TabsTrigger value="compliance">Compliance</TabsTrigger>
             <TabsTrigger value="performance">Performance</TabsTrigger>
             <TabsTrigger value="reviews">Reviews</TabsTrigger>
+            <TabsTrigger value="compensation">Compensation</TabsTrigger>
             <TabsTrigger value="login">Login & Access</TabsTrigger>
           </TabsList>
         </div>
