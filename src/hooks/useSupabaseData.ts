@@ -1034,6 +1034,8 @@ export function useCreateJob() {
       street: string; city: string; province: string; postalCode: string; country: string;
       lat: string; lng: string; scheduledDate: string; scheduledTime: string; estimatedDuration: string;
       notes?: string; urgency?: string;
+      marketingRecipient?: string;
+      marketingRecipientName?: string;
     }) => {
       // job_number is auto-assigned by DB trigger (assign_job_number)
       const { error } = await supabase.from("jobs").insert({
@@ -1056,8 +1058,10 @@ export function useCreateJob() {
         is_broadcast: (form as any).isBroadcast ?? false,
         broadcast_radius_km: (form as any).broadcastRadiusKm ?? 100,
         broadcast_note: (form as any).broadcastNote ?? "",
+        marketing_recipient: form.marketingRecipient ?? "Winducks",
+        marketing_recipient_name: form.marketingRecipientName ?? "",
         status: "Created",
-      });
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
