@@ -22,7 +22,9 @@ export default function Payouts() {
   const markUnpaid = useMarkInvoiceUnpaid();
 
   const [feeInput, setFeeInput] = useState<string>("");
+  const [marketingInput, setMarketingInput] = useState<string>("");
   const currentFee = settings?.defaultPlatformFeePct ?? 15;
+  const currentMarketing = settings?.defaultMarketingPct ?? 20;
 
   const [paidDialogInvoice, setPaidDialogInvoice] = useState<SPInvoice | null>(null);
 
