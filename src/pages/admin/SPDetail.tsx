@@ -267,6 +267,10 @@ export default function SPDetail() {
           <SPReviewsTab spId={sp.id} />
         </TabsContent>
 
+        <TabsContent value="compensation">
+          <SPCompensationTab spId={sp.id} readOnly={false} />
+        </TabsContent>
+
         <TabsContent value="login">
           <SPLoginAccess spId={sp.id} spName={sp.name} />
         </TabsContent>
