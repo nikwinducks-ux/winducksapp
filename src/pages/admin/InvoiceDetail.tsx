@@ -322,6 +322,15 @@ export default function InvoiceDetail() {
         </div>
       </div>
 
+      <WorkflowStepper stages={buildInvoiceStages({
+        status: invoice.status,
+        source_estimate_id: (invoice as any).source_estimate_id,
+        job_id: invoice.job_id,
+        sent_at: (invoice as any).sent_at,
+        amount_paid: (invoice as any).amount_paid,
+        total: (invoice as any).total,
+      })} />
+
       {isVoid && (
         <div className="metric-card flex items-center gap-3 border-destructive/30 bg-destructive/5">
           <Ban className="h-5 w-5 text-destructive" />
