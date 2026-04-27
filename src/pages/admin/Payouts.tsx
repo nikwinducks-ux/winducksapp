@@ -23,8 +23,10 @@ export default function Payouts() {
 
   const [feeInput, setFeeInput] = useState<string>("");
   const [marketingInput, setMarketingInput] = useState<string>("");
+  const [subscriptionInput, setSubscriptionInput] = useState<string>("");
   const currentFee = settings?.defaultPlatformFeePct ?? 15;
   const currentMarketing = settings?.defaultMarketingPct ?? 20;
+  const currentSubscription = settings?.defaultSubscriptionFeeMonthly ?? 0;
 
   const [paidDialogInvoice, setPaidDialogInvoice] = useState<SPInvoice | null>(null);
 
@@ -51,12 +53,14 @@ export default function Payouts() {
       <div className="metric-card space-y-3">
         <h2 className="section-title flex items-center gap-2"><DollarSign className="h-4 w-4" /> Global default compensation splits</h2>
         <p className="text-xs text-muted-foreground">
-          These percentages of each completed job's invoice are automatically used as the
+          The two percentages of each completed job's invoice are automatically used as the
           <span className="font-medium"> Global Platform Fee %</span> and
           <span className="font-medium"> Marketing %</span> in every Service Provider's Compensation section,
-          unless that SP has a custom override. Changes apply to future jobs only.
+          unless that SP has a custom override. The monthly subscription fee appears as a
+          <span className="font-medium"> Subscription</span> line in every SP's Compensation → Expenses
+          (tracked monthly, not per job). Changes apply to future jobs only.
         </p>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <div className="space-y-2 rounded-md border p-3">
             <Label>Default platform fee % (applies to all SPs without an override)</Label>
             <div className="flex flex-wrap items-center gap-3">
@@ -99,9 +103,31 @@ export default function Payouts() {
                 <Save className="h-4 w-4" /> Save
               </Button>
               <p className="text-xs text-muted-foreground">Currently: {currentMarketing}%</p>
+          </div>
+          <div className="space-y-2 rounded-md border p-3">
+            <Label>Default monthly subscription fee ($/mo, applies to all SPs)</Label>
+            <div className="flex flex-wrap items-center gap-3">
+              <Input
+                type="number" step="0.01" min="0"
+                value={subscriptionInput !== "" ? subscriptionInput : String(currentSubscription)}
+                onChange={(e) => setSubscriptionInput(e.target.value)}
+                className="w-40"
+              />
+              <Button
+                onClick={() => updateSettings.mutate(
+                  { defaultSubscriptionFeeMonthly: Number(subscriptionInput || currentSubscription) },
+                  { onSuccess: () => setSubscriptionInput("") },
+                )}
+                disabled={updateSettings.isPending}
+                className="gap-1.5"
+              >
+                <Save className="h-4 w-4" /> Save
+              </Button>
+              <p className="text-xs text-muted-foreground">Currently: {formatCAD(currentSubscription)}/mo</p>
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">

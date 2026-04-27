@@ -252,6 +252,8 @@ const emptyDraft: DraftExpense = {
 
 function ExpensesCard({ spId, readOnly }: { spId: string; readOnly: boolean }) {
   const { data: expenses = [], isLoading } = useSPExpenses(spId);
+  const { data: settings } = useAppSettings();
+  const subscriptionFee = settings?.defaultSubscriptionFeeMonthly ?? 0;
   const upsert = useUpsertSPExpense();
   const remove = useDeleteSPExpense();
   const toggle = useToggleSPExpense();
@@ -306,8 +308,6 @@ function ExpensesCard({ spId, readOnly }: { spId: string; readOnly: boolean }) {
 
       {isLoading ? (
         <p className="py-4 text-center text-sm text-muted-foreground">Loading…</p>
-      ) : expenses.length === 0 && !draft ? (
-        <p className="py-4 text-center text-sm text-muted-foreground">No expenses configured.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -321,6 +321,25 @@ function ExpensesCard({ spId, readOnly }: { spId: string; readOnly: boolean }) {
               </tr>
             </thead>
             <tbody>
+              <tr className="border-b bg-muted/20">
+                <td className="py-2 pr-3">
+                  <div className="font-medium">Subscription</div>
+                  <div className="text-[11px] text-muted-foreground">Global default — set on Payouts page</div>
+                </td>
+                <td className="py-2 pr-3 text-muted-foreground">Monthly fixed $</td>
+                <td className="py-2 pr-3 text-right">{formatCAD(subscriptionFee)}/mo</td>
+                <td className="py-2 pr-3">
+                  <StatusBadge label="Active" variant="valid" />
+                </td>
+                {!readOnly && <td className="py-2 pr-3 text-right text-xs text-muted-foreground">—</td>}
+              </tr>
+              {expenses.length === 0 && !draft && (
+                <tr>
+                  <td colSpan={readOnly ? 4 : 5} className="py-4 text-center text-sm text-muted-foreground">
+                    No additional expenses configured.
+                  </td>
+                </tr>
+              )}
               {expenses.map((e) =>
                 draft?.id === e.id ? (
                   <DraftRow
@@ -485,6 +504,8 @@ function PayoutPreview({
   spPct: number;
 }) {
   const { data: expenses = [] } = useSPExpenses(spId);
+  const { data: settings } = useAppSettings();
+  const subscriptionFee = settings?.defaultSubscriptionFeeMonthly ?? 0;
   const [sample, setSample] = useState<string>("100");
   const invoice = Number(sample) || 0;
 
@@ -501,9 +522,12 @@ function PayoutPreview({
   const expenseDeduction = round2((grossSp * activePctTotal) / 100);
   const finalSp = round2(grossSp - expenseDeduction);
 
-  const monthlyFixed = expenses.filter(
-    (e) => e.active && e.expenseType === "monthly_fixed",
-  );
+  const monthlyFixed = [
+    { id: "__global_subscription__", name: "Subscription (global)", value: subscriptionFee },
+    ...expenses
+      .filter((e) => e.active && e.expenseType === "monthly_fixed")
+      .map((e) => ({ id: e.id, name: e.name, value: e.value })),
+  ];
   const monthlyTotal = monthlyFixed.reduce((s, e) => s + e.value, 0);
 
   return (
