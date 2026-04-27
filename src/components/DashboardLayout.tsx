@@ -10,7 +10,7 @@ import {
   Sliders, Scale, Users, FlaskConical, GitBranch, Plug, Tag,
   ChevronLeft, ChevronRight, Shield, UserCircle, Contact,
   LogOut, ClipboardList, Settings, TestTube, CalendarDays,
-  Smartphone, Monitor,
+  Smartphone, Monitor, FileText,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -34,6 +34,7 @@ const adminLinks = [
   { to: "/admin/jobs", icon: Briefcase, label: "Jobs" },
   { to: "/admin/calendar", icon: CalendarDays, label: "Calendar" },
   { to: "/admin/payouts", icon: Scale, label: "Payouts" },
+  { to: "/admin/invoices", icon: FileText, label: "Invoices" },
   { to: "/admin/categories", icon: Tag, label: "Service Categories" },
   { to: "/admin/allocation", icon: Sliders, label: "Allocation" },
   { to: "/admin/providers", icon: Users, label: "Service Providers" },

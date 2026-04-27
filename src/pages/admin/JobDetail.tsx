@@ -22,6 +22,8 @@ import { JobPhotosCard } from "@/components/JobPhotosCard";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { CrewPicker } from "@/components/admin/CrewPicker";
+import { useConvertJobToInvoice } from "@/hooks/useCustomerInvoices";
+import { useNavigate } from "react-router-dom";
 
 function ScheduleDisplay({ job }: { job: any }) {
   const urgency = job.urgency || "Scheduled";
@@ -54,6 +56,8 @@ export default function JobDetail() {
   const removeCrew = useRemoveCrewMember();
   const setLead = useSetCrewLead();
   const [addCrewSpId, setAddCrewSpId] = useState("");
+  const convertToInvoice = useConvertJobToInvoice();
+  const navigate = useNavigate();
 
   const job = jobs.find((j) => j.dbId === id);
   const [showAssign, setShowAssign] = useState(searchParams.get("assign") === "true");
@@ -466,7 +470,63 @@ export default function JobDetail() {
         )}
       </div>
 
-      {/* ====== OFFERS PANEL ====== */}
+      {/* ====== INVOICE ACTIONS ====== */}
+      {["Completed", "ConvertedToInvoice", "InvoiceSent"].includes(job.status) && (
+        <div className="metric-card space-y-3">
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" />
+            <h2 className="section-title">Invoice</h2>
+          </div>
+          {job.status === "Completed" && (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Job is complete. Convert it into a customer invoice — line items will be copied from job services and tax applied per settings.
+              </p>
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (!id) return;
+                  convertToInvoice.mutate(id, {
+                    onSuccess: (res) => {
+                      if (res?.invoice_id) navigate(`/admin/invoices/${res.invoice_id}`);
+                    },
+                  });
+                }}
+                disabled={convertToInvoice.isPending}
+              >
+                <FileText className="h-4 w-4 mr-1" />
+                {convertToInvoice.isPending ? "Converting..." : "Convert to invoice"}
+              </Button>
+            </>
+          )}
+          {(job.status === "ConvertedToInvoice" || job.status === "InvoiceSent") && (
+            <>
+              <p className="text-sm text-muted-foreground">
+                {job.status === "InvoiceSent" ? "Invoice has been sent to the customer." : "Draft invoice exists for this job."}
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  if (!id) return;
+                  const { data } = await supabase
+                    .from("customer_invoices")
+                    .select("id")
+                    .eq("job_id", id)
+                    .order("created_at", { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                  if (data?.id) navigate(`/admin/invoices/${data.id}`);
+                }}
+              >
+                <FileText className="h-4 w-4 mr-1" />Open invoice
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+
+
       <div className="metric-card space-y-4">
         <h2 className="section-title">Offers ({jobOffers.length})</h2>
 

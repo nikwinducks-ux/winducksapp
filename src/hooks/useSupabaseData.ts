@@ -1940,6 +1940,13 @@ export function useAppSettings() {
         defaultMarketingPct: Number(d.default_marketing_pct ?? 20),
         defaultSpPortionPct: Number(d.default_sp_portion_pct ?? 65),
         defaultSubscriptionFeeMonthly: Number(d.default_subscription_fee_monthly ?? 0),
+        defaultTaxPct: Number(d.default_tax_pct ?? 5),
+        defaultPaymentTerms: String(d.default_payment_terms ?? "Payment due within 15 days."),
+        companyName: String(d.company_name ?? ""),
+        companyAddress: String(d.company_address ?? ""),
+        companyEmail: String(d.company_email ?? ""),
+        companyPhone: String(d.company_phone ?? ""),
+        companyLogoUrl: String(d.company_logo_url ?? ""),
       };
     },
   });
@@ -1955,6 +1962,13 @@ export function useUpdateAppSettings() {
       defaultMarketingPct?: number;
       defaultSpPortionPct?: number;
       defaultSubscriptionFeeMonthly?: number;
+      defaultTaxPct?: number;
+      defaultPaymentTerms?: string;
+      companyName?: string;
+      companyAddress?: string;
+      companyEmail?: string;
+      companyPhone?: string;
+      companyLogoUrl?: string;
     }) => {
       const patch: any = { id: 1 };
       if (params.defaultPayoutFeePercent != null) patch.default_payout_fee_percent = params.defaultPayoutFeePercent;
@@ -1962,6 +1976,13 @@ export function useUpdateAppSettings() {
       if (params.defaultMarketingPct != null) patch.default_marketing_pct = params.defaultMarketingPct;
       if (params.defaultSpPortionPct != null) patch.default_sp_portion_pct = params.defaultSpPortionPct;
       if (params.defaultSubscriptionFeeMonthly != null) patch.default_subscription_fee_monthly = params.defaultSubscriptionFeeMonthly;
+      if (params.defaultTaxPct != null) patch.default_tax_pct = params.defaultTaxPct;
+      if (params.defaultPaymentTerms != null) patch.default_payment_terms = params.defaultPaymentTerms;
+      if (params.companyName != null) patch.company_name = params.companyName;
+      if (params.companyAddress != null) patch.company_address = params.companyAddress;
+      if (params.companyEmail != null) patch.company_email = params.companyEmail;
+      if (params.companyPhone != null) patch.company_phone = params.companyPhone;
+      if (params.companyLogoUrl != null) patch.company_logo_url = params.companyLogoUrl;
       const { error } = await supabase.from("app_settings" as any).upsert(patch);
       if (error) throw error;
     },
