@@ -3,6 +3,7 @@ import { useSpOffers, useAllSpOffers, useExpireStaleOffers, useDeclineOffer, typ
 import { JobServicesSummary } from "@/components/JobServicesDisplay";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
+import { getJobStatusLabel } from "@/lib/jobStatus";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { Link } from "react-router-dom";
 import { MapPin, Clock, DollarSign, FileText, Timer, ChevronDown, ChevronUp, Info, CheckCircle, XCircle, AlertTriangle, Eye } from "lucide-react";
@@ -350,7 +351,7 @@ export default function JobOffers() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold truncate">{job.customerName}</p>
-                      <StatusBadge label={job.status} variant={variant} />
+                      <StatusBadge label={getJobStatusLabel(job)} variant={variant} />
                     </div>
                     <p className="text-sm text-muted-foreground truncate mt-0.5">
                       {job.services && job.services.length > 0

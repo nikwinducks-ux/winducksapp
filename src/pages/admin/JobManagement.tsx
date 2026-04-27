@@ -3,6 +3,7 @@ import { formatCAD } from "@/lib/currency";
 import { useJobs, useServiceProviders, useServiceCategories, useDeleteJob, useStopBroadcast, useAssignJob, useUnassignJob } from "@/hooks/useSupabaseData";
 import { useGenerateBroadcastOffers } from "@/hooks/useOfferData";
 import { StatusBadge } from "@/components/StatusBadge";
+import { getJobDisplayStatus } from "@/lib/jobStatus";
 import { UrgencyBadge, URGENCY_PRIORITY } from "@/components/UrgencyBadge";
 import { JobServicesCodesSummary } from "@/components/JobServicesDisplay";
 import { Button } from "@/components/ui/button";
@@ -178,18 +179,8 @@ export default function JobManagement() {
 
   const clearSelection = () => setSelectedIds(new Set());
 
-  const statusVariant = (s: string) => {
-    switch (s) {
-      case "Assigned": case "Accepted": return "info";
-      case "InProgress": return "warning";
-      case "Completed": return "valid";
-      case "Cancelled": case "Expired": return "warning";
-      case "Created": case "Offered": return "neutral";
-      default: return "neutral";
-    }
-  };
+  // Status display is centralized in src/lib/jobStatus.ts
 
-  const statusLabel = (s: string) => s === "InProgress" ? "In Progress" : s;
 
   const openDeleteSingle = (jobDbId: string) => {
     setDeleteTarget([jobDbId]);
@@ -799,7 +790,7 @@ export default function JobManagement() {
                   <td className="py-3 text-muted-foreground">{job.jobAddress.city}</td>
                   <td className="py-3"><UrgencyBadge urgency={job.urgency} /></td>
                   <td className="py-3">
-                    <StatusBadge label={statusLabel(job.status)} variant={statusVariant(job.status) as any} />
+                    {(() => { const ds = getJobDisplayStatus(job); return <StatusBadge label={ds.label} variant={ds.variant} />; })()}
                   </td>
                   <td className="py-3" onClick={(e) => e.stopPropagation()}>
                     {NON_BROADCASTABLE.has(job.status) ? (

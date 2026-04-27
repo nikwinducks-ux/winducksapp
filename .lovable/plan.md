@@ -1,69 +1,107 @@
-## Goal
-In the week view of the calendar, display a **week total amount** (sum of SP payout shares across all 7 visible days) on the top-right of the calendar header row, alongside the existing prev/today/next navigation and date range label.
+## Goals
 
-## Where to add it
-Both calendar pages share the same nav row layout above `<JobCalendar>`:
-- `src/pages/sp/SPCalendar.tsx` (lines ~283–297) — main target since user is on `/calendar`
-- `src/pages/admin/AdminCalendar.tsx` (lines ~456–468) — same nav row, mirror the change for consistency
+1. Change how job statuses are **displayed** (labels only — DB values stay the same so existing logic doesn't break) and add two new lifecycle states tied to invoicing.
+2. Build a **Customer Invoice** module (separate from existing SP payout invoices).
 
-Current nav row:
-```tsx
-<div className="flex items-center gap-1">
-  <Button>‹</Button>
-  <Button>Today</Button>
-  <Button>›</Button>
-  <span className="ml-3 text-sm font-medium">{rangeLabel()}</span>
-</div>
+---
+
+## Part 1 — Job status display labels
+
+Underlying DB statuses stay: `Created | Offered | Assigned | Accepted | InProgress | Completed | Cancelled | Expired | Archived`. Two **new** DB statuses are added: `ConvertedToInvoice` and `InvoiceSent`.
+
+Display label mapping (single source of truth in a new `src/lib/jobStatus.ts`):
+
+| DB status | Display label |
+|---|---|
+| `Created` (no SP, no offer yet) | Created |
+| `Offered` / `Assigned` / `Accepted` | Offered to SP |
+| `Assigned`/`Accepted` AND has scheduled date in future AND no visit started | Upcoming |
+| `InProgress` (visit timer started) | In Progress |
+| `Completed` (all visits ended) | Completed |
+| `ConvertedToInvoice` (new) | Converted to Invoice |
+| `InvoiceSent` (new) | Invoice Sent |
+| `Cancelled` / `Expired` / `Archived` | unchanged |
+
+"Upcoming" is a derived label (computed from `Assigned/Accepted` + future `scheduledDate`). All status pills/badges across Admin Jobs list, Job Detail, SP My Jobs, Calendar tooltips, and Activity Log will read through the new helper.
+
+## Part 2 — Customer Invoice module
+
+A new admin module at `/admin/invoices` plus an "Convert to invoice" action on completed jobs.
+
+### Features
+- **Convert to invoice** button appears on Job Detail when status = `Completed`. Creates a draft `customer_invoice` from the job's services and flips job status to `ConvertedToInvoice`.
+- **Invoice editor**: Pre-filled with line items from `job_services` (description, qty, unit price). Editable. Configurable GST tax line (default 5%, stored in `app_settings`). Notes / payment terms textarea.
+- **Customer billing details**: Pulled from the customer record. Your company name/logo/address pulled from `app_settings` (new fields).
+- **Send invoice**: Generates a PDF, emails it to the customer (Lovable Emails), and creates a public share link `/invoice/:token`. Job status flips to `InvoiceSent`.
+- **Share link page**: Public route, no auth, shows the invoice and a "Download PDF" button.
+- **Invoice list**: `/admin/invoices` with filters (Draft / Sent / Paid), search, totals.
+- **Mark paid**: Manual button on each invoice.
+
+### Numbering
+Sequential `INV-1001` format (next number tracked in `app_settings`).
+
+---
+
+## Technical changes
+
+### Database (migration)
+
+**New table `customer_invoices`**
+```
+id uuid pk, invoice_number text unique, job_id uuid, customer_id uuid,
+status text default 'Draft' check ('Draft','Sent','Paid','Void'),
+subtotal numeric, tax_pct numeric, tax_amount numeric, total numeric,
+notes text, payment_terms text,
+share_token text unique, sent_at timestamptz, paid_at timestamptz,
+created_by_user_id uuid, created_at, updated_at
+```
+RLS: admin full access; public SELECT only by `share_token` via security-definer function.
+
+**New table `customer_invoice_line_items`**
+```
+id uuid pk, invoice_id uuid fk, description text, quantity numeric,
+unit_price numeric, line_total numeric, display_order int
 ```
 
-## Change
-Wrap the row with `justify-between` (or use `ml-auto` on the new element) and append a right-aligned **Week Total** badge that only renders when `view === "week"`.
+**`jobs.status`**: extend allowed values via a validation trigger to include `ConvertedToInvoice` and `InvoiceSent`.
 
-```tsx
-<div className="flex items-center gap-1 justify-between flex-wrap">
-  <div className="flex items-center gap-1">
-    {/* prev / Today / next / rangeLabel — unchanged */}
-  </div>
-  {view === "week" && (
-    <div className="text-sm font-medium text-muted-foreground">
-      Week total:{" "}
-      <span className="text-primary font-semibold">{formatCADWhole(weekTotal)}</span>
-    </div>
-  )}
-</div>
-```
+**`app_settings`**: add `next_invoice_number int default 1001`, `default_tax_pct numeric default 5`, `company_name text`, `company_address text`, `company_email text`, `company_phone text`, `company_logo_url text`.
 
-## Computing the week total
-Reuse the same logic already used for per-day totals in `JobCalendar.tsx` (`sumPayoutShare` — sums `payoutShare ?? payout`) so the weekly figure equals the sum of the seven daily badges shown in the header.
+### Frontend
 
-In `SPCalendar.tsx` and `AdminCalendar.tsx`, add a `useMemo`:
+- `src/lib/jobStatus.ts` — `getDisplayStatus(job)` + `STATUS_LABEL_MAP` + variant mapping. Replaces inline label logic in `StatusBadge` callsites.
+- Update callsites: `JobManagement.tsx`, `JobDetail.tsx`, `MyJobs.tsx`, `SPJobDetailContent.tsx`, `JobBlock.tsx` (calendar), `JobOffers.tsx`, `GlobalActivityLog.tsx`.
+- `src/hooks/useCustomerInvoices.ts` — list/get/create/update/send/markPaid/delete hooks.
+- `src/pages/admin/InvoicesList.tsx` — list view with filters and totals.
+- `src/pages/admin/InvoiceDetail.tsx` — view + edit + send actions.
+- `src/pages/admin/InvoiceEditor.tsx` — line-item editor (reuses `JobServiceLineItems` pattern).
+- `src/pages/PublicInvoice.tsx` — public route `/invoice/:token` for customers.
+- `src/components/admin/ConvertToInvoiceButton.tsx` — added to Job Detail when status=`Completed`.
+- `src/components/admin/CompanyBrandingSettings.tsx` — new section in Payouts/Settings page for logo/company info.
+- Sidebar nav: add "Invoices" entry under Admin.
 
-```ts
-const weekTotal = useMemo(() => {
-  const start = startOfWeek(currentDate, { weekStartsOn: 1 });
-  const end = endOfWeek(currentDate, { weekStartsOn: 1 });
-  return myCalendarJobs   // (or `jobs` in AdminCalendar)
-    .filter((j) => {
-      if (!j.scheduledDate) return false;
-      try {
-        const d = parseISO(j.scheduledDate);
-        return isWithinInterval(d, { start, end });
-      } catch { return false; }
-    })
-    .reduce((sum, j) => sum + (Number(j.payoutShare ?? j.payout) || 0), 0);
-}, [myCalendarJobs, currentDate]);
-```
+### PDF + Email
+- Edge function `send-customer-invoice` (Deno):
+  - Inputs: `invoice_id`.
+  - Renders invoice HTML → PDF using `pdf-lib` (no external services needed).
+  - Uploads PDF to Supabase Storage bucket `customer-invoices` (private).
+  - Sends email via Lovable Emails with the PDF attachment + share link.
+  - Updates invoice `status='Sent'`, `sent_at=now()`, generates `share_token` if missing.
+  - Updates job `status='InvoiceSent'`.
+- Storage bucket `customer-invoices` (private; signed URL for downloads).
+- Public download endpoint via security-definer RPC that issues a short-lived signed URL when given a valid `share_token`.
 
-Use `formatCADWhole` from `@/lib/currency` (already imported in JobCalendar; import it here).
+### Email template
+New transactional template `customer-invoice` (React Email): branded with company logo, summary of invoice, "View invoice" CTA → share link, PDF attached.
 
-## Note on week boundaries
-The user said "Sunday to Saturday", but the calendar today uses **Monday–Sunday** (`weekStartsOn: 1`) consistently throughout the app. To keep the displayed total consistent with the seven day columns the user sees, this plan sums the **visible** week (Mon–Sun). If you'd like to switch the entire calendar to Sun–Sat instead, that's a separate change — say the word and I'll roll that in.
+---
 
-## Files to edit
-- `src/pages/sp/SPCalendar.tsx` — add `weekTotal` memo + render badge in the nav row
-- `src/pages/admin/AdminCalendar.tsx` — same change for parity
+## Out of scope for this iteration
+- Online payment (Stripe) on the share link — flagged for a follow-up.
+- Recurring invoices.
+- Customer portal login.
+- Editing an invoice after it's been sent (sent invoices become read-only; you'd need to "Void & re-issue").
 
-## Out of scope
-- No DB or schema changes
-- No changes to per-day totals (already SP payout share)
-- No change to week start day (Mon-based) unless requested
+## Open follow-ups (we can decide later)
+- Should "Mark paid" on a customer invoice also auto-mark the related SP payout invoice paid? Default: no, they remain independent.
+- Should customers be able to pay via Stripe link on the public invoice page?

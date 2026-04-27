@@ -188,30 +188,54 @@ export type Database = {
       }
       app_settings: {
         Row: {
+          company_address: string
+          company_email: string
+          company_logo_url: string
+          company_name: string
+          company_phone: string
           default_marketing_pct: number
+          default_payment_terms: string
           default_payout_fee_percent: number
           default_platform_fee_pct: number
           default_sp_portion_pct: number
           default_subscription_fee_monthly: number
+          default_tax_pct: number
           id: number
+          next_invoice_number: number
           updated_at: string
         }
         Insert: {
+          company_address?: string
+          company_email?: string
+          company_logo_url?: string
+          company_name?: string
+          company_phone?: string
           default_marketing_pct?: number
+          default_payment_terms?: string
           default_payout_fee_percent?: number
           default_platform_fee_pct?: number
           default_sp_portion_pct?: number
           default_subscription_fee_monthly?: number
+          default_tax_pct?: number
           id?: number
+          next_invoice_number?: number
           updated_at?: string
         }
         Update: {
+          company_address?: string
+          company_email?: string
+          company_logo_url?: string
+          company_name?: string
+          company_phone?: string
           default_marketing_pct?: number
+          default_payment_terms?: string
           default_payout_fee_percent?: number
           default_platform_fee_pct?: number
           default_sp_portion_pct?: number
           default_subscription_fee_monthly?: number
+          default_tax_pct?: number
           id?: number
+          next_invoice_number?: number
           updated_at?: string
         }
         Relationships: []
@@ -336,6 +360,119 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      customer_invoice_line_items: {
+        Row: {
+          created_at: string
+          description: string
+          display_order: number
+          id: string
+          invoice_id: string
+          line_total: number
+          quantity: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          display_order?: number
+          id?: string
+          invoice_id: string
+          line_total?: number
+          quantity?: number
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          display_order?: number
+          id?: string
+          invoice_id?: string
+          line_total?: number
+          quantity?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_invoice_line_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "customer_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_invoices: {
+        Row: {
+          created_at: string
+          created_by_user_id: string | null
+          customer_id: string | null
+          id: string
+          invoice_number: string
+          job_id: string | null
+          notes: string
+          paid_at: string | null
+          paid_by_user_id: string | null
+          payment_method: string
+          payment_reference: string
+          payment_terms: string
+          pdf_storage_path: string
+          sent_at: string | null
+          share_token: string
+          status: string
+          subtotal: number
+          tax_amount: number
+          tax_pct: number
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id?: string | null
+          customer_id?: string | null
+          id?: string
+          invoice_number: string
+          job_id?: string | null
+          notes?: string
+          paid_at?: string | null
+          paid_by_user_id?: string | null
+          payment_method?: string
+          payment_reference?: string
+          payment_terms?: string
+          pdf_storage_path?: string
+          sent_at?: string | null
+          share_token?: string
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          tax_pct?: number
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string | null
+          customer_id?: string | null
+          id?: string
+          invoice_number?: string
+          job_id?: string | null
+          notes?: string
+          paid_at?: string | null
+          paid_by_user_id?: string | null
+          payment_method?: string
+          payment_reference?: string
+          payment_terms?: string
+          pdf_storage_path?: string
+          sent_at?: string | null
+          share_token?: string
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          tax_pct?: number
+          total?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       customer_properties: {
         Row: {
@@ -1676,6 +1813,7 @@ export type Database = {
         Returns: undefined
       }
       accept_offer: { Args: { _offer_id: string }; Returns: Json }
+      convert_job_to_invoice: { Args: { _job_id: string }; Returns: Json }
       decline_offer: {
         Args: { _offer_id: string; _reason?: string }
         Returns: Json
@@ -1689,6 +1827,7 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      get_customer_invoice_by_token: { Args: { _token: string }; Returns: Json }
       get_review_by_token: { Args: { _token: string }; Returns: Json }
       get_user_sp_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
@@ -1705,6 +1844,10 @@ export type Database = {
       hhmm_to_minutes: { Args: { _t: string }; Returns: number }
       is_admin_or_owner: { Args: { _user_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
+      mark_customer_invoice_sent: {
+        Args: { _invoice_id: string; _pdf_path?: string }
+        Returns: Json
+      }
       move_to_dlq: {
         Args: {
           dlq_name: string
@@ -1714,6 +1857,7 @@ export type Database = {
         }
         Returns: number
       }
+      next_customer_invoice_number: { Args: never; Returns: string }
       parse_duration_minutes: { Args: { _d: string }; Returns: number }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }

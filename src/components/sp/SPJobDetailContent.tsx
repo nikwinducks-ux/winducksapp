@@ -22,6 +22,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { computeProximityResult, DISTANCE_SOURCE_LABELS } from "@/lib/proximity";
 import { openInMaps } from "@/lib/geolocation";
 import { spShareForJob } from "@/lib/compensation";
+import { getJobDisplayStatus } from "@/lib/jobStatus";
 import type { Job } from "@/data/mockData";
 
 function ScheduleDisplay({ job }: { job: Job }) {
@@ -34,24 +35,6 @@ function ScheduleDisplay({ job }: { job: Job }) {
     </p>
   );
 }
-
-const statusVariant = (s: string) => {
-  switch (s) {
-    case "Assigned":
-    case "Accepted":
-      return "info";
-    case "InProgress":
-      return "warning";
-    case "Completed":
-      return "valid";
-    case "Cancelled":
-      return "error";
-    default:
-      return "neutral";
-  }
-};
-
-const statusLabel = (s: string) => (s === "InProgress" ? "In Progress" : s);
 
 interface Props {
   job: Job;
@@ -91,7 +74,7 @@ export function SPJobDetailContent({ job, variant = "page", hideHeader = false }
       {!hideHeader && (
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="page-header">{job.id}</h1>
-          <StatusBadge label={statusLabel(job.status)} variant={statusVariant(job.status) as any} />
+          {(() => { const ds = getJobDisplayStatus(job); return <StatusBadge label={ds.label} variant={ds.variant} />; })()}
           <UrgencyBadge urgency={job.urgency} />
         </div>
       )}
