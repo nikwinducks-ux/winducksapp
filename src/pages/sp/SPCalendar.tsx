@@ -313,17 +313,25 @@ export default function SPCalendar() {
         <AvailabilitySettings />
       ) : (
         <>
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
-              Today
-            </Button>
-            <Button variant="outline" size="icon" onClick={() => navigate(1)}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <span className="ml-3 text-sm font-medium">{rangeLabel()}</span>
+          <div className="flex items-center gap-1 flex-wrap justify-between">
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
+                Today
+              </Button>
+              <Button variant="outline" size="icon" onClick={() => navigate(1)}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <span className="ml-3 text-sm font-medium">{rangeLabel()}</span>
+            </div>
+            {view === "week" && weekTotal > 0 && (
+              <div className="text-sm font-medium text-muted-foreground">
+                Week total:{" "}
+                <span className="text-primary font-semibold">{formatCADWhole(weekTotal)}</span>
+              </div>
+            )}
           </div>
 
           {isLoading ? (
