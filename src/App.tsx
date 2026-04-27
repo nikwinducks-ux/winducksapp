@@ -51,6 +51,9 @@ import SPCalendar from "./pages/sp/SPCalendar";
 import ReviewSubmit from "./pages/ReviewSubmit";
 import Unsubscribe from "./pages/Unsubscribe";
 import Install from "./pages/Install";
+import PublicInvoice from "./pages/PublicInvoice";
+import InvoicesList from "./pages/admin/InvoicesList";
+import InvoiceDetail from "./pages/admin/InvoiceDetail";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 
