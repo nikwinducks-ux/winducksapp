@@ -23,6 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { CrewPicker } from "@/components/admin/CrewPicker";
 import { useConvertJobToInvoice } from "@/hooks/useCustomerInvoices";
+import { JobDepositCard } from "@/components/admin/JobDepositCard";
 import { useNavigate } from "react-router-dom";
 
 function ScheduleDisplay({ job }: { job: any }) {
@@ -273,6 +274,14 @@ export default function JobDetail() {
           </div>
         </div>
       </div>
+
+      <JobDepositCard
+        jobId={job.dbId}
+        depositDue={job.depositDue ?? 0}
+        depositReceived={job.depositReceived ?? 0}
+        depositReceivedAt={job.depositReceivedAt ?? null}
+        sourceEstimateId={job.sourceEstimateId ?? null}
+      />
 
       {/* Compensation Breakdown */}
       {(() => {

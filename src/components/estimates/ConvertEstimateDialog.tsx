@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useJobs } from "@/hooks/useSupabaseData";
-import { useConvertEstimateToJob } from "@/hooks/useEstimates";
+import { useConvertEstimateToJob, useEstimate, useEstimateLineItems } from "@/hooks/useEstimates";
+import { formatCAD } from "@/lib/currency";
 
 export function ConvertEstimateDialog({
   open, onOpenChange, estimateId, customerId, onConverted,
@@ -21,8 +22,14 @@ export function ConvertEstimateDialog({
   const [jobId, setJobId] = useState<string>("");
   const { data: jobs = [] } = useJobs();
   const convert = useConvertEstimateToJob();
+  const { data: estimate } = useEstimate(estimateId);
+  const acceptedPkgId = estimate?.accepted_package_id ?? null;
+  const { data: items = [] } = useEstimateLineItems(acceptedPkgId ? [acceptedPkgId] : []);
 
   const candidateJobs = jobs.filter((j) => j.customerId === customerId);
+  const selectedItems = items.filter((i) => i.is_selected);
+  const services = selectedItems.filter((i) => i.item_type !== "product");
+  const products = selectedItems.filter((i) => i.item_type === "product");
 
   const handleConvert = async () => {
     const r = await convert.mutateAsync({
@@ -41,6 +48,25 @@ export function ConvertEstimateDialog({
           <DialogTitle>Convert estimate to job</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
+          {/* Carryover summary */}
+          <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Total invoice (carried over)</span>
+              <span className="font-semibold">{formatCAD(estimate?.accepted_total ?? 0)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Deposit due (record only)</span>
+              <span className="font-semibold">{formatCAD(estimate?.accepted_deposit ?? 0)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Selected line items</span>
+              <span className="font-semibold">
+                {services.length} service{services.length === 1 ? "" : "s"}
+                {products.length > 0 && ` · ${products.length} product${products.length === 1 ? "" : "s"}`}
+              </span>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label>Action</Label>
             <Select value={mode} onValueChange={(v) => setMode(v as any)}>
@@ -65,13 +91,13 @@ export function ConvertEstimateDialog({
                 </SelectContent>
               </Select>
               <p className="text-xs text-warning">
-                Attaching will replace this job's existing services with the accepted package's items.
+                Attaching will replace this job's existing services and update its total invoice and deposit due to match the accepted estimate.
               </p>
             </div>
           )}
           {mode === "new" && (
             <p className="text-xs text-muted-foreground">
-              A new job will be created using the customer's address and the accepted package's selected line items.
+              A new job will be created using the customer's address and the accepted package's selected line items. Total invoice and deposit due are carried over.
             </p>
           )}
         </div>

@@ -154,6 +154,10 @@ function dbToJob(row: any, customers: Customer[]): Job {
     payoutShare: Number(row.payout),
     marketingRecipient: (row.marketing_recipient ?? "Winducks") as Job["marketingRecipient"],
     marketingRecipientName: row.marketing_recipient_name ?? "",
+    depositDue: (row as any).deposit_due != null ? Number((row as any).deposit_due) : 0,
+    depositReceived: (row as any).deposit_received != null ? Number((row as any).deposit_received) : 0,
+    depositReceivedAt: (row as any).deposit_received_at ?? null,
+    sourceEstimateId: (row as any).source_estimate_id ?? null,
   };
 }
 

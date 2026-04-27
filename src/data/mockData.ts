@@ -130,6 +130,13 @@ export interface Job {
   marketingRecipient?: "Winducks" | "SP" | "Third-party";
   /** Optional display name when marketingRecipient is "Third-party". */
   marketingRecipientName?: string;
+  /** Deposit owed (carried over from accepted estimate). */
+  depositDue?: number;
+  /** Deposit recorded as collected by an admin. */
+  depositReceived?: number;
+  depositReceivedAt?: string | null;
+  /** Originating estimate, if this job came from one. */
+  sourceEstimateId?: string | null;
 }
 
 export interface AllocationScores {
