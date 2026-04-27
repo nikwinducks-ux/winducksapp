@@ -1921,6 +1921,7 @@ export function useAppSettings() {
         defaultPlatformFeePct: Number(d.default_platform_fee_pct ?? 15),
         defaultMarketingPct: Number(d.default_marketing_pct ?? 20),
         defaultSpPortionPct: Number(d.default_sp_portion_pct ?? 65),
+        defaultSubscriptionFeeMonthly: Number(d.default_subscription_fee_monthly ?? 0),
       };
     },
   });
