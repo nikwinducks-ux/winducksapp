@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useRef } from "react";
 import type { Address, Customer, CustomerProperty, CustomerContact, ServiceProvider, Job, JobService, AllocationScores } from "@/data/mockData";
+import { spShareForJob } from "@/lib/compensation";
 
 // ===== Type mappers =====
 
@@ -403,6 +404,8 @@ export function useJobs() {
   // Customers are fetched in parallel; their names are merged in via the
   // `select` transform below so jobs are NEVER blocked on customers loading.
   const { data: customers = [] } = useCustomers();
+  const { data: providers = [] } = useServiceProviders();
+  const { data: settings } = useAppSettings();
 
   return useQuery({
     queryKey: ["jobs"],
@@ -451,7 +454,12 @@ export function useJobs() {
         job.services = servicesMap[r.id] ?? [];
         job.crew = crewMap[r.id] ?? [];
         const n = job.crew.length || 1;
-        job.payoutShare = Math.round((job.payout / n) * 100) / 100;
+        // payoutShare = SP's portion of the total invoice (after platform + marketing fees),
+        // divided by crew size. Past and future jobs both derive this live from the assigned
+        // SP's split (or global defaults when unassigned / no override).
+        const assignedSp = providers.find((p) => p.id === job.assignedSpId) ?? null;
+        const spShare = spShareForJob(job.payout, assignedSp, settings ?? null, n);
+        job.payoutShare = spShare;
         return job;
       });
     },

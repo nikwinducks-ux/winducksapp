@@ -83,7 +83,7 @@ export default function MyJobs() {
             activeJobs.map((job) => {
               const crewSize = job.crew?.length ?? 0;
               const isCrew = crewSize > 1;
-              const displayPayout = isCrew ? (job.payoutShare ?? job.payout) : job.payout;
+              const displayPayout = job.payoutShare ?? job.payout;
               return (
                 <Link key={job.id} to={`/sp/jobs/${job.dbId}`} className="block">
                   <div className="metric-card space-y-2 hover:border-primary/30 transition-colors cursor-pointer">
@@ -214,7 +214,7 @@ function PastJobCard({ job, inv, paid }: { job: Job; inv: any; paid: boolean }) 
               </p>
             )}
           </div>
-          <p className="text-lg font-bold">${(inv?.netAmount ?? job.payout).toFixed(2)}</p>
+          <p className="text-lg font-bold">${(inv?.netAmount ?? job.payoutShare ?? job.payout).toFixed(2)}</p>
         </div>
 
         {isMine && (

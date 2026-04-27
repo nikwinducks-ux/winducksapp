@@ -735,7 +735,7 @@ export default function JobManagement() {
               <th className="pb-3 font-medium text-muted-foreground">Job #</th>
               <th className="pb-3 font-medium text-muted-foreground">Customer</th>
               <th className="pb-3 font-medium text-muted-foreground">Service(s)</th>
-              <th className="pb-3 font-medium text-muted-foreground">Amount</th>
+              <th className="pb-3 font-medium text-muted-foreground">Total Invoice</th>
               <th className="pb-3 font-medium text-muted-foreground">City</th>
               <th className="pb-3 font-medium text-muted-foreground">Urgency</th>
               <th className="pb-3 font-medium text-muted-foreground">Status</th>
@@ -790,7 +790,12 @@ export default function JobManagement() {
                   <td className="py-3">
                     <JobServicesCodesSummary services={job.services} categories={categories} fallbackCategory={job.serviceCategory} />
                   </td>
-                  <td className="py-3 font-medium">{formatCAD(job.payout)}</td>
+                  <td className="py-3 font-medium">
+                    <div>{formatCAD(job.payout)}</div>
+                    {job.assignedSpId && job.payoutShare != null && (
+                      <div className="text-[11px] text-muted-foreground font-normal">SP gets {formatCAD(job.payoutShare)}</div>
+                    )}
+                  </td>
                   <td className="py-3 text-muted-foreground">{job.jobAddress.city}</td>
                   <td className="py-3"><UrgencyBadge urgency={job.urgency} /></td>
                   <td className="py-3">

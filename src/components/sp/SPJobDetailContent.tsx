@@ -16,10 +16,12 @@ import {
   useServiceCategories,
   useJobCrew,
   useReopenJob,
+  useAppSettings,
 } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { computeProximityResult, DISTANCE_SOURCE_LABELS } from "@/lib/proximity";
 import { openInMaps } from "@/lib/geolocation";
+import { spShareForJob } from "@/lib/compensation";
 import type { Job } from "@/data/mockData";
 
 function ScheduleDisplay({ job }: { job: Job }) {

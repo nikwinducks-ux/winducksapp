@@ -84,7 +84,7 @@ export default function SPDashboard() {
                     )}
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-bold text-primary">${job.payout}</p>
+                    <p className="text-lg font-bold text-primary">${(job.payoutShare ?? job.payout).toFixed(2)}</p>
                     <p className="text-xs text-muted-foreground">{job.scheduledTime}</p>
                   </div>
                 </div>
@@ -109,7 +109,7 @@ export default function SPDashboard() {
                   <p className="text-sm text-muted-foreground">{job.serviceCategory}</p>
                   <p className="mt-1 text-xs text-muted-foreground">{job.scheduledDate} · {job.scheduledTime}</p>
                 </div>
-                <p className="text-lg font-bold text-primary">${job.payout}</p>
+                <p className="text-lg font-bold text-primary">${(job.payoutShare ?? job.payout).toFixed(2)}</p>
               </div>
               <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                 <span>{(() => {
