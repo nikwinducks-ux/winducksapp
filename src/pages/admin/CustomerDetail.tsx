@@ -2,11 +2,14 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useCustomer, useJobs, useCustomerTags, tagColorClass } from "@/hooks/useSupabaseData";
 import { formatAddress } from "@/data/mockData";
+import { formatCAD } from "@/lib/currency";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CustomerActivityLog } from "@/components/CustomerActivityLog";
-import { ArrowLeft, MapPin, Pencil, History, Star, Mail, Phone, Building2 } from "lucide-react";
+import { ArrowLeft, MapPin, Pencil, History, Star, Mail, Phone, Building2, FileText, Receipt } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function CustomerDetail() {
   const { id } = useParams();
@@ -14,6 +17,29 @@ export default function CustomerDetail() {
   const { data: jobs = [] } = useJobs();
   const { data: tagCatalog = [] } = useCustomerTags();
   const [logOpen, setLogOpen] = useState(false);
+
+  const { data: estimates = [] } = useQuery({
+    queryKey: ["customer_estimates", id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data } = await supabase.from("estimates")
+        .select("id,estimate_number,status,estimate_date,accepted_total")
+        .eq("customer_id", id).order("created_at", { ascending: false });
+      return data ?? [];
+    },
+    enabled: !!id,
+  });
+  const { data: invoices = [] } = useQuery({
+    queryKey: ["customer_invoices_list", id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data } = await supabase.from("customer_invoices")
+        .select("id,invoice_number,status,invoice_date,total,balance_due")
+        .eq("customer_id", id).order("created_at", { ascending: false });
+      return data ?? [];
+    },
+    enabled: !!id,
+  });
 
   if (isLoading) return <div className="py-20 text-center text-muted-foreground">Loading...</div>;
 
