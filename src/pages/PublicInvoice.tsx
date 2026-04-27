@@ -1,7 +1,8 @@
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { fetchInvoiceByToken, markInvoiceViewedByToken } from "@/hooks/useCustomerInvoices";
+import { fetchInvoiceByToken } from "@/hooks/useCustomerInvoices";
+import { markInvoiceViewedByToken } from "@/hooks/useInvoices";
 import { formatCAD } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import { Printer, FileText, Mail, Phone, MapPin, AlertTriangle } from "lucide-react";
