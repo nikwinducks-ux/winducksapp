@@ -14,6 +14,7 @@ export type ExtendedJobStatus =
   | "Accepted"
   | "InProgress"
   | "Completed"
+  | "ReadyToInvoice"
   | "Cancelled"
   | "Expired"
   | "Archived"
