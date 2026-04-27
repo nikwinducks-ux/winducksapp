@@ -284,6 +284,8 @@ export default function EstimateDetail() {
         </div>
       </div>
 
+      <WorkflowStepper stages={buildEstimateStages(estimate, { invoiceId: linkedInvoiceId })} />
+
       {/* Header card */}
       <div className="metric-card grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">
