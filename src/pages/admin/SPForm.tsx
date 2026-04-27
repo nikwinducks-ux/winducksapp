@@ -75,10 +75,19 @@ export default function SPForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Auto-fill coords from city if missing — matches JobForm behaviour and
+    // ensures allocation proximity scoring stays accurate.
+    let payload = formData;
+    if ((!formData.lat || !formData.lng) && formData.city) {
+      const auto = autofillCoords(formData.city);
+      if (auto) {
+        payload = { ...formData, lat: String(auto.lat), lng: String(auto.lng) };
+      }
+    }
     if (isEdit && id) {
-      updateMutation.mutate({ id, ...formData }, { onSuccess: () => navigate("/admin/providers") });
+      updateMutation.mutate({ id, ...payload }, { onSuccess: () => navigate("/admin/providers") });
     } else {
-      createMutation.mutate(formData, { onSuccess: () => navigate("/admin/providers") });
+      createMutation.mutate(payload, { onSuccess: () => navigate("/admin/providers") });
     }
   };
 
