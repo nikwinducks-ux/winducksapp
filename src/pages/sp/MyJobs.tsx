@@ -20,6 +20,8 @@ export default function MyJobs() {
   const { user } = useAuth();
   const { data: jobs = [], isLoading } = useJobs();
   const { data: sp } = useServiceProvider(user?.spId);
+  const { data: invoices = [] } = useSPInvoices(user?.spId ? { spId: user.spId } : undefined);
+  const invoiceByJob = new Map(invoices.map((inv) => [inv.jobId, inv]));
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get("tab") === "past" ? "past" : "active";
 
