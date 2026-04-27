@@ -667,6 +667,7 @@ export default function JobManagement() {
         <Select value={sortBy} onValueChange={setSortBy}>
           <SelectTrigger className="w-[160px]"><SelectValue placeholder="Sort by" /></SelectTrigger>
           <SelectContent>
+            <SelectItem value="recent">Recently Created</SelectItem>
             <SelectItem value="default">Default</SelectItem>
             <SelectItem value="urgency">Urgency Priority</SelectItem>
             <SelectItem value="scheduled">Scheduled Date</SelectItem>
