@@ -74,7 +74,7 @@ export function SPJobDetailContent({ job, variant = "page", hideHeader = false }
       {!hideHeader && (
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="page-header">{job.id}</h1>
-          <StatusBadge label={statusLabel(job.status)} variant={statusVariant(job.status) as any} />
+          {(() => { const ds = getJobDisplayStatus(job); return <StatusBadge label={ds.label} variant={ds.variant} />; })()}
           <UrgencyBadge urgency={job.urgency} />
         </div>
       )}
