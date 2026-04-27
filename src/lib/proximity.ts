@@ -89,7 +89,7 @@ export function proximityScore(distanceKm: number): number {
 }
 
 export const PROXIMITY_TOOLTIP =
-  "Proximity scoring: 0km = 100, 10km = 90, 25km = 70, 50km = 40, 75km = 10, >75km = 0. Calculated using straight-line (Haversine) distance between SP base address and job location. When coordinates are missing, exact address match = 0km/100%.";
+  "Proximity scoring: 0km = 100, 10km = 90, 25km = 70, 50km = 40, 75km = 10, >75km = 0. Calculated using straight-line (Haversine) distance between SP base and job. When coordinates are missing: same-city fallback = 80, exact address match = 100, different city = 0.";
 
 export const DISTANCE_SOURCE_LABELS: Record<DistanceSource, string> = {
   coordinates: "Coordinates",
