@@ -209,6 +209,11 @@ export default function AccountPage() {
       </form>
 
       <SPComplianceDocuments spId={sp.id} readOnly />
+
+      <div>
+        <h2 className="page-header text-xl mb-2">Compensation</h2>
+        <SPCompensationTab spId={sp.id} readOnly />
+      </div>
     </div>
   );
 }
