@@ -126,6 +126,10 @@ export interface Job {
   createdAt?: string;
   crew?: { spId: string; isLead: boolean }[];
   payoutShare?: number;
+  /** Who receives the marketing portion of the invoice. Defaults to "Winducks". */
+  marketingRecipient?: "Winducks" | "SP" | "Third-party";
+  /** Optional display name when marketingRecipient is "Third-party". */
+  marketingRecipientName?: string;
 }
 
 export interface AllocationScores {

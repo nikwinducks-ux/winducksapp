@@ -104,6 +104,8 @@ export default function JobForm() {
     isBroadcast: false,
     broadcastRadiusKm: "100",
     broadcastNote: "",
+    marketingRecipient: "Winducks",
+    marketingRecipientName: "",
   });
 
   const [serviceItems, setServiceItems] = useState<ServiceLineItem[]>([
@@ -136,6 +138,8 @@ export default function JobForm() {
           isBroadcast: (data as any).is_broadcast ?? false,
           broadcastRadiusKm: String((data as any).broadcast_radius_km ?? 100),
           broadcastNote: (data as any).broadcast_note ?? "",
+          marketingRecipient: (data as any).marketing_recipient ?? "Winducks",
+          marketingRecipientName: (data as any).marketing_recipient_name ?? "",
         });
       }
       setLoadingExisting(false);
@@ -248,6 +252,8 @@ export default function JobForm() {
       isBroadcast: form.isBroadcast,
       broadcastRadiusKm: parseInt(form.broadcastRadiusKm) || 100,
       broadcastNote: form.broadcastNote,
+      marketingRecipient: form.marketingRecipient,
+      marketingRecipientName: form.marketingRecipient === "Third-party" ? form.marketingRecipientName : "",
     };
 
     const servicesPayload = serviceItems
@@ -312,8 +318,10 @@ export default function JobForm() {
           is_broadcast: payload.isBroadcast ?? false,
           broadcast_radius_km: payload.broadcastRadiusKm ?? 100,
           broadcast_note: payload.broadcastNote ?? "",
+          marketing_recipient: payload.marketingRecipient ?? "Winducks",
+          marketing_recipient_name: payload.marketingRecipientName ?? "",
           status: "Created",
-        }).select("id").single();
+        } as any).select("id").single();
         if (error) throw error;
         if (newJob && servicesPayload.length > 0) {
           console.log("[JobForm] Saving", servicesPayload.length, "services for new job", newJob.id);
@@ -412,8 +420,37 @@ export default function JobForm() {
               );
             })()}
             <div className="space-y-1.5">
-              <Label>Amount <span className="text-xs text-muted-foreground">(CAD — auto-calculated from services if empty)</span></Label>
+              <Label>Total Invoice <span className="text-xs text-muted-foreground">(CAD — what the customer pays. Auto-calculated from services if empty)</span></Label>
               <Input type="number" min="0" step="0.01" value={form.payout} onChange={(e) => update("payout", e.target.value)} placeholder={computedTotal > 0 ? `Auto: ${formatCAD(computedTotal)}` : "0.00"} />
+              <p className="text-[11px] text-muted-foreground">
+                The Winducks platform fee, marketing portion, and SP portion are all derived from this total
+                using the assigned SP's compensation split. See the breakdown on the Job Detail page.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Marketing portion goes to</Label>
+              <Select
+                value={form.marketingRecipient}
+                onValueChange={(v) => update("marketingRecipient", v)}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Winducks">Winducks</SelectItem>
+                  <SelectItem value="SP">Service Provider</SelectItem>
+                  <SelectItem value="Third-party">Third-party</SelectItem>
+                </SelectContent>
+              </Select>
+              {form.marketingRecipient === "Third-party" && (
+                <Input
+                  className="mt-1.5"
+                  placeholder="Third-party name (e.g. referral partner)"
+                  value={form.marketingRecipientName}
+                  onChange={(e) => update("marketingRecipientName", e.target.value)}
+                />
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Determines who receives the marketing % of the invoice. Defaults to Winducks.
+              </p>
             </div>
           </div>
         </div>
