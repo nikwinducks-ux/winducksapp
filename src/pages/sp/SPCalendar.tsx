@@ -45,6 +45,7 @@ export default function SPCalendar() {
   const { data: providers = [] } = useServiceProviders();
   const { data: spOffers = [] } = useSpOffers(spId);
   const { data: unavailableBlocks = [] } = useSpUnavailableBlocks(spId);
+  const { data: scheduledVisits = [] } = useSPScheduledVisits(spId);
 
   const acceptOffer = useAcceptOffer();
   const declineOffer = useDeclineOffer();
