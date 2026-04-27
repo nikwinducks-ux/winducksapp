@@ -142,6 +142,11 @@ export default function SPCompensationTab({ spId, readOnly = false }: Props) {
                 label="Marketing %"
                 value={marketing}
                 onChange={setMarketing}
+                hint={
+                  marketingUsesDefault
+                    ? `Default ${defaults.marketing}% from Payouts. Saving will create a per-SP override.`
+                    : "Per-SP override. Clear by matching the global default on the Payouts page."
+                }
               />
               <PctInput
                 label="Service Provider Portion %"
