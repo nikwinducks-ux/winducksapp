@@ -1083,6 +1083,8 @@ export function useUpdateJob() {
       street: string; city: string; province: string; postalCode: string; country: string;
       lat: string; lng: string; scheduledDate: string; scheduledTime: string; estimatedDuration: string;
       notes?: string; urgency?: string;
+      marketingRecipient?: string;
+      marketingRecipientName?: string;
     }) => {
       const { error } = await supabase.from("jobs").update({
         customer_id: form.customerId || null,
@@ -1104,7 +1106,9 @@ export function useUpdateJob() {
         is_broadcast: (form as any).isBroadcast ?? false,
         broadcast_radius_km: (form as any).broadcastRadiusKm ?? 100,
         broadcast_note: (form as any).broadcastNote ?? "",
-      }).eq("id", id);
+        marketing_recipient: form.marketingRecipient ?? "Winducks",
+        marketing_recipient_name: form.marketingRecipientName ?? "",
+      } as any).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
