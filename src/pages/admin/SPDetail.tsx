@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArrowLeft, MapPin, Pencil, Eye } from "lucide-react";
 import SPLoginAccess from "@/components/admin/SPLoginAccess";
+import SPCompensationTab from "@/components/admin/SPCompensationTab";
 import SPAvailabilityEditor from "@/components/admin/SPAvailabilityEditor";
 import SPReviewsTab from "@/components/admin/SPReviewsTab";
 import SPComplianceDocuments from "@/components/admin/SPComplianceDocuments";
