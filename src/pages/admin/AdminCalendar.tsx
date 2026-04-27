@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatCAD } from "@/lib/currency";
+import { formatCAD, formatCADWhole } from "@/lib/currency";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   addDays, addMonths, addWeeks, format, startOfWeek, endOfWeek,
@@ -202,6 +202,23 @@ export default function AdminCalendar() {
       return true;
     });
   }, [scheduledJobs, spFilter, statusFilters]);
+
+  // Week total: sum of SP payout shares for all visible-week jobs (Mon–Sun).
+  // Mirrors the per-day totals shown in JobCalendar header.
+  const weekTotal = useMemo(() => {
+    const start = startOfWeek(currentDate, { weekStartsOn: 1 });
+    const end = endOfWeek(currentDate, { weekStartsOn: 1 });
+    return filteredJobs
+      .filter((j) => {
+        if (!j.scheduledDate) return false;
+        try {
+          return isWithinInterval(parseLocalDate(j.scheduledDate), { start, end });
+        } catch {
+          return false;
+        }
+      })
+      .reduce((sum, j) => sum + (Number(j.payoutShare ?? j.payout) || 0), 0);
+  }, [filteredJobs, currentDate]);
 
   // Range diagnostics: jobs in/out of view + nearest neighbours
   const rangeDiagnostics = useMemo(() => {
@@ -466,6 +483,13 @@ export default function AdminCalendar() {
           </Button>
           <span className="ml-3 text-sm font-medium">{rangeLabel()}</span>
         </div>
+
+        {view === "week" && weekTotal > 0 && (
+          <div className="ml-auto text-sm font-medium text-muted-foreground">
+            Week total:{" "}
+            <span className="text-primary font-semibold">{formatCADWhole(weekTotal)}</span>
+          </div>
+        )}
 
         <div className="flex items-center gap-2">
           <Label className="text-xs">SP:</Label>

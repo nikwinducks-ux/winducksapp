@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/sheet";
 import { statusLabel } from "@/components/calendar/JobBlock";
 import { SPJobDetailContent } from "@/components/sp/SPJobDetailContent";
+import { formatCADWhole } from "@/lib/currency";
 import type { Job } from "@/data/mockData";
 
 function dateToISO(d: Date): string {
@@ -146,6 +147,23 @@ export default function SPCalendar() {
   }, [myCalendarJobs, view, currentDate]);
 
   const inRangeCount = myCalendarJobs.length - offRangeJobs.length;
+
+  // Week total: sum of SP payout shares for all jobs scheduled in the visible
+  // week (Mon–Sun). Mirrors per-day totals shown in JobCalendar header.
+  const weekTotal = useMemo(() => {
+    const start = startOfWeek(currentDate, { weekStartsOn: 1 });
+    const end = endOfWeek(currentDate, { weekStartsOn: 1 });
+    return myCalendarJobs
+      .filter((j) => {
+        if (!j.scheduledDate) return false;
+        try {
+          return isWithinInterval(parseISO(j.scheduledDate), { start, end });
+        } catch {
+          return false;
+        }
+      })
+      .reduce((sum, j) => sum + (Number(j.payoutShare ?? j.payout) || 0), 0);
+  }, [myCalendarJobs, currentDate]);
 
   function jumpToJob(j: Job) {
     if (j.scheduledDate) setCurrentDate(parseISO(j.scheduledDate));
@@ -295,17 +313,25 @@ export default function SPCalendar() {
         <AvailabilitySettings />
       ) : (
         <>
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
-              Today
-            </Button>
-            <Button variant="outline" size="icon" onClick={() => navigate(1)}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <span className="ml-3 text-sm font-medium">{rangeLabel()}</span>
+          <div className="flex items-center gap-1 flex-wrap justify-between">
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
+                Today
+              </Button>
+              <Button variant="outline" size="icon" onClick={() => navigate(1)}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <span className="ml-3 text-sm font-medium">{rangeLabel()}</span>
+            </div>
+            {view === "week" && weekTotal > 0 && (
+              <div className="text-sm font-medium text-muted-foreground">
+                Week total:{" "}
+                <span className="text-primary font-semibold">{formatCADWhole(weekTotal)}</span>
+              </div>
+            )}
           </div>
 
           {isLoading ? (
