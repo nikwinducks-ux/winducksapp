@@ -54,6 +54,11 @@ import Install from "./pages/Install";
 import PublicInvoice from "./pages/PublicInvoice";
 import InvoicesList from "./pages/admin/InvoicesList";
 import InvoiceDetail from "./pages/admin/InvoiceDetail";
+import EstimatesList from "./pages/admin/EstimatesList";
+import EstimateDetail from "./pages/admin/EstimateDetail";
+import Products from "./pages/admin/Products";
+import DiscountCodes from "./pages/admin/DiscountCodes";
+import PublicEstimate from "./pages/PublicEstimate";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 
@@ -75,6 +80,7 @@ function AppRoutes() {
         <Route path="/review/:token" element={<ReviewSubmit />} />
         <Route path="/unsubscribe" element={<Unsubscribe />} />
         <Route path="/invoice/:token" element={<PublicInvoice />} />
+        <Route path="/estimate/:token" element={<PublicEstimate />} />
         <Route path="*" element={<Login />} />
       </Routes>
     );
@@ -101,6 +107,7 @@ function AppRoutes() {
         <Route path="/review/:token" element={<ReviewSubmit />} />
         <Route path="/unsubscribe" element={<Unsubscribe />} />
         <Route path="/invoice/:token" element={<PublicInvoice />} />
+        <Route path="/estimate/:token" element={<PublicEstimate />} />
         <Route path="/install" element={<Install />} />
 
         {/* SP Routes — only accessible to SP role */}
@@ -146,6 +153,10 @@ function AppRoutes() {
         <Route path="/admin/payouts" element={isAdmin ? <Payouts /> : <Navigate to="/" replace />} />
         <Route path="/admin/invoices" element={isAdmin ? <InvoicesList /> : <Navigate to="/" replace />} />
         <Route path="/admin/invoices/:id" element={isAdmin ? <InvoiceDetail /> : <Navigate to="/" replace />} />
+        <Route path="/admin/estimates" element={isAdmin ? <EstimatesList /> : <Navigate to="/" replace />} />
+        <Route path="/admin/estimates/:id" element={isAdmin ? <EstimateDetail /> : <Navigate to="/" replace />} />
+        <Route path="/admin/products" element={isAdmin ? <Products /> : <Navigate to="/" replace />} />
+        <Route path="/admin/discount-codes" element={isAdmin ? <DiscountCodes /> : <Navigate to="/" replace />} />
 
         <Route path="*" element={<NotFound />} />
       </Routes>
