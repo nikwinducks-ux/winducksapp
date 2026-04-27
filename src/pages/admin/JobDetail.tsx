@@ -56,6 +56,8 @@ export default function JobDetail() {
   const removeCrew = useRemoveCrewMember();
   const setLead = useSetCrewLead();
   const [addCrewSpId, setAddCrewSpId] = useState("");
+  const convertToInvoice = useConvertJobToInvoice();
+  const navigate = useNavigate();
 
   const job = jobs.find((j) => j.dbId === id);
   const [showAssign, setShowAssign] = useState(searchParams.get("assign") === "true");
