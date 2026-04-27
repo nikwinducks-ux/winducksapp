@@ -145,6 +145,7 @@ function dbToJob(row: any, customers: Customer[]): Job {
     broadcastRadiusKm: row.broadcast_radius_km ?? 100,
     broadcastNote: row.broadcast_note ?? "",
     completedAt: row.completed_at ?? undefined,
+    createdAt: row.created_at ?? undefined,
     crew: [],
     payoutShare: Number(row.payout),
   };
