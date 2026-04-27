@@ -179,11 +179,12 @@ export default function SPCompensationTab({ spId, readOnly = false }: Props) {
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div>
       <p className="text-xs text-muted-foreground mb-1">{label}</p>
       <p className="text-lg font-semibold">{value}</p>
+      {hint && <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   );
 }
