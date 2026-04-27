@@ -3,6 +3,7 @@ import { useSpOffers, useAllSpOffers, useExpireStaleOffers, useDeclineOffer, typ
 import { JobServicesSummary } from "@/components/JobServicesDisplay";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
+import { getJobStatusLabel } from "@/lib/jobStatus";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { Link } from "react-router-dom";
 import { MapPin, Clock, DollarSign, FileText, Timer, ChevronDown, ChevronUp, Info, CheckCircle, XCircle, AlertTriangle, Eye } from "lucide-react";
