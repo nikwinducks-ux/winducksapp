@@ -155,7 +155,6 @@ export default function MyJobs() {
                 </Link>
               );
             })
-            ))
           )}
         </TabsContent>
       </Tabs>
