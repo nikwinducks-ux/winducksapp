@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useJobs, useServiceProvider, useSPInvoices, useReopenJob } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
+import { getJobDisplayStatus } from "@/lib/jobStatus";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { JobServicesSummary } from "@/components/JobServicesDisplay";
 
@@ -90,7 +91,7 @@ export default function MyJobs() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-semibold">{job.id}</p>
-                        <StatusBadge label={job.status === "InProgress" ? "In Progress" : job.status} variant={job.status === "InProgress" ? "warning" : "info"} />
+                        {(() => { const ds = getJobDisplayStatus(job); return <StatusBadge label={ds.label} variant={ds.variant} />; })()}
                         <UrgencyBadge urgency={job.urgency} />
                         {isCrew && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">
@@ -195,7 +196,7 @@ function PastJobCard({ job, inv, paid }: { job: Job; inv: any; paid: boolean }) 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-semibold truncate">{job.id}</p>
-              <StatusBadge label={job.status} variant="valid" />
+              {(() => { const ds = getJobDisplayStatus(job); return <StatusBadge label={ds.label} variant={ds.variant} />; })()}
               <UrgencyBadge urgency={job.urgency} />
               {inv && (
                 <StatusBadge

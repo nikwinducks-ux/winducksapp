@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { ScheduleDebugBadge } from "./ScheduleDebug";
 import { getSpColor, type SpColor } from "./spColors";
 import { isJobDraggable } from "./useCalendarDnd";
+import { getJobStatusLabel } from "@/lib/jobStatus";
 
 export type ColorMode = "sp" | "status";
 
@@ -101,22 +102,9 @@ function getSpJobAppearance(job: Job, spColor?: SpColor): JobAppearance & { show
 }
 
 export function statusLabel(status: string): string {
-  switch (status) {
-    case "Created":
-    case "Offered":
-      return "Pending";
-    case "Assigned":
-    case "Accepted":
-      return "Accepted";
-    case "InProgress":
-      return "In Progress";
-    case "Completed":
-      return "Completed";
-    case "Cancelled":
-      return "Cancelled";
-    default:
-      return status;
-  }
+  // Delegate to the central helper so calendar tooltips/labels match
+  // every other surface (Jobs list, Job Detail, MyJobs, etc).
+  return getJobStatusLabel({ status: status as Job["status"] });
 }
 
 export function formatShortTime(value?: string): string {

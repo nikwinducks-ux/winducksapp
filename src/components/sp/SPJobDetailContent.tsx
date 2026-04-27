@@ -22,6 +22,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { computeProximityResult, DISTANCE_SOURCE_LABELS } from "@/lib/proximity";
 import { openInMaps } from "@/lib/geolocation";
 import { spShareForJob } from "@/lib/compensation";
+import { getJobDisplayStatus } from "@/lib/jobStatus";
 import type { Job } from "@/data/mockData";
 
 function ScheduleDisplay({ job }: { job: Job }) {
@@ -34,24 +35,6 @@ function ScheduleDisplay({ job }: { job: Job }) {
     </p>
   );
 }
-
-const statusVariant = (s: string) => {
-  switch (s) {
-    case "Assigned":
-    case "Accepted":
-      return "info";
-    case "InProgress":
-      return "warning";
-    case "Completed":
-      return "valid";
-    case "Cancelled":
-      return "error";
-    default:
-      return "neutral";
-  }
-};
-
-const statusLabel = (s: string) => (s === "InProgress" ? "In Progress" : s);
 
 interface Props {
   job: Job;

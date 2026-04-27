@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/StatusBadge";
+import { getJobDisplayStatus } from "@/lib/jobStatus";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { ArrowLeft, MapPin, Calendar, Clock, DollarSign, User, Pencil, UserPlus, AlertCircle, FileText, Send, Radio, Bug, ChevronDown, FlaskConical, Zap, Shield, Users, Star, X, Plus } from "lucide-react";
 import { useState } from "react";
@@ -189,17 +190,7 @@ export default function JobDetail() {
     refetchOffers();
   };
 
-  const statusVariant = (s: string) => {
-    switch (s) {
-      case "Assigned": case "Accepted": return "info";
-      case "InProgress": return "warning";
-      case "Completed": return "valid";
-      case "Cancelled": return "warning";
-      default: return "neutral";
-    }
-  };
-
-  const statusLabel = (s: string) => s === "InProgress" ? "In Progress" : s;
+  // Job status display centralized in src/lib/jobStatus.ts
 
   const offerVariant = (s: string) => {
     switch (s) {
@@ -231,7 +222,7 @@ export default function JobDetail() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="page-header">{job.id}</h1>
-          <StatusBadge label={statusLabel(job.status)} variant={statusVariant(job.status) as any} />
+          {(() => { const ds = getJobDisplayStatus(job); return <StatusBadge label={ds.label} variant={ds.variant} />; })()}
           <UrgencyBadge urgency={job.urgency} />
           {job.isBroadcast && <StatusBadge label="Broadcast" variant="warning" />}
         </div>
