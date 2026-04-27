@@ -1936,12 +1936,14 @@ export function useUpdateAppSettings() {
       defaultPlatformFeePct?: number;
       defaultMarketingPct?: number;
       defaultSpPortionPct?: number;
+      defaultSubscriptionFeeMonthly?: number;
     }) => {
       const patch: any = { id: 1 };
       if (params.defaultPayoutFeePercent != null) patch.default_payout_fee_percent = params.defaultPayoutFeePercent;
       if (params.defaultPlatformFeePct != null) patch.default_platform_fee_pct = params.defaultPlatformFeePct;
       if (params.defaultMarketingPct != null) patch.default_marketing_pct = params.defaultMarketingPct;
       if (params.defaultSpPortionPct != null) patch.default_sp_portion_pct = params.defaultSpPortionPct;
+      if (params.defaultSubscriptionFeeMonthly != null) patch.default_subscription_fee_monthly = params.defaultSubscriptionFeeMonthly;
       const { error } = await supabase.from("app_settings" as any).upsert(patch);
       if (error) throw error;
     },
