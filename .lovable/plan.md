@@ -1,74 +1,80 @@
 ## Goal
 
-Replace the static Compliance tab on the Service Provider admin page with a manageable list of compliance documents (insurance, certifications, licenses, etc.). Each document has a name, expiration date, and an attached file. Status is computed from the expiration date: **Valid** if in the future, **Expiring** if within 30 days, **Expired** if past.
+From the SP **My Jobs → Past Jobs** view, allow a Service Provider to:
+1. **Re-open** a completed job (revert it to an active status).
+2. **Schedule one or more follow-up visits** (date + time + duration) under the same job, which then appear on the SP's calendar alongside the original job.
 
-## What gets built
+---
 
-### 1. Database (new table + storage bucket)
+## UX
 
-**Table: `sp_compliance_documents`**
-- `id` (uuid, pk)
-- `sp_id` (uuid, references service_providers)
-- `name` (text) — e.g. "General Liability Insurance", "WCB Certificate"
-- `document_type` (text, optional category label)
-- `expires_on` (date, nullable — null = no expiry)
-- `file_path` (text) — storage path
-- `file_name` (text) — original filename for display
-- `file_size` (int)
-- `mime_type` (text)
-- `notes` (text)
-- `created_at`, `updated_at`, `created_by_user_id`
+### My Jobs → Past Jobs card
+- Each completed job card gets a **"Re-open job"** button (and a kebab/secondary "Schedule follow-up visit" action).
+- Clicking **Re-open** opens a small confirm dialog: "Re-open JOB-1234? It will move back to your Active jobs." On confirm, status flips Completed → **Assigned** (the SP can then start a new visit / mark complete again normally).
+- Clicking **Schedule follow-up visit** opens a dialog (date, start time, duration, optional note) that creates a new scheduled-visit record, even if the job stays Completed.
 
-**RLS:**
-- Admin/owner: full access
-- SP: SELECT own documents (where `sp_id = get_user_sp_id(auth.uid())`)
+### SP Job Detail (panel + page)
+- New **"Follow-up visits"** section on completed (and active) jobs that lists scheduled follow-ups with edit/cancel actions and an **"Add follow-up visit"** button.
 
-**Storage bucket: `sp-compliance` (private)**
-- Path convention: `{sp_id}/{document_id}/{filename}`
-- RLS: Admin/owner full access; SP read-only on own folder.
+### SP Calendar (`SPCalendar.tsx`)
+- Pull scheduled follow-up visits and render them as additional blocks on the calendar (same color as the parent job, with a small "follow-up" tag).
+- Clicking a follow-up block opens the existing job sheet, scrolled to the Follow-up visits section.
 
-**Optional:** A computed view or a small helper to auto-roll the SP's overall `compliance_status` to "Expired" if any required doc is expired (kept simple — overall status badge will reflect worst doc status client-side; we won't auto-mutate the existing column to avoid scope creep).
+---
 
-### 2. Admin UI changes (`src/pages/admin/SPDetail.tsx`)
+## Data model
 
-- The header `Compliance` badge becomes a **button** that jumps to the Compliance tab.
-- Compliance tab is rebuilt as a documents manager:
-  - List of documents with: name, type, expiry date, computed status badge (Valid/Expiring/Expired/No expiry), file link (download), and actions (Edit, Delete).
-  - "Add Document" button opens a dialog with: Name, Type, Expiration Date (date picker), File upload, Notes.
-  - Edit dialog supports replacing the file or updating expiry.
-  - Empty state: "No compliance documents yet".
-- The badge color in the SP header is derived from the worst doc status across all docs.
+New table **`job_scheduled_visits`** (separate from `job_visits`, which stays a clock-in/out log):
 
-### 3. SP portal (read-only)
-
-- A "My Documents" section on the SP Account page lists their own compliance documents and statuses with download links, so SPs can see what's on file and what's expiring.
-
-### 4. Status logic (shared util)
-
-```ts
-function complianceStatus(expiresOn: string | null): "valid" | "expiring" | "expired" | "none" {
-  if (!expiresOn) return "none";
-  const days = daysUntil(expiresOn);
-  if (days < 0) return "expired";
-  if (days <= 30) return "expiring";
-  return "valid";
-}
+```text
+id              uuid pk
+job_id          uuid not null
+sp_id           uuid not null         -- which SP this visit is for
+visit_date      date not null
+start_time      text not null          -- "HH:MM"
+duration_min    int  not null default 60
+status          text not null default 'Scheduled'  -- Scheduled | Completed | Cancelled
+note            text not null default ''
+created_by_user_id uuid
+created_at, updated_at timestamptz
 ```
 
-## Files
+RLS:
+- Admin/Owner: full access.
+- SP: select / insert / update / delete rows where `sp_id = get_user_sp_id(auth.uid())` AND they are on the job (`assigned_sp_id` or `job_crew_members`).
 
-**New**
-- `supabase/migrations/<ts>_sp_compliance_documents.sql` — table, indexes, RLS, storage bucket + policies
-- `src/components/admin/SPComplianceDocuments.tsx` — list + add/edit dialog
-- `src/lib/compliance.ts` — status helper
+### Re-open transition
+The current `enforce_sp_job_update` trigger does **not** allow `Completed → Assigned` for SPs. We will extend the allowed SP transitions to include:
+- `Completed → Assigned` (re-open)
 
-**Edited**
-- `src/pages/admin/SPDetail.tsx` — clickable header badge, replace Compliance tab content, derive overall status from docs
-- `src/hooks/useSupabaseData.ts` — hooks: `useSPComplianceDocs(spId)`, `useUpsertSPComplianceDoc`, `useDeleteSPComplianceDoc` (handles file upload to storage)
-- `src/pages/sp/AccountPage.tsx` — read-only "My Documents" section
+`completed_at` will be cleared when the job leaves Completed, and re-set the next time the job is completed (already handled).
+
+---
+
+## Code changes
+
+**Migration**
+- Create `job_scheduled_visits` + RLS policies + `updated_at` trigger.
+- Update `enforce_sp_job_update` to allow `Completed → Assigned`, and clear `completed_at` when transitioning out of Completed.
+
+**Hooks** (`src/hooks/useSupabaseData.ts`)
+- `useJobScheduledVisits(jobId?)` — list for one job.
+- `useSPScheduledVisits(spId?)` — list across all my jobs (for calendar).
+- `useCreateScheduledVisit`, `useUpdateScheduledVisit`, `useDeleteScheduledVisit`.
+- `useReopenJob({ jobDbId, spId })` — wraps the existing status update + audit event with note "Re-opened by SP".
+
+**New components**
+- `src/components/sp/ScheduledVisitDialog.tsx` — date / start time / duration / note, used for create + edit.
+- `src/components/sp/JobScheduledVisitsCard.tsx` — list + add/edit/cancel UI for a single job.
+
+**Edited components**
+- `src/pages/sp/MyJobs.tsx` — Past Jobs cards: add **Re-open** button (with confirm) and **Schedule follow-up** action that opens the dialog. Stop the parent `Link` from intercepting button clicks.
+- `src/components/sp/SPJobDetailContent.tsx` — Render `JobScheduledVisitsCard` for the SP, and on Completed jobs also show a **Re-open job** button next to the "Job Completed" banner.
+- `src/pages/sp/SPCalendar.tsx` — Fetch `useSPScheduledVisits(spId)` and merge them into the calendar feed as synthetic blocks tied to their parent job (use parent job's color). Clicking opens the same job sheet that's already wired up.
+- `src/components/calendar/JobCalendar.tsx` — Accept an optional `extraBlocks` prop (or extend the jobs array with virtual entries flagged `kind: "follow-up"`) so the calendar renders them with a subtle "+visit" badge.
+
+---
 
 ## Out of scope
-
-- Email/push reminders for expiring docs (can add later)
-- Required vs optional document templates per category
-- Automatic suspension when a doc expires
+- No changes to invoicing — re-opening a Completed job does not auto-void the existing invoice. Admin can adjust manually if needed (we'll surface a small inline note in the Re-open confirm dialog).
+- No SMS/push notifications for scheduled follow-ups in this pass.
