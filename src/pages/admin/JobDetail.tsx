@@ -1,7 +1,8 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { formatCAD } from "@/lib/currency";
 import { JobServicesDisplay } from "@/components/JobServicesDisplay";
-import { useJobs, useServiceProviders, useAssignJob, useActiveServiceCategories, useServiceCategories, useJobCrew, useAddCrewMember, useRemoveCrewMember, useSetCrewLead } from "@/hooks/useSupabaseData";
+import { useJobs, useServiceProviders, useAssignJob, useActiveServiceCategories, useServiceCategories, useJobCrew, useAddCrewMember, useRemoveCrewMember, useSetCrewLead, useAppSettings } from "@/hooks/useSupabaseData";
+import { effectiveCompSplit, splitInvoice, formatMarketingRecipient } from "@/lib/compensation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOffers, useCreateManualOffer, useGenerateBroadcastOffers, useGenerateOffers, useCancelOffers } from "@/hooks/useOfferData";
 import { useActivePolicy, useFairnessContext, useSaveAllocationRun } from "@/hooks/useAllocationData";
