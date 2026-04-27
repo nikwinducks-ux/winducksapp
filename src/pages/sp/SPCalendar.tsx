@@ -148,6 +148,23 @@ export default function SPCalendar() {
 
   const inRangeCount = myCalendarJobs.length - offRangeJobs.length;
 
+  // Week total: sum of SP payout shares for all jobs scheduled in the visible
+  // week (Mon–Sun). Mirrors per-day totals shown in JobCalendar header.
+  const weekTotal = useMemo(() => {
+    const start = startOfWeek(currentDate, { weekStartsOn: 1 });
+    const end = endOfWeek(currentDate, { weekStartsOn: 1 });
+    return myCalendarJobs
+      .filter((j) => {
+        if (!j.scheduledDate) return false;
+        try {
+          return isWithinInterval(parseISO(j.scheduledDate), { start, end });
+        } catch {
+          return false;
+        }
+      })
+      .reduce((sum, j) => sum + (Number(j.payoutShare ?? j.payout) || 0), 0);
+  }, [myCalendarJobs, currentDate]);
+
   function jumpToJob(j: Job) {
     if (j.scheduledDate) setCurrentDate(parseISO(j.scheduledDate));
   }
