@@ -48,6 +48,7 @@ export default function JobDetail() {
   const saveRun = useSaveAllocationRun();
   const { toast } = useToast();
   const { data: crew = [] } = useJobCrew(id);
+  const { data: settings } = useAppSettings();
   const addCrew = useAddCrewMember();
   const removeCrew = useRemoveCrewMember();
   const setLead = useSetCrewLead();
