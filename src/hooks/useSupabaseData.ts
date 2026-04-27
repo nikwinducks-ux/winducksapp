@@ -151,6 +151,8 @@ function dbToJob(row: any, customers: Customer[]): Job {
     createdAt: row.created_at ?? undefined,
     crew: [],
     payoutShare: Number(row.payout),
+    marketingRecipient: (row.marketing_recipient ?? "Winducks") as Job["marketingRecipient"],
+    marketingRecipientName: row.marketing_recipient_name ?? "",
   };
 }
 
