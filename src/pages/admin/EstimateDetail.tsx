@@ -23,6 +23,10 @@ import { DiscountCodeInput } from "@/components/estimates/DiscountCodeInput";
 import { DepositConfig } from "@/components/estimates/DepositConfig";
 import { ConvertEstimateDialog } from "@/components/estimates/ConvertEstimateDialog";
 import { computePackageTotals } from "@/lib/estimateTotals";
+import { WorkflowStepper, buildEstimateStages } from "@/components/workflow/WorkflowStepper";
+import { ActivityTimelineCard } from "@/components/workflow/ActivityTimeline";
+import { useEstimateEvents } from "@/hooks/useWorkflowEvents";
+import { supabase } from "@/integrations/supabase/client";
 
 const STATUS_VARIANT: Record<string, "neutral" | "info" | "valid" | "warning" | "error"> = {
   Draft: "neutral", Sent: "info", Viewed: "info", Accepted: "valid",
