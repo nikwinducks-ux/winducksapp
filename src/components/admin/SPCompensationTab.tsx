@@ -57,6 +57,7 @@ export default function SPCompensationTab({ spId, readOnly = false }: Props) {
     sp?.compMarketingPct == null &&
     sp?.compSpPortionPct == null;
   const platformUsesDefault = sp?.compPlatformFeePct == null;
+  const marketingUsesDefault = sp?.compMarketingPct == null;
 
   // Edit state
   const [editing, setEditing] = useState(false);
@@ -117,7 +118,11 @@ export default function SPCompensationTab({ spId, readOnly = false }: Props) {
               value={`${effective.platform}%`}
               hint={platformUsesDefault ? "Global default — set on Payouts page" : "Per-SP override"}
             />
-            <Field label="Marketing %" value={`${effective.marketing}%`} />
+            <Field
+              label="Marketing %"
+              value={`${effective.marketing}%`}
+              hint={marketingUsesDefault ? "Global default — set on Payouts page" : "Per-SP override"}
+            />
             <Field label="Service Provider Portion %" value={`${effective.sp}%`} />
           </div>
         ) : (
@@ -137,6 +142,11 @@ export default function SPCompensationTab({ spId, readOnly = false }: Props) {
                 label="Marketing %"
                 value={marketing}
                 onChange={setMarketing}
+                hint={
+                  marketingUsesDefault
+                    ? `Default ${defaults.marketing}% from Payouts. Saving will create a per-SP override.`
+                    : "Per-SP override. Clear by matching the global default on the Payouts page."
+                }
               />
               <PctInput
                 label="Service Provider Portion %"

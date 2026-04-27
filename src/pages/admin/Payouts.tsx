@@ -22,7 +22,9 @@ export default function Payouts() {
   const markUnpaid = useMarkInvoiceUnpaid();
 
   const [feeInput, setFeeInput] = useState<string>("");
+  const [marketingInput, setMarketingInput] = useState<string>("");
   const currentFee = settings?.defaultPlatformFeePct ?? 15;
+  const currentMarketing = settings?.defaultMarketingPct ?? 20;
 
   const [paidDialogInvoice, setPaidDialogInvoice] = useState<SPInvoice | null>(null);
 
@@ -47,33 +49,58 @@ export default function Payouts() {
       </div>
 
       <div className="metric-card space-y-3">
-        <h2 className="section-title flex items-center gap-2"><DollarSign className="h-4 w-4" /> Global default platform fee</h2>
+        <h2 className="section-title flex items-center gap-2"><DollarSign className="h-4 w-4" /> Global default compensation splits</h2>
         <p className="text-xs text-muted-foreground">
-          This percentage of each completed job's invoice goes to the platform. It is automatically used as the
-          <span className="font-medium"> Global Platform Fee %</span> in every Service Provider's Compensation section,
+          These percentages of each completed job's invoice are automatically used as the
+          <span className="font-medium"> Global Platform Fee %</span> and
+          <span className="font-medium"> Marketing %</span> in every Service Provider's Compensation section,
           unless that SP has a custom override. Changes apply to future jobs only.
         </p>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1.5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2 rounded-md border p-3">
             <Label>Default platform fee % (applies to all SPs without an override)</Label>
-            <Input
-              type="number" step="0.01" min="0" max="100"
-              value={feeInput !== "" ? feeInput : String(currentFee)}
-              onChange={(e) => setFeeInput(e.target.value)}
-              className="w-40"
-            />
+            <div className="flex flex-wrap items-center gap-3">
+              <Input
+                type="number" step="0.01" min="0" max="100"
+                value={feeInput !== "" ? feeInput : String(currentFee)}
+                onChange={(e) => setFeeInput(e.target.value)}
+                className="w-40"
+              />
+              <Button
+                onClick={() => updateSettings.mutate(
+                  { defaultPlatformFeePct: Number(feeInput || currentFee) },
+                  { onSuccess: () => setFeeInput("") },
+                )}
+                disabled={updateSettings.isPending}
+                className="gap-1.5"
+              >
+                <Save className="h-4 w-4" /> Save
+              </Button>
+              <p className="text-xs text-muted-foreground">Currently: {currentFee}%</p>
+            </div>
           </div>
-          <Button
-            onClick={() => updateSettings.mutate(
-              { defaultPlatformFeePct: Number(feeInput || currentFee) },
-              { onSuccess: () => setFeeInput("") },
-            )}
-            disabled={updateSettings.isPending}
-            className="gap-1.5"
-          >
-            <Save className="h-4 w-4" /> Save
-          </Button>
-          <p className="text-xs text-muted-foreground">Currently: {currentFee}%</p>
+          <div className="space-y-2 rounded-md border p-3">
+            <Label>Default marketing % (applies to all SPs without an override)</Label>
+            <div className="flex flex-wrap items-center gap-3">
+              <Input
+                type="number" step="0.01" min="0" max="100"
+                value={marketingInput !== "" ? marketingInput : String(currentMarketing)}
+                onChange={(e) => setMarketingInput(e.target.value)}
+                className="w-40"
+              />
+              <Button
+                onClick={() => updateSettings.mutate(
+                  { defaultMarketingPct: Number(marketingInput || currentMarketing) },
+                  { onSuccess: () => setMarketingInput("") },
+                )}
+                disabled={updateSettings.isPending}
+                className="gap-1.5"
+              >
+                <Save className="h-4 w-4" /> Save
+              </Button>
+              <p className="text-xs text-muted-foreground">Currently: {currentMarketing}%</p>
+            </div>
+          </div>
         </div>
       </div>
 
