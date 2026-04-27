@@ -318,8 +318,10 @@ export default function JobForm() {
           is_broadcast: payload.isBroadcast ?? false,
           broadcast_radius_km: payload.broadcastRadiusKm ?? 100,
           broadcast_note: payload.broadcastNote ?? "",
+          marketing_recipient: payload.marketingRecipient ?? "Winducks",
+          marketing_recipient_name: payload.marketingRecipientName ?? "",
           status: "Created",
-        }).select("id").single();
+        } as any).select("id").single();
         if (error) throw error;
         if (newJob && servicesPayload.length > 0) {
           console.log("[JobForm] Saving", servicesPayload.length, "services for new job", newJob.id);
