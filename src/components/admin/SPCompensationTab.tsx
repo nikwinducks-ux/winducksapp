@@ -57,6 +57,7 @@ export default function SPCompensationTab({ spId, readOnly = false }: Props) {
     sp?.compMarketingPct == null &&
     sp?.compSpPortionPct == null;
   const platformUsesDefault = sp?.compPlatformFeePct == null;
+  const marketingUsesDefault = sp?.compMarketingPct == null;
 
   // Edit state
   const [editing, setEditing] = useState(false);
