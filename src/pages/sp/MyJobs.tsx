@@ -1,4 +1,5 @@
-import { useJobs, useServiceProvider, useSPInvoices } from "@/hooks/useSupabaseData";
+import { useState } from "react";
+import { useJobs, useServiceProvider, useSPInvoices, useReopenJob } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
@@ -6,8 +7,16 @@ import { JobServicesSummary } from "@/components/JobServicesDisplay";
 
 import { CrewTeammates } from "@/components/sp/CrewTeammates";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { MapPin, Clock, DollarSign, Calendar, FileText, Users } from "lucide-react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { MapPin, Clock, DollarSign, Calendar, FileText, Users, RotateCcw, CalendarPlus } from "lucide-react";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import ScheduledVisitDialog, { type ScheduledVisitValue } from "@/components/sp/ScheduledVisitDialog";
+import { useCreateScheduledVisit } from "@/hooks/useSupabaseData";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import type { Job } from "@/data/mockData";
 
 function ScheduleText({ job }: { job: any }) {
   const urgency = job.urgency || "Scheduled";
